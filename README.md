@@ -3,10 +3,10 @@
 Sistema centralizado de datos maestros para proyectos G360.
 
 Genera JSONs de catálogo consolidado que alimentan:
-- `g360-order-form` - Sistema de pedidos
+- `g360-order-xlsx` - Sistema de pedidos
 - `g360-stock-reporter` - Reportes de stock
-- `Devolucion_de_Productos` - Devoluciones
-- `Lista_Cotizacion` - Cotizaciones
+- `g360-return-form` - Devoluciones
+- `comparador_de_precios` - Cotizaciones
 
 ## 📁 Estructura
 
@@ -152,20 +152,20 @@ La plantilla `plantilla_precios.xlsx` contiene 4 hojas:
 }
 ```
 
-## � Copiar a proyectos
+## 📁 Copiar a proyectos
 
 ```bash
-# Order Form
-cp output/catalogo_productos.json ../g360-order-form/public/
+# Order XLSX
+cp output/catalogo_productos.json ../g360-order-xlsx/public/
 
 # Stock Reporter
 cp output/catalogo_productos.json ../g360-stock-reporter/public/
 
 # Devoluciones
-cp output/catalogo_productos.json ../Devolucion_de_Productos/public/
+cp output/catalogo_productos.json ../g360-return-form/public/
 ```
 
-## �🛠️ Scripts
+## 🛠️ Scripts
 
 ### `generar_catalogo.py`
 Genera el catálogo consolidado desde el Excel.
@@ -226,10 +226,10 @@ Script batch para automatizar la actualización del catálogo.
 ```
 
 **Proyectos actualizados automáticamente:**
-- g360-order-form
+- g360-order-xlsx
 - g360-stock-reporter
-- Devolucion_de_Productos
-- Lista_Cotizacion
+- g360-return-form
+- comparador_de_precios
 
 ## 📝 Notas
 
