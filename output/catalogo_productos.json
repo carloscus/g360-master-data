@@ -1,9 +1,9 @@
 {
   "metadata": {
     "version": "2.0.0",
-    "generated_at": "2026-03-24T20:28:21.619525",
+    "generated_at": "2026-05-18T12:03:29.409304",
     "source_file": "plantilla_precios.xlsx",
-    "total_productos": 1088,
+    "total_productos": 1087,
     "lineas": [
       "ACCESORIOS",
       "ARCHIVO",
@@ -26,7 +26,7 @@
     ],
     "moneda_default": "PEN",
     "estadisticas": {
-      "sin_ean13": 148,
+      "sin_ean13": 153,
       "con_descuento": 339,
       "con_precio_fijo": 129
     },
@@ -1028,6 +1028,76 @@
     },
     {
       "orden": 28,
+      "sku": "016791",
+      "nombre": "VOLEY PU PANAL1",
+      "ean13": "",
+      "categoria": "VINIBALL",
+      "subcategoria": "",
+      "linea": "PELOTAS",
+      "grupo": "IMPORTADA VINIBALL",
+      "tipo": "PU",
+      "familia": "VOLEY",
+      "unidad_medida": "UND",
+      "peso_kg": 0.33,
+      "un_bx": 36,
+      "precio_lista": 30.8,
+      "moneda": "PEN",
+      "imagen_url": "",
+      "keywords": [
+        "PANAL1",
+        "PELOTAS",
+        "VINIBALL",
+        "VOLEY"
+      ],
+      "nombre_corto": "Voley Panal1",
+      "descuentos": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "descuento_pct": 0,
+      "precio_fijo": null,
+      "precio_final": 30.8,
+      "es_remate": false
+    },
+    {
+      "orden": 29,
+      "sku": "016793",
+      "nombre": "VOLEY PU COMPETITION 1",
+      "ean13": "",
+      "categoria": "VINIBALL",
+      "subcategoria": "",
+      "linea": "PELOTAS",
+      "grupo": "IMPORTADA VINIBALL",
+      "tipo": "PU",
+      "familia": "VOLEY",
+      "unidad_medida": "UND",
+      "peso_kg": 0.33,
+      "un_bx": 36,
+      "precio_lista": 30.8,
+      "moneda": "PEN",
+      "imagen_url": "",
+      "keywords": [
+        "COMPETITION",
+        "PELOTAS",
+        "VINIBALL",
+        "VOLEY"
+      ],
+      "nombre_corto": "Voley Competition 1",
+      "descuentos": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "descuento_pct": 0,
+      "precio_fijo": null,
+      "precio_final": 30.8,
+      "es_remate": false
+    },
+    {
+      "orden": 30,
       "sku": "016729",
       "nombre": "VOLEY CUERO COSIDO FLORES",
       "ean13": "",
@@ -1064,7 +1134,7 @@
       "es_remate": false
     },
     {
-      "orden": 29,
+      "orden": 31,
       "sku": "016731",
       "nombre": "VOLEY CUP CUERO COSIDO CELESTE AMARILLO ROSADO",
       "ean13": "",
@@ -1104,7 +1174,7 @@
       "es_remate": false
     },
     {
-      "orden": 30,
+      "orden": 32,
       "sku": "016728",
       "nombre": "VOLEY CUERO COSIDO FOLK",
       "ean13": "",
@@ -1141,7 +1211,7 @@
       "es_remate": false
     },
     {
-      "orden": 31,
+      "orden": 33,
       "sku": "016730",
       "nombre": "VOLEY CUERO COSIDO FOLK GRAFITTI",
       "ean13": "7754807167307",
@@ -1179,7 +1249,7 @@
       "es_remate": false
     },
     {
-      "orden": 32,
+      "orden": 34,
       "sku": "016788",
       "nombre": "VOLEY CUERO COSIDO CREW",
       "ean13": "7754807167888",
@@ -1216,7 +1286,7 @@
       "es_remate": false
     },
     {
-      "orden": 33,
+      "orden": 35,
       "sku": "016737",
       "nombre": "VOLEY CELULAR PWR1",
       "ean13": "",
@@ -1252,7 +1322,7 @@
       "es_remate": true
     },
     {
-      "orden": 34,
+      "orden": 36,
       "sku": "016738",
       "nombre": "VOLEY CELULAR PWR2",
       "ean13": "",
@@ -1288,7 +1358,7 @@
       "es_remate": true
     },
     {
-      "orden": 35,
+      "orden": 37,
       "sku": "016739",
       "nombre": "VOLEY CELULAR PWR3",
       "ean13": "",
@@ -1324,7 +1394,7 @@
       "es_remate": true
     },
     {
-      "orden": 36,
+      "orden": 38,
       "sku": "016004",
       "nombre": "FUTBOL GOMA SPARTANO #3",
       "ean13": "7754807160049",
@@ -1360,7 +1430,7 @@
       "es_remate": false
     },
     {
-      "orden": 37,
+      "orden": 39,
       "sku": "015938",
       "nombre": "FUTBOL GOMA FREE #5",
       "ean13": "7754807159388",
@@ -1396,7 +1466,7 @@
       "es_remate": false
     },
     {
-      "orden": 38,
+      "orden": 40,
       "sku": "016678",
       "nombre": "FUTBOL GOMA URBAN #5",
       "ean13": "7754807166782",
@@ -1432,7 +1502,7 @@
       "es_remate": false
     },
     {
-      "orden": 39,
+      "orden": 41,
       "sku": "016724",
       "nombre": "FUTBOL GOMA SPECTRE #5",
       "ean13": "7754807167246",
@@ -1468,7 +1538,7 @@
       "es_remate": false
     },
     {
-      "orden": 40,
+      "orden": 42,
       "sku": "016783",
       "nombre": "FUTBOL GOMA INVICTUS  #5",
       "ean13": "7754807167833",
@@ -1504,7 +1574,7 @@
       "es_remate": false
     },
     {
-      "orden": 41,
+      "orden": 43,
       "sku": "014323",
       "nombre": "FUTBOL GOMA PAISES BLANCO #5",
       "ean13": "7754807143233",
@@ -1541,7 +1611,7 @@
       "es_remate": false
     },
     {
-      "orden": 42,
+      "orden": 44,
       "sku": "014796",
       "nombre": "FUTBOL GOMA TEAM #5",
       "ean13": "7754807147965",
@@ -1577,7 +1647,7 @@
       "es_remate": false
     },
     {
-      "orden": 43,
+      "orden": 45,
       "sku": "011883",
       "nombre": "FUTBOL GOMA PAISES COLORES #5",
       "ean13": "7754807118835",
@@ -1614,7 +1684,7 @@
       "es_remate": false
     },
     {
-      "orden": 44,
+      "orden": 46,
       "sku": "016657",
       "nombre": "VOLEY GOMA BUTTERFLY",
       "ean13": "7754807166577",
@@ -1650,7 +1720,7 @@
       "es_remate": false
     },
     {
-      "orden": 45,
+      "orden": 47,
       "sku": "015936",
       "nombre": "VOLEY VINIBALL GOMA MULTICOLOR",
       "ean13": "7754807159364",
@@ -1686,7 +1756,7 @@
       "es_remate": false
     },
     {
-      "orden": 46,
+      "orden": 48,
       "sku": "014268",
       "nombre": "VOLEY VINIBALL GOMA TRICOLOR",
       "ean13": "7754807142687",
@@ -1722,7 +1792,7 @@
       "es_remate": false
     },
     {
-      "orden": 47,
+      "orden": 49,
       "sku": "016784",
       "nombre": "VOLEY GOMA FLORES2",
       "ean13": "7754807167840",
@@ -1758,7 +1828,7 @@
       "es_remate": false
     },
     {
-      "orden": 48,
+      "orden": 50,
       "sku": "016786",
       "nombre": "VOLEY GOMA FRUTAS2",
       "ean13": "7754807167864",
@@ -1794,7 +1864,7 @@
       "es_remate": false
     },
     {
-      "orden": 49,
+      "orden": 51,
       "sku": "015939",
       "nombre": "VOLEY VINIBALL GOMA FOLK",
       "ean13": "7754807159395",
@@ -1830,7 +1900,7 @@
       "es_remate": false
     },
     {
-      "orden": 50,
+      "orden": 52,
       "sku": "016785",
       "nombre": "VOLEY GOMA MARIPOSAS",
       "ean13": "7754807167857",
@@ -1866,7 +1936,7 @@
       "es_remate": false
     },
     {
-      "orden": 51,
+      "orden": 53,
       "sku": "016787",
       "nombre": "VOLEY GOMA URBANA",
       "ean13": "7754807167871",
@@ -1902,7 +1972,7 @@
       "es_remate": false
     },
     {
-      "orden": 52,
+      "orden": 54,
       "sku": "016672",
       "nombre": "BASQUET GOMA #3 SONRISAS",
       "ean13": "7754807166720",
@@ -1938,7 +2008,7 @@
       "es_remate": false
     },
     {
-      "orden": 53,
+      "orden": 55,
       "sku": "014271",
       "nombre": "BASQUET GOMA #3 NARANJA",
       "ean13": "7754807142717",
@@ -1974,7 +2044,7 @@
       "es_remate": false
     },
     {
-      "orden": 54,
+      "orden": 56,
       "sku": "014270",
       "nombre": "BASQUET GOMA #5 NARANJA",
       "ean13": "7754807111638",
@@ -2010,7 +2080,7 @@
       "es_remate": false
     },
     {
-      "orden": 55,
+      "orden": 57,
       "sku": "014277",
       "nombre": "BASQUET GOMA #7 NARANJA",
       "ean13": "7754807142779",
@@ -2046,7 +2116,7 @@
       "es_remate": false
     },
     {
-      "orden": 56,
+      "orden": 58,
       "sku": "015933",
       "nombre": "BASQUET GOMA #7 PERU",
       "ean13": "7754807159333",
@@ -2082,7 +2152,7 @@
       "es_remate": false
     },
     {
-      "orden": 57,
+      "orden": 59,
       "sku": "016676",
       "nombre": "BASQUET GOMA #5 GALAXY",
       "ean13": "7754807166768",
@@ -2118,7 +2188,7 @@
       "es_remate": false
     },
     {
-      "orden": 58,
+      "orden": 60,
       "sku": "016675",
       "nombre": "BASQUET GOMA #7 GALAXY",
       "ean13": "7754807166751",
@@ -2154,7 +2224,7 @@
       "es_remate": false
     },
     {
-      "orden": 59,
+      "orden": 61,
       "sku": "016752",
       "nombre": "BASQUET GOMA #5 LEGACY",
       "ean13": "",
@@ -2190,7 +2260,7 @@
       "es_remate": false
     },
     {
-      "orden": 60,
+      "orden": 62,
       "sku": "016750",
       "nombre": "BASQUET GOMA #7 LEGACY",
       "ean13": "",
@@ -2226,7 +2296,7 @@
       "es_remate": false
     },
     {
-      "orden": 61,
+      "orden": 63,
       "sku": "016751",
       "nombre": "BASQUET GOMA #5 JAM",
       "ean13": "",
@@ -2262,7 +2332,7 @@
       "es_remate": false
     },
     {
-      "orden": 62,
+      "orden": 64,
       "sku": "016749",
       "nombre": "BASQUET GOMA #7 JAM",
       "ean13": "",
@@ -2298,7 +2368,7 @@
       "es_remate": false
     },
     {
-      "orden": 63,
+      "orden": 65,
       "sku": "016764",
       "nombre": "BALONMANO GOMA #1",
       "ean13": "",
@@ -2333,7 +2403,7 @@
       "es_remate": false
     },
     {
-      "orden": 64,
+      "orden": 66,
       "sku": "016765",
       "nombre": "BALONMANO GOMA #2",
       "ean13": "",
@@ -2368,7 +2438,7 @@
       "es_remate": false
     },
     {
-      "orden": 65,
+      "orden": 67,
       "sku": "011603",
       "nombre": "N DEPORTIVA FUTBOL PENTA BLANCO #5",
       "ean13": "7754807116039",
@@ -2405,7 +2475,7 @@
       "es_remate": false
     },
     {
-      "orden": 66,
+      "orden": 68,
       "sku": "015945",
       "nombre": "PELOTA DE PVC DEPORTIVA FUTBOL TEAM BRASIL #5",
       "ean13": "7754807159456",
@@ -2444,7 +2514,7 @@
       "es_remate": false
     },
     {
-      "orden": 67,
+      "orden": 69,
       "sku": "015947",
       "nombre": "PELOTA DE PVC DEPORTIVA FUTBOL TEAM ESPAÑA #5",
       "ean13": "7754807159470",
@@ -2483,7 +2553,7 @@
       "es_remate": false
     },
     {
-      "orden": 68,
+      "orden": 70,
       "sku": "016753",
       "nombre": "PELOTA DE PVC DEPORTIVA FUTBOL TEAM VENEZUELA #5",
       "ean13": "",
@@ -2522,7 +2592,7 @@
       "es_remate": false
     },
     {
-      "orden": 69,
+      "orden": 71,
       "sku": "015944",
       "nombre": "PELOTA DE PVC DEPORTIVA FUTBOL TEAM PERU #5",
       "ean13": "7754807159449",
@@ -2561,7 +2631,7 @@
       "es_remate": false
     },
     {
-      "orden": 70,
+      "orden": 72,
       "sku": "015946",
       "nombre": "PELOTA DE PVC DEPORTIVA FUTBOL TEAM ARGENTINA #5",
       "ean13": "7754807159463",
@@ -2600,7 +2670,7 @@
       "es_remate": false
     },
     {
-      "orden": 71,
+      "orden": 73,
       "sku": "015948",
       "nombre": "PELOTA DE PVC DEPORTIVA FUTBOL TEAM ALEMANIA #5",
       "ean13": "7754807159487",
@@ -2639,7 +2709,7 @@
       "es_remate": false
     },
     {
-      "orden": 72,
+      "orden": 74,
       "sku": "011019",
       "nombre": "N SEMIDEPORTIVA FUTBOL CRACKCITO BLANCO C/ROJO",
       "ean13": "7754807110198",
@@ -2677,7 +2747,7 @@
       "es_remate": false
     },
     {
-      "orden": 73,
+      "orden": 75,
       "sku": "01240",
       "nombre": "N SEMIDEPORTIVA FUTBOL CRACKCITO BL/AZL",
       "ean13": "7754807012409",
@@ -2714,7 +2784,7 @@
       "es_remate": false
     },
     {
-      "orden": 74,
+      "orden": 76,
       "sku": "014741",
       "nombre": "N SEMIDEPORTIVA FUTBOL CRACKCITO BICOLOR NEON",
       "ean13": "7754807147415",
@@ -2752,7 +2822,7 @@
       "es_remate": false
     },
     {
-      "orden": 75,
+      "orden": 77,
       "sku": "014384",
       "nombre": "N SEMIDEPORTIVA FUTBOL CRACKCITO MULTICOLOR",
       "ean13": "7754807143844",
@@ -2789,7 +2859,7 @@
       "es_remate": false
     },
     {
-      "orden": 76,
+      "orden": 78,
       "sku": "014542",
       "nombre": "N SEMIDEPORTIVA  FUTBOL  ESCUDO DEL PERU",
       "ean13": "",
@@ -2827,7 +2897,7 @@
       "es_remate": false
     },
     {
-      "orden": 77,
+      "orden": 79,
       "sku": "016715",
       "nombre": "PELOTA DE PVC SEMIDEPORTIVA FUTBOL CRACKCITO STELLAR",
       "ean13": "7754807167154",
@@ -2866,7 +2936,7 @@
       "es_remate": false
     },
     {
-      "orden": 78,
+      "orden": 80,
       "sku": "015345",
       "nombre": "PELOTA DE PVC SEMIDEPORTIVA FUTBOL CHAMPION",
       "ean13": "7754807153454",
@@ -2904,7 +2974,7 @@
       "es_remate": false
     },
     {
-      "orden": 79,
+      "orden": 81,
       "sku": "015931",
       "nombre": "FUTBOL SEMI DEPORTIVA CRACKCITO STAR #5",
       "ean13": "7754807159319",
@@ -2942,7 +3012,7 @@
       "es_remate": false
     },
     {
-      "orden": 80,
+      "orden": 82,
       "sku": "015992",
       "nombre": "N SEMIDEPORTIVA CRACKCITO TRAINING",
       "ean13": "7754807159920",
@@ -2978,7 +3048,7 @@
       "es_remate": false
     },
     {
-      "orden": 81,
+      "orden": 83,
       "sku": "016773",
       "nombre": "PELOTA DE PVC SEMIDEPORTIVA FUTBOL CRACKCITO LEAGUE",
       "ean13": "",
@@ -3017,7 +3087,241 @@
       "es_remate": false
     },
     {
-      "orden": 82,
+      "orden": 84,
+      "sku": "016800",
+      "nombre": "PELOTA DE PVC SEMIDEPORTIVA FUTBOL CRACKCITO PERU",
+      "ean13": "7754807168007",
+      "categoria": "VINIBALL",
+      "subcategoria": "",
+      "linea": "PELOTAS",
+      "grupo": "NACIONAL",
+      "tipo": "SEMI-DEPORTIVA",
+      "familia": "FUTBOL",
+      "unidad_medida": "UND",
+      "peso_kg": 0.2,
+      "un_bx": 60,
+      "precio_lista": 8.33,
+      "moneda": "PEN",
+      "imagen_url": "",
+      "keywords": [
+        "CRACKCITO",
+        "FUTBOL",
+        "PELOTA",
+        "PELOTAS",
+        "PERU",
+        "PVC",
+        "SEMIDEPORTIVA",
+        "VINIBALL"
+      ],
+      "nombre_corto": "Semideportiva Futbol Crackcito Peru",
+      "descuentos": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "descuento_pct": 0,
+      "precio_fijo": null,
+      "precio_final": 8.33,
+      "es_remate": false
+    },
+    {
+      "orden": 85,
+      "sku": "016801",
+      "nombre": "PELOTA DE PVC SEMIDEPORTIVA FUTBOL CRACKCITO BRASIL",
+      "ean13": "7754807168014",
+      "categoria": "VINIBALL",
+      "subcategoria": "",
+      "linea": "PELOTAS",
+      "grupo": "NACIONAL",
+      "tipo": "SEMI-DEPORTIVA",
+      "familia": "FUTBOL",
+      "unidad_medida": "UND",
+      "peso_kg": 0.2,
+      "un_bx": 60,
+      "precio_lista": 8.33,
+      "moneda": "PEN",
+      "imagen_url": "",
+      "keywords": [
+        "BRASIL",
+        "CRACKCITO",
+        "FUTBOL",
+        "PELOTA",
+        "PELOTAS",
+        "PVC",
+        "SEMIDEPORTIVA",
+        "VINIBALL"
+      ],
+      "nombre_corto": "Semideportiva Futbol Crackcito Brasil",
+      "descuentos": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "descuento_pct": 0,
+      "precio_fijo": null,
+      "precio_final": 8.33,
+      "es_remate": false
+    },
+    {
+      "orden": 86,
+      "sku": "016802",
+      "nombre": "PELOTA DE PVC SEMIDEPORTIVA FUTBOL CRACKCITO ARGENTINA",
+      "ean13": "7754807168021",
+      "categoria": "VINIBALL",
+      "subcategoria": "",
+      "linea": "PELOTAS",
+      "grupo": "NACIONAL",
+      "tipo": "SEMI-DEPORTIVA",
+      "familia": "FUTBOL",
+      "unidad_medida": "UND",
+      "peso_kg": 0.2,
+      "un_bx": 60,
+      "precio_lista": 8.33,
+      "moneda": "PEN",
+      "imagen_url": "",
+      "keywords": [
+        "ARGENTINA",
+        "CRACKCITO",
+        "FUTBOL",
+        "PELOTA",
+        "PELOTAS",
+        "PVC",
+        "SEMIDEPORTIVA",
+        "VINIBALL"
+      ],
+      "nombre_corto": "Semideportiva Futbol Crackcito Argentina",
+      "descuentos": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "descuento_pct": 0,
+      "precio_fijo": null,
+      "precio_final": 8.33,
+      "es_remate": false
+    },
+    {
+      "orden": 87,
+      "sku": "016803",
+      "nombre": "PELOTA DE PVC SEMIDEPORTIVA FUTBOL CRACKCITO USA",
+      "ean13": "7754807168038",
+      "categoria": "VINIBALL",
+      "subcategoria": "",
+      "linea": "PELOTAS",
+      "grupo": "NACIONAL",
+      "tipo": "SEMI-DEPORTIVA",
+      "familia": "FUTBOL",
+      "unidad_medida": "UND",
+      "peso_kg": 0.2,
+      "un_bx": 60,
+      "precio_lista": 8.33,
+      "moneda": "PEN",
+      "imagen_url": "",
+      "keywords": [
+        "CRACKCITO",
+        "FUTBOL",
+        "PELOTA",
+        "PELOTAS",
+        "PVC",
+        "SEMIDEPORTIVA",
+        "USA",
+        "VINIBALL"
+      ],
+      "nombre_corto": "Semideportiva Futbol Crackcito Usa",
+      "descuentos": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "descuento_pct": 0,
+      "precio_fijo": null,
+      "precio_final": 8.33,
+      "es_remate": false
+    },
+    {
+      "orden": 88,
+      "sku": "016811",
+      "nombre": "PELOTA DE PVC SEMIDEPORTIVA FUTBOL PERU NEON1",
+      "ean13": "",
+      "categoria": "VINIBALL",
+      "subcategoria": "",
+      "linea": "PELOTAS",
+      "grupo": "NACIONAL",
+      "tipo": "SEMI-DEPORTIVA",
+      "familia": "FUTBOL",
+      "unidad_medida": "UND",
+      "peso_kg": 0.2,
+      "un_bx": 60,
+      "precio_lista": 8.33,
+      "moneda": "PEN",
+      "imagen_url": "",
+      "keywords": [
+        "FUTBOL",
+        "NEON1",
+        "PELOTA",
+        "PELOTAS",
+        "PERU",
+        "PVC",
+        "SEMIDEPORTIVA",
+        "VINIBALL"
+      ],
+      "nombre_corto": "Semideportiva Futbol Peru Neon1",
+      "descuentos": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "descuento_pct": 0,
+      "precio_fijo": null,
+      "precio_final": 8.33,
+      "es_remate": false
+    },
+    {
+      "orden": 89,
+      "sku": "016812",
+      "nombre": "PELOTA DE PVC SEMIDEPORTIVA FUTBOL PERU NEON2",
+      "ean13": "",
+      "categoria": "VINIBALL",
+      "subcategoria": "",
+      "linea": "PELOTAS",
+      "grupo": "NACIONAL",
+      "tipo": "SEMI-DEPORTIVA",
+      "familia": "FUTBOL",
+      "unidad_medida": "UND",
+      "peso_kg": 0.2,
+      "un_bx": 60,
+      "precio_lista": 8.33,
+      "moneda": "PEN",
+      "imagen_url": "",
+      "keywords": [
+        "FUTBOL",
+        "NEON2",
+        "PELOTA",
+        "PELOTAS",
+        "PERU",
+        "PVC",
+        "SEMIDEPORTIVA",
+        "VINIBALL"
+      ],
+      "nombre_corto": "Semideportiva Futbol Peru Neon2",
+      "descuentos": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "descuento_pct": 0,
+      "precio_fijo": null,
+      "precio_final": 8.33,
+      "es_remate": false
+    },
+    {
+      "orden": 90,
       "sku": "016782",
       "nombre": "PELOTA DE PVC SEMIDEPORTIVA FUTBOL CRACKCITO MATCH",
       "ean13": "",
@@ -3056,7 +3360,7 @@
       "es_remate": false
     },
     {
-      "orden": 83,
+      "orden": 91,
       "sku": "015349",
       "nombre": "PELOTA DE PVC SEMIDEPORTIVA FUTBOL SPIDERMAN 01",
       "ean13": "7754807153492",
@@ -3094,7 +3398,7 @@
       "es_remate": false
     },
     {
-      "orden": 84,
+      "orden": 92,
       "sku": "015350",
       "nombre": "PELOTA DE PVC SEMIDEPORTIVA FUTBOL SPIDERMAN 02",
       "ean13": "7754807153508",
@@ -3132,7 +3436,7 @@
       "es_remate": false
     },
     {
-      "orden": 85,
+      "orden": 93,
       "sku": "015358",
       "nombre": "PELOTA DE PVC SEMIDEPORTIVA DE FUTBOL CRACKCITO SONIC 1",
       "ean13": "",
@@ -3171,7 +3475,7 @@
       "es_remate": false
     },
     {
-      "orden": 86,
+      "orden": 94,
       "sku": "014733",
       "nombre": "N DEPORTIVA VOLEY GABY RAINBOW",
       "ean13": "7754807147330",
@@ -3208,7 +3512,7 @@
       "es_remate": false
     },
     {
-      "orden": 87,
+      "orden": 95,
       "sku": "01706",
       "nombre": "N DEPORTIVA VOLEY GABY CALCO BLANCA",
       "ean13": "7754807017060",
@@ -3246,7 +3550,7 @@
       "es_remate": false
     },
     {
-      "orden": 88,
+      "orden": 96,
       "sku": "016718",
       "nombre": "PELOTA DE PVC DEPORTIVA VOLEY GABY TRI MAG-NAR-CEL",
       "ean13": "7754807167185",
@@ -3286,7 +3590,7 @@
       "es_remate": false
     },
     {
-      "orden": 89,
+      "orden": 97,
       "sku": "016719",
       "nombre": "PELOTA DE PVC DEPORTIVA VOLEY GABY TRI LIL-AMA-MAG",
       "ean13": "7754807167192",
@@ -3326,7 +3630,7 @@
       "es_remate": false
     },
     {
-      "orden": 90,
+      "orden": 98,
       "sku": "016720",
       "nombre": "PELOTA DE PVC DEPORTIVA VOLEY GABY TRI VER-AMA-ROJ",
       "ean13": "7754807167208",
@@ -3366,7 +3670,7 @@
       "es_remate": false
     },
     {
-      "orden": 91,
+      "orden": 99,
       "sku": "016721",
       "nombre": "PELOTA DE PVC DEPORTIVA VOLEY GABY TRI VER-LIL-ROS",
       "ean13": "7754807167215",
@@ -3406,7 +3710,7 @@
       "es_remate": false
     },
     {
-      "orden": 92,
+      "orden": 100,
       "sku": "01707",
       "nombre": "N DEPORTIVA VOLEY GABY TRI BLA-AZL-AMA",
       "ean13": "7754807017077",
@@ -3444,7 +3748,7 @@
       "es_remate": false
     },
     {
-      "orden": 93,
+      "orden": 101,
       "sku": "011028",
       "nombre": "N DEPORTIVA VOLEY GABY TRI BLA-AZL-FUC",
       "ean13": "7754807110280",
@@ -3482,7 +3786,7 @@
       "es_remate": false
     },
     {
-      "orden": 94,
+      "orden": 102,
       "sku": "011950",
       "nombre": "N DEPORTIVA VOLEY GABY TRI AMA-FUC-CEL",
       "ean13": "7754807119504",
@@ -3520,7 +3824,7 @@
       "es_remate": false
     },
     {
-      "orden": 95,
+      "orden": 103,
       "sku": "014734",
       "nombre": "N SEMIDEPORTIVA VOLEY CHIBOLITA RAINBOW",
       "ean13": "7754807147347",
@@ -3557,7 +3861,85 @@
       "es_remate": false
     },
     {
-      "orden": 96,
+      "orden": 104,
+      "sku": "016799",
+      "nombre": "PELOTA DE PVC SEMIDEPORTIVA VOLEY CHIBOLITA TRENO",
+      "ean13": "7754807167994",
+      "categoria": "VINIBALL",
+      "subcategoria": "",
+      "linea": "PELOTAS",
+      "grupo": "NACIONAL",
+      "tipo": "SEMI-DEPORTIVA",
+      "familia": "VOLEY",
+      "unidad_medida": "UND",
+      "peso_kg": 0.2,
+      "un_bx": 60,
+      "precio_lista": 8.33,
+      "moneda": "PEN",
+      "imagen_url": "",
+      "keywords": [
+        "CHIBOLITA",
+        "PELOTA",
+        "PELOTAS",
+        "PVC",
+        "SEMIDEPORTIVA",
+        "TRENO",
+        "VINIBALL",
+        "VOLEY"
+      ],
+      "nombre_corto": "Semideportiva Voley Chibolita Treno",
+      "descuentos": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "descuento_pct": 0,
+      "precio_fijo": null,
+      "precio_final": 8.33,
+      "es_remate": false
+    },
+    {
+      "orden": 105,
+      "sku": "016806",
+      "nombre": "PELOTA DE PVC SEMIDEPORTIVA VOLEY CHIBOLITA TRENO2",
+      "ean13": "",
+      "categoria": "VINIBALL",
+      "subcategoria": "",
+      "linea": "PELOTAS",
+      "grupo": "NACIONAL",
+      "tipo": "SEMI-DEPORTIVA",
+      "familia": "VOLEY",
+      "unidad_medida": "UND",
+      "peso_kg": 0.2,
+      "un_bx": 60,
+      "precio_lista": 8.33,
+      "moneda": "PEN",
+      "imagen_url": "",
+      "keywords": [
+        "CHIBOLITA",
+        "PELOTA",
+        "PELOTAS",
+        "PVC",
+        "SEMIDEPORTIVA",
+        "TRENO2",
+        "VINIBALL",
+        "VOLEY"
+      ],
+      "nombre_corto": "Semideportiva Voley Chibolita Treno2",
+      "descuentos": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "descuento_pct": 0,
+      "precio_fijo": null,
+      "precio_final": 8.33,
+      "es_remate": false
+    },
+    {
+      "orden": 106,
       "sku": "01709",
       "nombre": "N SEMIDEPORTIVA VOLEY CHIBOLITA CALCO BLANCA",
       "ean13": "7754807017091",
@@ -3595,7 +3977,7 @@
       "es_remate": false
     },
     {
-      "orden": 97,
+      "orden": 107,
       "sku": "014775",
       "nombre": "N SEMIDEPORTIVA VOLEY CHIBOLITA SWEET",
       "ean13": "7754807147750",
@@ -3632,7 +4014,7 @@
       "es_remate": false
     },
     {
-      "orden": 98,
+      "orden": 108,
       "sku": "015993",
       "nombre": "N SEMIDEPORTIVA CHIBOLITA VOLEY SPRING",
       "ean13": "7754807159937",
@@ -3669,7 +4051,7 @@
       "es_remate": false
     },
     {
-      "orden": 99,
+      "orden": 109,
       "sku": "011262",
       "nombre": "N SEMIDEPORTIVA VOLEY CHIBOLITA TRI BLA-AZL-AMA",
       "ean13": "7754807112628",
@@ -3707,7 +4089,7 @@
       "es_remate": false
     },
     {
-      "orden": 100,
+      "orden": 110,
       "sku": "011263",
       "nombre": "N SEMIDEPORTIVA VOLEY CHIBOLITA TRI BLA-AZL-MGT",
       "ean13": "7754807112635",
@@ -3745,7 +4127,7 @@
       "es_remate": false
     },
     {
-      "orden": 101,
+      "orden": 111,
       "sku": "011861",
       "nombre": "N SEMIDEPORTIVA VOLEY CHIBOLITA TRI AMA-FUC-CEL",
       "ean13": "7754807118613",
@@ -3783,7 +4165,7 @@
       "es_remate": false
     },
     {
-      "orden": 102,
+      "orden": 112,
       "sku": "015287",
       "nombre": "PELOTA DE PVC SEMIDEPORTIVA VOLEY PRINCESAS 01",
       "ean13": "7754807152877",
@@ -3821,7 +4203,7 @@
       "es_remate": false
     },
     {
-      "orden": 103,
+      "orden": 113,
       "sku": "015288",
       "nombre": "PELOTA DE PVC SEMIDEPORTIVA VOLEY PRINCESAS 02",
       "ean13": "7754807152884",
@@ -3859,7 +4241,7 @@
       "es_remate": false
     },
     {
-      "orden": 104,
+      "orden": 114,
       "sku": "015302",
       "nombre": "PELOTA DE PVC SEMIDEPORTIVA VOLEY STITCH",
       "ean13": "",
@@ -3897,7 +4279,7 @@
       "es_remate": false
     },
     {
-      "orden": 105,
+      "orden": 115,
       "sku": "015301",
       "nombre": "PELOTA DE PVC SEMIDEPORTIVA VOLEY SMILES",
       "ean13": "7754807153010",
@@ -3935,7 +4317,7 @@
       "es_remate": false
     },
     {
-      "orden": 106,
+      "orden": 116,
       "sku": "015281",
       "nombre": "PELOTA DE PVC SEMIDEPORTIVA VOLEY ANIMAL PRINT",
       "ean13": "7754807152815",
@@ -3974,7 +4356,7 @@
       "es_remate": false
     },
     {
-      "orden": 107,
+      "orden": 117,
       "sku": "015296",
       "nombre": "PELOTA DE PVC SEMIDEPORTIVA VOLEY CHIBOLITA FRUTAS",
       "ean13": "",
@@ -4013,7 +4395,7 @@
       "es_remate": false
     },
     {
-      "orden": 108,
+      "orden": 118,
       "sku": "015290",
       "nombre": "PELOTA DE PVC SEMIDEPORTIVA VOLEY KAWAII 03",
       "ean13": "7754807152907",
@@ -4051,7 +4433,7 @@
       "es_remate": false
     },
     {
-      "orden": 109,
+      "orden": 119,
       "sku": "015286",
       "nombre": "PELOTA DE PVC SEMIDEPORTIVA VOLEY KAWAII 02",
       "ean13": "",
@@ -4089,7 +4471,7 @@
       "es_remate": false
     },
     {
-      "orden": 110,
+      "orden": 120,
       "sku": "012536",
       "nombre": "N SEMIDEPORTIVA CHIBOLITA VOLEY FLORES",
       "ean13": "7754807125369",
@@ -4126,7 +4508,7 @@
       "es_remate": false
     },
     {
-      "orden": 111,
+      "orden": 121,
       "sku": "012537",
       "nombre": "N SEMIDEPORTIVA CHIBOLITA VOLEY FLORES ROSADA",
       "ean13": "7754807125376",
@@ -4164,7 +4546,7 @@
       "es_remate": false
     },
     {
-      "orden": 112,
+      "orden": 122,
       "sku": "015282",
       "nombre": "PELOTA DE PVC SEMIDEPORTIVA VOLEY KAWAII",
       "ean13": "7754807152822",
@@ -4202,7 +4584,7 @@
       "es_remate": false
     },
     {
-      "orden": 113,
+      "orden": 123,
       "sku": "014762",
       "nombre": "N SEMIDEPORTIVA VOLEY CHIBOLITA TRENDY",
       "ean13": "7754807147620",
@@ -4239,7 +4621,7 @@
       "es_remate": false
     },
     {
-      "orden": 114,
+      "orden": 124,
       "sku": "011253",
       "nombre": "INFLABLE PARA GIMNASIA VINIGYM BALL 65 SPORT",
       "ean13": "7754807112536",
@@ -4278,7 +4660,7 @@
       "es_remate": false
     },
     {
-      "orden": 115,
+      "orden": 125,
       "sku": "011254",
       "nombre": "INFLABLE PARA GIMNASIA VINIGYM BALL 75 SPORT",
       "ean13": "7754807112543",
@@ -4317,7 +4699,7 @@
       "es_remate": false
     },
     {
-      "orden": 116,
+      "orden": 126,
       "sku": "014844",
       "nombre": "INFLABLE PARA GIMNASIA VINIGYM BALL 65 SPORT SWEET",
       "ean13": "7754807148443",
@@ -4357,7 +4739,7 @@
       "es_remate": false
     },
     {
-      "orden": 117,
+      "orden": 127,
       "sku": "014843",
       "nombre": "INFLABLE PARA GIMNASIA VINIGYM BALL 75 SPORT SWEET",
       "ean13": "7754807148436",
@@ -4397,7 +4779,7 @@
       "es_remate": false
     },
     {
-      "orden": 118,
+      "orden": 128,
       "sku": "014410",
       "nombre": "PELOTA DE PVC STRESSBALL SWEET FELICES",
       "ean13": "7754807144100",
@@ -4435,7 +4817,7 @@
       "es_remate": false
     },
     {
-      "orden": 119,
+      "orden": 129,
       "sku": "014429",
       "nombre": "PELOTA DE PVC STRESSBALL SWEET",
       "ean13": "7754807144292",
@@ -4472,7 +4854,7 @@
       "es_remate": false
     },
     {
-      "orden": 120,
+      "orden": 130,
       "sku": "014649",
       "nombre": "PELOTA DE PVC STRESSBALL BE POSITIVE",
       "ean13": "7754807146494",
@@ -4509,7 +4891,7 @@
       "es_remate": false
     },
     {
-      "orden": 121,
+      "orden": 131,
       "sku": "013924",
       "nombre": "PELOTA DE PVC STRESSBALL CARITAS FELICES",
       "ean13": "",
@@ -4547,7 +4929,7 @@
       "es_remate": false
     },
     {
-      "orden": 122,
+      "orden": 132,
       "sku": "011500",
       "nombre": "PELOTA DE PVC STRESSBALL CARITAS EXPORTACION",
       "ean13": "7754807115001",
@@ -4585,7 +4967,7 @@
       "es_remate": false
     },
     {
-      "orden": 123,
+      "orden": 133,
       "sku": "015737",
       "nombre": "PELOTA DE PVC STRESSBALL TRENDY",
       "ean13": "",
@@ -4622,7 +5004,7 @@
       "es_remate": false
     },
     {
-      "orden": 124,
+      "orden": 134,
       "sku": "013888",
       "nombre": "PELOTA DE PVC BABY BALL ANIMALITOS",
       "ean13": "7754807138888",
@@ -4660,7 +5042,7 @@
       "es_remate": false
     },
     {
-      "orden": 125,
+      "orden": 135,
       "sku": "012230",
       "nombre": "PELOTA DE PVC RECREATIVA #5 PERFUMADA TUTTI FRUTI",
       "ean13": "7754807122306",
@@ -4699,7 +5081,7 @@
       "es_remate": false
     },
     {
-      "orden": 126,
+      "orden": 136,
       "sku": "014910",
       "nombre": "PELOTA DE PVC RECREATIVA #5.5 HAPPY SUMMER",
       "ean13": "7754807149105",
@@ -4737,7 +5119,7 @@
       "es_remate": false
     },
     {
-      "orden": 127,
+      "orden": 137,
       "sku": "014945",
       "nombre": "PELOTA DE PVC RECREATIVA #5.5 KAWAII CUTE",
       "ean13": "7754807149457",
@@ -4775,7 +5157,7 @@
       "es_remate": false
     },
     {
-      "orden": 128,
+      "orden": 138,
       "sku": "014949",
       "nombre": "PELOTA DE PVC RECREATIVA #5.5 DINO CUTE",
       "ean13": "7754807149495",
@@ -4813,7 +5195,7 @@
       "es_remate": false
     },
     {
-      "orden": 129,
+      "orden": 139,
       "sku": "014467",
       "nombre": "PELOTA DE PVC RECREATIVA #5.5 TRENDY GIRL",
       "ean13": "7754807144674",
@@ -4851,7 +5233,7 @@
       "es_remate": false
     },
     {
-      "orden": 130,
+      "orden": 140,
       "sku": "015104",
       "nombre": "PELOTA DE PVC RECREATIVA #5.5 ANIMALES CUTE 1",
       "ean13": "7754807151047",
@@ -4889,7 +5271,7 @@
       "es_remate": false
     },
     {
-      "orden": 131,
+      "orden": 141,
       "sku": "015102",
       "nombre": "PELOTA DE PVC RECREATIVA #5.5 ANIMALES DE ZOOLÓGICO 1",
       "ean13": "",
@@ -4927,7 +5309,7 @@
       "es_remate": false
     },
     {
-      "orden": 132,
+      "orden": 142,
       "sku": "014899",
       "nombre": "PELOTA DE PVC RECREATIVA #5.5 CHILDREN",
       "ean13": "7754807148993",
@@ -4964,7 +5346,7 @@
       "es_remate": false
     },
     {
-      "orden": 133,
+      "orden": 143,
       "sku": "014845",
       "nombre": "PELOTA DE PVC RECREATIVA #5.5 DRAGONES",
       "ean13": "7754807148450",
@@ -5001,7 +5383,7 @@
       "es_remate": false
     },
     {
-      "orden": 134,
+      "orden": 144,
       "sku": "014861",
       "nombre": "PELOTA DE PVC RECREATIVA #5.5 BOYS",
       "ean13": "7754807148610",
@@ -5038,7 +5420,7 @@
       "es_remate": false
     },
     {
-      "orden": 135,
+      "orden": 145,
       "sku": "014946",
       "nombre": "PELOTA DE PVC RECREATIVA #5.5 UNICORN CUTE",
       "ean13": "7754807149464",
@@ -5076,7 +5458,7 @@
       "es_remate": false
     },
     {
-      "orden": 136,
+      "orden": 146,
       "sku": "014411",
       "nombre": "PELOTA DE PVC RECREATIVA #5.5 ANIMALITOS EN ACCION",
       "ean13": "7754807144117",
@@ -5114,7 +5496,7 @@
       "es_remate": false
     },
     {
-      "orden": 137,
+      "orden": 147,
       "sku": "014829",
       "nombre": "PELOTA DE PVC RECREATIVA #5.5 ROBOT",
       "ean13": "7754807148290",
@@ -5151,7 +5533,7 @@
       "es_remate": false
     },
     {
-      "orden": 138,
+      "orden": 148,
       "sku": "015100",
       "nombre": "PELOTA DE PVC RECREATIVA #5.5 ANIMALES FANTASTICOS 1",
       "ean13": "7754807151009",
@@ -5189,7 +5571,44 @@
       "es_remate": false
     },
     {
-      "orden": 139,
+      "orden": 149,
+      "sku": "015022",
+      "nombre": "PELOTA DE PVC RECREATIVA #5.5 TRENDY 01",
+      "ean13": "",
+      "categoria": "VINIBALL",
+      "subcategoria": "",
+      "linea": "PELOTAS",
+      "grupo": "NACIONAL",
+      "tipo": "RECREATIVAS #5.5",
+      "familia": "CALCO",
+      "unidad_medida": "UND",
+      "peso_kg": 0.08,
+      "un_bx": 120,
+      "precio_lista": 3.6,
+      "moneda": "PEN",
+      "imagen_url": "",
+      "keywords": [
+        "PELOTA",
+        "PELOTAS",
+        "PVC",
+        "RECREATIVA",
+        "TRENDY",
+        "VINIBALL"
+      ],
+      "nombre_corto": "Recreativa #5.5 Trendy 01",
+      "descuentos": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "descuento_pct": 0,
+      "precio_fijo": null,
+      "precio_final": 3.6,
+      "es_remate": false
+    },
+    {
+      "orden": 150,
       "sku": "015101",
       "nombre": "PELOTA DE PVC RECREATIVA #5.5 ANIMALES FANTASTICOS 2",
       "ean13": "7754807151016",
@@ -5227,7 +5646,7 @@
       "es_remate": false
     },
     {
-      "orden": 140,
+      "orden": 151,
       "sku": "015113",
       "nombre": "PELOTA DE PVC RECREATIVA #5.5 GATITOS",
       "ean13": "7754807151139",
@@ -5264,7 +5683,7 @@
       "es_remate": false
     },
     {
-      "orden": 141,
+      "orden": 152,
       "sku": "015119",
       "nombre": "PELOTA DE PVC RECREATIVA #5.5 AVIONES ROBOT",
       "ean13": "7754807151191",
@@ -5302,7 +5721,7 @@
       "es_remate": false
     },
     {
-      "orden": 142,
+      "orden": 153,
       "sku": "013985",
       "nombre": "PELOTA DE PVC RECREATIVA #5.5 MASK",
       "ean13": "7754807139854",
@@ -5339,7 +5758,7 @@
       "es_remate": false
     },
     {
-      "orden": 143,
+      "orden": 154,
       "sku": "013860",
       "nombre": "PELOTA DE PVC RECREATIVA #5.5 RAINBOW BOYS",
       "ean13": "7754807138604",
@@ -5377,7 +5796,7 @@
       "es_remate": false
     },
     {
-      "orden": 144,
+      "orden": 155,
       "sku": "013861",
       "nombre": "PELOTA DE PVC RECREATIVA #5.5 RAINBOW GIRLS",
       "ean13": "7754807138611",
@@ -5415,7 +5834,7 @@
       "es_remate": false
     },
     {
-      "orden": 145,
+      "orden": 156,
       "sku": "012232",
       "nombre": "PELOTA DE PVC RECREATIVA #7 COLECCION ANIMALES",
       "ean13": "7754807122320",
@@ -5453,7 +5872,7 @@
       "es_remate": false
     },
     {
-      "orden": 146,
+      "orden": 157,
       "sku": "014479",
       "nombre": "PELOTA DE PVC RECREATIVA #5.5 SPIDERMAN SUBIDA",
       "ean13": "7754807144797",
@@ -5491,7 +5910,7 @@
       "es_remate": false
     },
     {
-      "orden": 147,
+      "orden": 158,
       "sku": "014478",
       "nombre": "PELOTA DE PVC RECREATIVA #5.5 SPIDERMAN RETRATO",
       "ean13": "7754807144780",
@@ -5529,7 +5948,7 @@
       "es_remate": false
     },
     {
-      "orden": 148,
+      "orden": 159,
       "sku": "014480",
       "nombre": "PELOTA DE PVC RECREATIVA #5.5 SPIDERMAN THWIP",
       "ean13": "7754807144803",
@@ -5567,7 +5986,7 @@
       "es_remate": false
     },
     {
-      "orden": 149,
+      "orden": 160,
       "sku": "015047",
       "nombre": "PELOTA DE PVC RECREATIVA #5.5 BLUEY 02",
       "ean13": "",
@@ -5604,7 +6023,7 @@
       "es_remate": false
     },
     {
-      "orden": 150,
+      "orden": 161,
       "sku": "015046",
       "nombre": "PELOTA DE PVC RECREATIVA #5.5 BLUEY 01",
       "ean13": "7754807150460",
@@ -5641,7 +6060,7 @@
       "es_remate": false
     },
     {
-      "orden": 151,
+      "orden": 162,
       "sku": "015048",
       "nombre": "PELOTA DE PVC RECREATIVA #5.5 BLUEY 03",
       "ean13": "7754807150484",
@@ -5678,7 +6097,7 @@
       "es_remate": false
     },
     {
-      "orden": 152,
+      "orden": 163,
       "sku": "014852",
       "nombre": "PELOTA DE PVC RECREATIVA #5.5 FROZEN 2 ANNA",
       "ean13": "7754807148528",
@@ -5716,7 +6135,7 @@
       "es_remate": false
     },
     {
-      "orden": 153,
+      "orden": 164,
       "sku": "014853",
       "nombre": "PELOTA DE PVC RECREATIVA #5.5 FROZEN 2 ELSA",
       "ean13": "7754807148535",
@@ -5754,7 +6173,7 @@
       "es_remate": false
     },
     {
-      "orden": 154,
+      "orden": 165,
       "sku": "014854",
       "nombre": "PELOTA DE PVC RECREATIVA #5.5 FROZEN 2 HERMANAS",
       "ean13": "7754807148542",
@@ -5792,7 +6211,7 @@
       "es_remate": false
     },
     {
-      "orden": 155,
+      "orden": 166,
       "sku": "014934",
       "nombre": "PELOTA ARIEL TYE DIE  #5.5",
       "ean13": "7754807149341",
@@ -5829,7 +6248,7 @@
       "es_remate": false
     },
     {
-      "orden": 156,
+      "orden": 167,
       "sku": "014933",
       "nombre": "PELOTA DE PVC RECREATIVA #5.5 BLANCA NIEVES TYE DIE",
       "ean13": "7754807149334",
@@ -5869,7 +6288,7 @@
       "es_remate": false
     },
     {
-      "orden": 157,
+      "orden": 168,
       "sku": "014932",
       "nombre": "PELOTA DE PVC RECREATIVA #5.5 CENICIENTA TYE DIE",
       "ean13": "7754807149327",
@@ -5908,7 +6327,7 @@
       "es_remate": false
     },
     {
-      "orden": 158,
+      "orden": 169,
       "sku": "014935",
       "nombre": "PELOTA DE PVC RECREATIVA #5.5 BELLA TYE DIE",
       "ean13": "7754807149358",
@@ -5947,7 +6366,7 @@
       "es_remate": false
     },
     {
-      "orden": 159,
+      "orden": 170,
       "sku": "014929",
       "nombre": "PELOTA DE PVC RECREATIVA #5.5 MINNIE TYE DIE",
       "ean13": "7754807149297",
@@ -5986,7 +6405,7 @@
       "es_remate": false
     },
     {
-      "orden": 160,
+      "orden": 171,
       "sku": "014928",
       "nombre": "PELOTA DE PVC RECREATIVA #5.5 MICKEY TYE DIE",
       "ean13": "7754807149280",
@@ -6025,7 +6444,7 @@
       "es_remate": false
     },
     {
-      "orden": 161,
+      "orden": 172,
       "sku": "015058",
       "nombre": "PELOTA DE PVC RECREATIVA #5.5 SONIC 02",
       "ean13": "7754807150583",
@@ -6062,7 +6481,7 @@
       "es_remate": false
     },
     {
-      "orden": 162,
+      "orden": 173,
       "sku": "015060",
       "nombre": "PELOTA DE PVC RECREATIVA #5.5 SONIC 03",
       "ean13": "7754807150606",
@@ -6099,7 +6518,7 @@
       "es_remate": false
     },
     {
-      "orden": 163,
+      "orden": 174,
       "sku": "015056",
       "nombre": "PELOTA DE PVC RECREATIVA #5.5 SONIC 01",
       "ean13": "7754807150569",
@@ -6136,7 +6555,7 @@
       "es_remate": false
     },
     {
-      "orden": 164,
+      "orden": 175,
       "sku": "014846",
       "nombre": "PELOTA DE PVC RECREATIVA #5.5 AVENGERS HULK PORTRAIT",
       "ean13": "7754807148467",
@@ -6175,7 +6594,7 @@
       "es_remate": false
     },
     {
-      "orden": 165,
+      "orden": 176,
       "sku": "014847",
       "nombre": "PELOTA DE PVC RECREATIVA #5.5 AVENGERS IRON MAN PORTRAIT",
       "ean13": "7754807148474",
@@ -6215,7 +6634,7 @@
       "es_remate": false
     },
     {
-      "orden": 166,
+      "orden": 177,
       "sku": "014848",
       "nombre": "PELOTA DE PVC RECREATIVA #5.5 AVENGERS CAP AMERICA PORTRAIT",
       "ean13": "7754807148481",
@@ -6255,7 +6674,7 @@
       "es_remate": false
     },
     {
-      "orden": 167,
+      "orden": 178,
       "sku": "015093",
       "nombre": "PELOTA DE PVC RECREATIVA #5.5 SPIDEY 01",
       "ean13": "7754807150934",
@@ -6292,7 +6711,7 @@
       "es_remate": false
     },
     {
-      "orden": 168,
+      "orden": 179,
       "sku": "014886",
       "nombre": "PELOTA DE PVC RECREATIVA #5.5 LA GRANJA DE ZENON GRUPAL",
       "ean13": "7754807148863",
@@ -6331,7 +6750,7 @@
       "es_remate": false
     },
     {
-      "orden": 169,
+      "orden": 180,
       "sku": "014884",
       "nombre": "PELOTA DE PVC RECREATIVA #5.5 BARTOLITO",
       "ean13": "7754807148849",
@@ -6368,7 +6787,7 @@
       "es_remate": false
     },
     {
-      "orden": 170,
+      "orden": 181,
       "sku": "014885",
       "nombre": "PELOTA DE PVC RECREATIVA #5.5 LA VACA LOLA",
       "ean13": "7754807148856",
@@ -6406,7 +6825,7 @@
       "es_remate": false
     },
     {
-      "orden": 171,
+      "orden": 182,
       "sku": "015116",
       "nombre": "PELOTA DE PVC RECREATIVA #5.5 STITCH 1",
       "ean13": "",
@@ -6443,7 +6862,45 @@
       "es_remate": false
     },
     {
-      "orden": 172,
+      "orden": 183,
+      "sku": "015019",
+      "nombre": "PELOTA DE PVC RECREATIVA #5.5 TOY STORY 05",
+      "ean13": "7754807150194",
+      "categoria": "VINIBALL",
+      "subcategoria": "",
+      "linea": "PELOTAS",
+      "grupo": "NACIONAL",
+      "tipo": "RECREATIVAS #5.5",
+      "familia": "CALCO",
+      "unidad_medida": "UND",
+      "peso_kg": 0.3,
+      "un_bx": 120,
+      "precio_lista": 6.69,
+      "moneda": "PEN",
+      "imagen_url": "",
+      "keywords": [
+        "PELOTA",
+        "PELOTAS",
+        "PVC",
+        "RECREATIVA",
+        "STORY",
+        "TOY",
+        "VINIBALL"
+      ],
+      "nombre_corto": "Recreativa #5.5 Toy Story 05",
+      "descuentos": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "descuento_pct": 0,
+      "precio_fijo": null,
+      "precio_final": 6.69,
+      "es_remate": false
+    },
+    {
+      "orden": 184,
       "sku": "014647",
       "nombre": "JUGUETE MONTABLE PELOTA SALTARINA TRENDY",
       "ean13": "",
@@ -6481,7 +6938,7 @@
       "es_remate": false
     },
     {
-      "orden": 173,
+      "orden": 185,
       "sku": "015472",
       "nombre": "JUGUETE MONTABLE PELOTA SALTARINA LA GRANJA DE ZENON",
       "ean13": "7754807154727",
@@ -6520,515 +6977,7 @@
       "es_remate": false
     },
     {
-      "orden": 174,
-      "sku": "016288",
-      "nombre": "PELOTA DE PVC RECREATIVA #5 PARA PINTAR KAWAII 02",
-      "ean13": "7754807162883",
-      "categoria": "VINIBALL",
-      "subcategoria": "",
-      "linea": "PELOTAS",
-      "grupo": "NACIONAL",
-      "tipo": "RECREATIVAS # 5",
-      "familia": "CALCO",
-      "unidad_medida": "UND",
-      "peso_kg": 0.23,
-      "un_bx": 12,
-      "precio_lista": 12.8,
-      "moneda": "PEN",
-      "imagen_url": "",
-      "keywords": [
-        "KAWAII",
-        "PARA",
-        "PELOTA",
-        "PELOTAS",
-        "PINTAR",
-        "PVC",
-        "RECREATIVA",
-        "VINIBALL"
-      ],
-      "nombre_corto": "Recreativa #5 Para Pintar Kawaii 02",
-      "descuentos": [
-        0,
-        0,
-        0,
-        0
-      ],
-      "descuento_pct": 0,
-      "precio_fijo": null,
-      "precio_final": 12.8,
-      "es_remate": false
-    },
-    {
-      "orden": 175,
-      "sku": "016289",
-      "nombre": "PELOTA DE PVC RECREATIVA #5 PARA PINTAR KAWAII 03",
-      "ean13": "7754807162890",
-      "categoria": "VINIBALL",
-      "subcategoria": "",
-      "linea": "PELOTAS",
-      "grupo": "NACIONAL",
-      "tipo": "RECREATIVAS # 5",
-      "familia": "CALCO",
-      "unidad_medida": "UND",
-      "peso_kg": 0.07,
-      "un_bx": 12,
-      "precio_lista": 12.8,
-      "moneda": "PEN",
-      "imagen_url": "",
-      "keywords": [
-        "KAWAII",
-        "PARA",
-        "PELOTA",
-        "PELOTAS",
-        "PINTAR",
-        "PVC",
-        "RECREATIVA",
-        "VINIBALL"
-      ],
-      "nombre_corto": "Recreativa #5 Para Pintar Kawaii 03",
-      "descuentos": [
-        0,
-        0,
-        0,
-        0
-      ],
-      "descuento_pct": 0,
-      "precio_fijo": null,
-      "precio_final": 12.8,
-      "es_remate": false
-    },
-    {
-      "orden": 176,
-      "sku": "016211",
-      "nombre": "PELOTA DE PVC RECREATIVA #5 PARA PINTAR UNICORNIO 03",
-      "ean13": "7754807162111",
-      "categoria": "VINIBALL",
-      "subcategoria": "",
-      "linea": "PELOTAS",
-      "grupo": "NACIONAL",
-      "tipo": "RECREATIVAS # 5",
-      "familia": "CALCO",
-      "unidad_medida": "UND",
-      "peso_kg": 0.07,
-      "un_bx": 12,
-      "precio_lista": 12.8,
-      "moneda": "PEN",
-      "imagen_url": "",
-      "keywords": [
-        "PARA",
-        "PELOTA",
-        "PELOTAS",
-        "PINTAR",
-        "PVC",
-        "RECREATIVA",
-        "UNICORNIO",
-        "VINIBALL"
-      ],
-      "nombre_corto": "Recreativa #5 Para Pintar Unicornio 03",
-      "descuentos": [
-        0,
-        0,
-        0,
-        0
-      ],
-      "descuento_pct": 0,
-      "precio_fijo": null,
-      "precio_final": 12.8,
-      "es_remate": false
-    },
-    {
-      "orden": 177,
-      "sku": "016287",
-      "nombre": "PELOTA DE PVC RECREATIVA #5 PARA PINTAR KAWAII 01",
-      "ean13": "7754807162876",
-      "categoria": "VINIBALL",
-      "subcategoria": "",
-      "linea": "PELOTAS",
-      "grupo": "NACIONAL",
-      "tipo": "RECREATIVAS # 5",
-      "familia": "CALCO",
-      "unidad_medida": "UND",
-      "peso_kg": 0.23,
-      "un_bx": 12,
-      "precio_lista": 12.8,
-      "moneda": "PEN",
-      "imagen_url": "",
-      "keywords": [
-        "KAWAII",
-        "PARA",
-        "PELOTA",
-        "PELOTAS",
-        "PINTAR",
-        "PVC",
-        "RECREATIVA",
-        "VINIBALL"
-      ],
-      "nombre_corto": "Recreativa #5 Para Pintar Kawaii 01",
-      "descuentos": [
-        0,
-        0,
-        0,
-        0
-      ],
-      "descuento_pct": 0,
-      "precio_fijo": null,
-      "precio_final": 12.8,
-      "es_remate": false
-    },
-    {
-      "orden": 178,
-      "sku": "016341",
-      "nombre": "PELOTA DE PVC RECREATIVA #5 PARA PINTAR BLUEY1",
-      "ean13": "7754807163415",
-      "categoria": "VINIBALL",
-      "subcategoria": "",
-      "linea": "PELOTAS",
-      "grupo": "NACIONAL",
-      "tipo": "RECREATIVAS # 5",
-      "familia": "CALCO",
-      "unidad_medida": "UND",
-      "peso_kg": 0.28,
-      "un_bx": 12,
-      "precio_lista": 15.06,
-      "moneda": "PEN",
-      "imagen_url": "",
-      "keywords": [
-        "BLUEY1",
-        "PARA",
-        "PELOTA",
-        "PELOTAS",
-        "PINTAR",
-        "PVC",
-        "RECREATIVA",
-        "VINIBALL"
-      ],
-      "nombre_corto": "Recreativa #5 Para Pintar Bluey1",
-      "descuentos": [
-        0,
-        0,
-        0,
-        0
-      ],
-      "descuento_pct": 0,
-      "precio_fijo": null,
-      "precio_final": 15.06,
-      "es_remate": false
-    },
-    {
-      "orden": 179,
-      "sku": "016358",
-      "nombre": "PELOTA DE PVC RECREATIVA #5 PARA PINTAR SONIC 1",
-      "ean13": "",
-      "categoria": "VINIBALL",
-      "subcategoria": "",
-      "linea": "PELOTAS",
-      "grupo": "NACIONAL",
-      "tipo": "RECREATIVAS # 5",
-      "familia": "CALCO",
-      "unidad_medida": "UND",
-      "peso_kg": 0.3,
-      "un_bx": 12,
-      "precio_lista": 15.06,
-      "moneda": "PEN",
-      "imagen_url": "",
-      "keywords": [
-        "PARA",
-        "PELOTA",
-        "PELOTAS",
-        "PINTAR",
-        "PVC",
-        "RECREATIVA",
-        "SONIC",
-        "VINIBALL"
-      ],
-      "nombre_corto": "Recreativa #5 Para Pintar Sonic 1",
-      "descuentos": [
-        0,
-        0,
-        0,
-        0
-      ],
-      "descuento_pct": 0,
-      "precio_fijo": null,
-      "precio_final": 15.06,
-      "es_remate": false
-    },
-    {
-      "orden": 180,
-      "sku": "016227",
-      "nombre": "PELOTA DE PVC RECREATIVA #5 PARA PINTAR GRANJA BARTOLITO 01",
-      "ean13": "7754807162272",
-      "categoria": "VINIBALL",
-      "subcategoria": "",
-      "linea": "PELOTAS",
-      "grupo": "NACIONAL",
-      "tipo": "RECREATIVAS # 5",
-      "familia": "CALCO",
-      "unidad_medida": "UND",
-      "peso_kg": 0.23,
-      "un_bx": 12,
-      "precio_lista": 15.06,
-      "moneda": "PEN",
-      "imagen_url": "",
-      "keywords": [
-        "BARTOLITO",
-        "GRANJA",
-        "PARA",
-        "PELOTA",
-        "PELOTAS",
-        "PINTAR",
-        "PVC",
-        "RECREATIVA",
-        "VINIBALL"
-      ],
-      "nombre_corto": "Recreativa #5 Para Pintar Granja Bartolito 01",
-      "descuentos": [
-        0,
-        0,
-        0,
-        0
-      ],
-      "descuento_pct": 0,
-      "precio_fijo": null,
-      "precio_final": 15.06,
-      "es_remate": false
-    },
-    {
-      "orden": 181,
-      "sku": "016233",
-      "nombre": "PELOTA DE PVC RECREATIVA #5 PARA PINTAR GRANJA VACA LOLA 01",
-      "ean13": "7754807162333",
-      "categoria": "VINIBALL",
-      "subcategoria": "",
-      "linea": "PELOTAS",
-      "grupo": "NACIONAL",
-      "tipo": "RECREATIVAS # 5",
-      "familia": "CALCO",
-      "unidad_medida": "UND",
-      "peso_kg": 0.23,
-      "un_bx": 12,
-      "precio_lista": 15.06,
-      "moneda": "PEN",
-      "imagen_url": "",
-      "keywords": [
-        "GRANJA",
-        "LOLA",
-        "PARA",
-        "PELOTA",
-        "PELOTAS",
-        "PINTAR",
-        "PVC",
-        "RECREATIVA",
-        "VACA",
-        "VINIBALL"
-      ],
-      "nombre_corto": "Recreativa #5 Para Pintar Granja Vaca Lola 01",
-      "descuentos": [
-        0,
-        0,
-        0,
-        0
-      ],
-      "descuento_pct": 0,
-      "precio_fijo": null,
-      "precio_final": 15.06,
-      "es_remate": false
-    },
-    {
-      "orden": 182,
-      "sku": "016311",
-      "nombre": "PELOTA DE PVC RECREATIVA #5 PARA PINTAR MICKEY 01",
-      "ean13": "7754807163118",
-      "categoria": "VINIBALL",
-      "subcategoria": "",
-      "linea": "PELOTAS",
-      "grupo": "NACIONAL",
-      "tipo": "RECREATIVAS # 5",
-      "familia": "CALCO",
-      "unidad_medida": "UND",
-      "peso_kg": 0.43,
-      "un_bx": 12,
-      "precio_lista": 15.06,
-      "moneda": "PEN",
-      "imagen_url": "",
-      "keywords": [
-        "MICKEY",
-        "PARA",
-        "PELOTA",
-        "PELOTAS",
-        "PINTAR",
-        "PVC",
-        "RECREATIVA",
-        "VINIBALL"
-      ],
-      "nombre_corto": "Recreativa #5 Para Pintar Mickey 01",
-      "descuentos": [
-        0,
-        0,
-        0,
-        0
-      ],
-      "descuento_pct": 0,
-      "precio_fijo": null,
-      "precio_final": 15.06,
-      "es_remate": false
-    },
-    {
-      "orden": 183,
-      "sku": "016316",
-      "nombre": "PELOTA DE PVC RECREATIVA #5 PARA PINTAR MINNIE 01",
-      "ean13": "7754807163163",
-      "categoria": "VINIBALL",
-      "subcategoria": "",
-      "linea": "PELOTAS",
-      "grupo": "NACIONAL",
-      "tipo": "RECREATIVAS # 5",
-      "familia": "CALCO",
-      "unidad_medida": "UND",
-      "peso_kg": 0.43,
-      "un_bx": 12,
-      "precio_lista": 15.06,
-      "moneda": "PEN",
-      "imagen_url": "",
-      "keywords": [
-        "MINNIE",
-        "PARA",
-        "PELOTA",
-        "PELOTAS",
-        "PINTAR",
-        "PVC",
-        "RECREATIVA",
-        "VINIBALL"
-      ],
-      "nombre_corto": "Recreativa #5 Para Pintar Minnie 01",
-      "descuentos": [
-        0,
-        0,
-        0,
-        0
-      ],
-      "descuento_pct": 0,
-      "precio_fijo": null,
-      "precio_final": 15.06,
-      "es_remate": false
-    },
-    {
-      "orden": 184,
-      "sku": "015955",
-      "nombre": "PELOTA CON PUAS PARA MASCOTAS GRANDES #2",
-      "ean13": "7754807159555",
-      "categoria": "VINIBALL",
-      "subcategoria": "",
-      "linea": "MASCOTAS",
-      "grupo": "PERRO",
-      "tipo": "JUGUETE",
-      "familia": "TAMAÑO",
-      "unidad_medida": "UND",
-      "peso_kg": 0.12,
-      "un_bx": 12,
-      "precio_lista": 5.98,
-      "moneda": "PEN",
-      "imagen_url": "",
-      "keywords": [
-        "CON",
-        "GRANDES",
-        "MASCOTAS",
-        "PARA",
-        "PELOTA",
-        "PUAS",
-        "VINIBALL"
-      ],
-      "nombre_corto": "Con Puas Para Mascotas Grandes #2",
-      "descuentos": [
-        0,
-        0,
-        0,
-        0
-      ],
-      "descuento_pct": 0,
-      "precio_fijo": null,
-      "precio_final": 5.98,
-      "es_remate": false
-    },
-    {
-      "orden": 185,
-      "sku": "015954",
-      "nombre": "PELOTA CON PUAS PARA MASCOTAS PEQUEÑAS #1",
-      "ean13": "7754807159548",
-      "categoria": "VINIBALL",
-      "subcategoria": "",
-      "linea": "MASCOTAS",
-      "grupo": "PERRO",
-      "tipo": "JUGUETE",
-      "familia": "TAMAÑO",
-      "unidad_medida": "UND",
-      "peso_kg": 0.11,
-      "un_bx": 12,
-      "precio_lista": 5.31,
-      "moneda": "PEN",
-      "imagen_url": "",
-      "keywords": [
-        "CON",
-        "MASCOTAS",
-        "PARA",
-        "PELOTA",
-        "PEQUEÑAS",
-        "PUAS",
-        "VINIBALL"
-      ],
-      "nombre_corto": "Con Puas Para Mascotas Pequeñas #1",
-      "descuentos": [
-        0,
-        0,
-        0,
-        0
-      ],
-      "descuento_pct": 0,
-      "precio_fijo": null,
-      "precio_final": 5.31,
-      "es_remate": false
-    },
-    {
       "orden": 186,
-      "sku": "016681",
-      "nombre": "PELOTA CON PUAS PARA MASCOTAS PEQUEÑAS #1 SWEET",
-      "ean13": "7754807166812",
-      "categoria": "VINIBALL",
-      "subcategoria": "",
-      "linea": "MASCOTAS",
-      "grupo": "PERRO",
-      "tipo": "JUGUETE",
-      "familia": "TAMAÑO",
-      "unidad_medida": "UND",
-      "peso_kg": 0.11,
-      "un_bx": 12,
-      "precio_lista": 5.31,
-      "moneda": "PEN",
-      "imagen_url": "",
-      "keywords": [
-        "CON",
-        "MASCOTAS",
-        "PARA",
-        "PELOTA",
-        "PEQUEÑAS",
-        "PUAS",
-        "SWEET",
-        "VINIBALL"
-      ],
-      "nombre_corto": "Con Puas Para Mascotas Pequeñas #1 Sweet",
-      "descuentos": [
-        0,
-        0,
-        0,
-        0
-      ],
-      "descuento_pct": 0,
-      "precio_fijo": null,
-      "precio_final": 5.31,
-      "es_remate": false
-    },
-    {
-      "orden": 187,
       "sku": "016682",
       "nombre": "PELOTA CON PUAS PARA MASCOTAS GRANDES #2 SWEET",
       "ean13": "7754807166829",
@@ -7067,8 +7016,8 @@
       "es_remate": false
     },
     {
-      "orden": 188,
-      "sku": "MA001",
+      "orden": 187,
+      "sku": "Ma001",
       "nombre": "JUGUETE PARA MASCOTA HUESITO PEQUEÑO NEON",
       "ean13": "7754807005753",
       "categoria": "VINIBALL",
@@ -7106,8 +7055,8 @@
       "es_remate": false
     },
     {
-      "orden": 189,
-      "sku": "MA002",
+      "orden": 188,
+      "sku": "Ma002",
       "nombre": "JUGUETE PARA MASCOTA HUESITO GRANDE NEON",
       "ean13": "7754807005760",
       "categoria": "VINIBALL",
@@ -7145,8 +7094,8 @@
       "es_remate": false
     },
     {
-      "orden": 190,
-      "sku": "MA003",
+      "orden": 189,
+      "sku": "Ma003",
       "nombre": "JUGUETE PARA MASCOTA HUESITO PEQUEÑO PASTEL",
       "ean13": "7754807005777",
       "categoria": "VINIBALL",
@@ -7184,8 +7133,8 @@
       "es_remate": false
     },
     {
-      "orden": 191,
-      "sku": "MA004",
+      "orden": 190,
+      "sku": "Ma004",
       "nombre": "JUGUETE PARA MASCOTA HUESITO GRANDE PASTEL",
       "ean13": "7754807005784",
       "categoria": "VINIBALL",
@@ -7223,7 +7172,7 @@
       "es_remate": false
     },
     {
-      "orden": 192,
+      "orden": 191,
       "sku": "014850",
       "nombre": "PELOTA DE PVC RECREATIVA #5 TRENDY GIRL",
       "ean13": "",
@@ -7261,7 +7210,7 @@
       "es_remate": true
     },
     {
-      "orden": 193,
+      "orden": 192,
       "sku": "014851",
       "nombre": "PELOTA DE PVC RECREATIVA #5 TRENDY BOY",
       "ean13": "",
@@ -7299,7 +7248,7 @@
       "es_remate": true
     },
     {
-      "orden": 194,
+      "orden": 193,
       "sku": "016777",
       "nombre": "PELOTA PUAS 1 VINIBALL 12 UN POR EMPAQUE",
       "ean13": "7754807009980",
@@ -7336,7 +7285,7 @@
       "es_remate": false
     },
     {
-      "orden": 195,
+      "orden": 194,
       "sku": "016778",
       "nombre": "PELOTA PUAS 2 VINIBALL 12 UN POR EMPAQUE",
       "ean13": "7754807009997",
@@ -7373,7 +7322,7 @@
       "es_remate": false
     },
     {
-      "orden": 196,
+      "orden": 195,
       "sku": "016779",
       "nombre": "PELOTA PUAS 3 VINIBALL 12 UN POR EMPAQUE",
       "ean13": "7754807010009",
@@ -7410,7 +7359,7 @@
       "es_remate": false
     },
     {
-      "orden": 197,
+      "orden": 196,
       "sku": "016780",
       "nombre": "PELOTA FULL PRINT 1 VINIBALL 12 UN POR EMPAQUE",
       "ean13": "7754807010108",
@@ -7448,7 +7397,7 @@
       "es_remate": false
     },
     {
-      "orden": 198,
+      "orden": 197,
       "sku": "016781",
       "nombre": "PELOTA FULL PRINT 2 VINIBALL 12 UN POR EMPAQUE",
       "ean13": "7754807010115",
