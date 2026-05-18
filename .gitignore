@@ -1,0 +1,7 @@
+.venv/
+__pycache__/
+*.pyc
+.ruff_cache/
+.pytest_cache/
+download_original.ps1
+docs/analisis-actualizacion-xlsx.md
