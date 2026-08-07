@@ -1,188 +1,159 @@
 # G360 Master Data
 
-> Sistema centralizado de datos maestros para proyectos G360. Genera JSONs de catalogo consolidado que alimentan multiples herramientas del ecosistema.
+> Sistema centralizado de datos maestros para proyectos G360.
+> Genera JSON de catálogo completo desde ERP + SKU_BX.
 
-[![Version](https://img.shields.io/badge/version-2.0.0-blue)](https://github.com/carloscus/g360-master-data)
-[![Python](https://img.shields.io/badge/Python-3.11+-blue)](https://python.org)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Version](https://img.shields.io/badge/version-3.0.0-blue)]()
+[![Python](https://img.shields.io/badge/Python-3.11+-blue)]()
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)]()
 
 ```mermaid
 flowchart TD
-    A[plantilla_precios.xlsx] --> B[generar_catalogo.py]
-    B --> C[catalogo_productos.json]
-    C --> D[g360-order-xlsx]
-    C --> E[g360-stock-reporter]
-    C --> F[g360-return-form]
-    C --> G[comparador_de_precios]
+    A[PRODUCTOS.xls] --> B[generar_catalogo_base.py]
+    C[SKU_BX.xlsx] --> B
+    B --> D[catalogo_productos.json]
+    D --> E[g360-stock-api]
+    D --> F[g360-stock-reporter-lit]
+    D --> G[g360-order-form]
 ```
 
 ---
 
-## Tabla de Contenidos
+## Estructura
 
-- [Descripcion](#descripcion)
-- [Caracteristicas](#caracteristicas)
-- [Tecnologias](#tecnologias)
-- [Instalacion](#instalacion)
-- [Uso](#uso)
-- [Estructura del Excel](#estructura-del-excel)
-- [JSON Generado](#json-generado)
-- [Scripts](#scripts)
-- [Tests](#tests)
-- [Automatizacion](#automatizacion)
-- [Contribucion](#contribucion)
-- [Licencia](#licencia)
-- [Familia G360](#familia-g360)
-
----
-
-## Descripcion
-
-Sistema centralizado que genera JSONs de catalogo consolidado desde una plantilla Excel. Estos JSONs alimentan multiples herramientas del ecosistema G360: pedidos, reportes de stock, devoluciones y cotizaciones.
-
-**Tipo**: Script / Data Pipeline
-**Lenguaje**: Python
-**Entrada**: Excel (plantilla_precios.xlsx)
-**Salida**: JSON (catalogo_productos.json)
+```
+g360-master-data/
+├── data/
+│   ├── PRODUCTOS.xls           ← Fuente principal (mensual/bimestral)
+│   │   Columnas: CODIGO, NOMBRE, COD_EAN, COD_EAN_14, CAN_KG_UM,
+│   │              LINEA, GRUPO, TIPO, FAMILIA, FLG_INACTIVO,
+│   │              FLG_DESCONTINUADO, PRECIO
+│   └── SKU_BX.xlsx             ← Cantidad por caja (manual, agregar cuando ingresa nuevo stock)
+│       Columnas: ORDEN, SKU, UN_BX
+│
+├── output/
+│   ├── catalogo_productos.json ← Catálogo generado (2,393 SKUs)
+│   └── un_bx_master.csv        ← Lista simplificada SKU,un_bx (para importación manual)
+│
+├── scripts/
+│   └── generar_catalogo_base.py ← Genera catálogo desde ERP + SKU_BX
+│
+├── actualizar_catalogo.bat     ← Workflow interactivo (BAT 1 / BAT 2)
+└── README.md
+```
 
 ---
 
-## Caracteristicas
+## Flujo de datos
 
-- **Consolidacion**: Merge de productos, descuentos y precios fijos en un solo JSON
-- **Validaciones**: Campos obligatorios (SKU, nombre, categoria, linea), SKUs duplicados ignorados
-- **Descuentos dinamicos**: N columnas de descuentos consecutivos
-- **Precio final**: Calculo automatico (descuentos o precio fijo)
-- **nombre_corto**: Generado automaticamente con regex
-- **keywords**: Generado automaticamente para busquedas
-- **Automatizacion**: `actualizar_catalogo.bat` genera y copia a proyectos G360
-
----
-
-## Tecnologias
-
-| Capa | Tecnologia |
-|---|---|
-| Lenguaje | Python 3.11+ |
-| Excel | openpyxl |
-| Runtime | uv (gestor de paquetes) |
-| Tests | pytest |
+```
+1. Descargar PRODUCTOS.xls desde appweb.cipsa.com.pe (mensual/bimestral)
+2. Actualizar SKU_BX.xlsx con nuevos SKUs (manual, cuando ingresa stock nuevo)
+3. Ejecutar: actualizar_catalogo.bat → Opción 1
+4. Verificar output/catalogo_productos.json
+5. Subir al API: Opción s en el bat, o manualmente:
+   curl -X POST "https://g360-stock-api.onrender.com/api/v1/catalog/upload" \
+        -F "archivo=@output/catalogo_productos.json"
+```
 
 ---
 
-## Instalacion
+## Filtros aplicados
+
+| Filtro | Resultado |
+|--------|-----------|
+| Descontinuados | Excluidos (~1,315) |
+| Sin precio (≤0) | Excluidos (~9,066) |
+| Líneas de proceso | Excluidas |
+| **Productos finales** | **2,393 SKUs** |
+
+---
+
+## Datos generados
+
+| Campo | Fuente | Notas |
+|-------|--------|-------|
+| sku, nombre | PRODUCTOS.xls | |
+| ean13 | PRODUCTOS.xls | ~58% tiene valor |
+| ean14 | PRODUCTOS.xls | ~34% tiene valor |
+| peso_kg | PRODUCTOS.xls | ~96% tiene valor |
+| linea, grupo, tipo, familia | PRODUCTOS.xls | |
+| categoria | Derivada de linea | VINIBALL, VINIFAN, REPRESENTADAS |
+| un_bx | SKU_BX.xlsx | 42% tiene valor definido |
+| precio | PRODUCTOS.xls | |
+| nombre_corto | Generado con regex | Elimina prefijos, marcas |
+| keywords | Generado automáticamente | Palabras clave del nombre + categoria |
+
+---
+
+## Scripts
+
+### `generar_catalogo_base.py`
+
+Genera el catálogo completo desde las dos fuentes.
 
 ```bash
-git clone https://github.com/carloscus/g360-master-data.git
-cd g360-master-data
-uv venv
-uv pip install openpyxl
+# Uso básico
+python scripts/generar_catalogo_base.py
+
+# Con argumentos
+python scripts/generar_catalogo_base.py -i data/PRODUCTOS.xls -u data/SKU_BX.xlsx -o output/catalogo_productos.json
+
+# Solo validación (no genera output)
+python scripts/generar_catalogo_base.py --validate-only
+```
+
+### `actualizar_catalogo.bat`
+
+Workflow interactivo:
+
+```
+1) Generar catalogo base (PRODUCTOS.xls + SKU_BX)
+2) Generar catalogo enriquecido (descuentos/precios)
+3) Ver estado del catalogo
+0) Salir
 ```
 
 ---
 
-## Uso
-
-### Generar catalogo
-
-```bash
-.venv\Scripts\python scripts/generar_catalogo.py -i data/plantilla_precios.xlsx -o output/catalogo_productos.json
-```
-
-### Copiar a proyectos
-
-```bash
-# Order XLSX
-cp output/catalogo_productos.json ../g360-order-xlsx/public/
-
-# Stock Reporter
-cp output/catalogo_productos.json ../g360-stock-reporter/public/
-
-# Devoluciones
-cp output/catalogo_productos.json ../g360-return-form/public/
-```
-
-### Automatizado
-
-```bash
-./actualizar_catalogo.bat    # Genera + copia automaticamente
-```
-
----
-
-## Estructura del Excel
-
-La plantilla `plantilla_precios.xlsx` contiene 4 hojas:
-
-### Hoja 1: PRODUCTOS (principal)
-
-| Columna | Descripcion | Obligatorio |
-|---------|-------------|-------------|
-| `orden` | Indice para interface | Si |
-| `sku` | Identificador unico | Si |
-| `nombre` | Descripcion completa | Si |
-| `ean13` | Codigo de barras | No |
-| `categoria` | VINIBALL/VINIFAN/REPRESENTADAS | Si |
-| `subcategoria` | Subclasificacion | No |
-| `linea` | PELOTAS, FORROS, ARCHIVO, etc. | Si |
-| `grupo` | IMPORTADA VINIBALL, ROCHELLE, etc. | No |
-| `tipo` | PU, CUERO TERMOSELLADA, etc. | No |
-| `familia` | FUTBOL, VOLEY, BASQUET, etc. | No |
-| `unidad_medida` | UND | No |
-| `peso_kg` | Peso en kg | No |
-| `un_bx` | Unidades por caja | No |
-| `precio_lista` | Precio de lista | No |
-| `moneda` | PEN | No |
-| `imagen_url` | URL de imagen | No |
-
-### Hoja 2: DESCUENTOS
-
-| Columna | Descripcion |
-|---------|-------------|
-| `sku` | Codigo de producto |
-| `desc1` - `desc4` | Descuentos (decimal, ej: 0.13 = 13%) |
-
-### Hoja 3: PRECIOS_FIJOS
-
-| Columna | Descripcion |
-|---------|-------------|
-| `sku` | Codigo de producto |
-| `precio_fijo` | Precio de remate/liquidacion |
-
-### Hoja 4: SKU_CLIENTES (opcional)
-
-| Columna | Descripcion |
-|---------|-------------|
-| `sku` | Codigo interno |
-| `sku_cliente` | Codigo del cliente |
-
----
-
-## JSON Generado
+## Output JSON
 
 ```json
 {
   "metadata": {
-    "version": "2.0.0",
-    "total_productos": 1088,
+    "version": "3.0.0",
+    "generated_at": "2026-08-04T...",
+    "source_erp": "PRODUCTOS.xls",
+    "source_un_bx": "SKU_BX.xlsx",
+    "total_productos": 2393,
     "estadisticas": {
-      "sin_ean13": 148,
-      "con_descuento": 339,
-      "con_precio_fijo": 129
+      "sin_ean13": 1398,
+      "con_ean14": 813,
+      "sin_unbx": 1378,
+      "con_unbx": 1015,
+      "por_categoria": {
+        "REPRESENTADAS": 1187,
+        "VINIFAN": 767,
+        "VINIBALL": 439
+      }
     }
   },
   "productos": [
     {
-      "sku": "016763",
-      "nombre": "FUTBOL PU FUTURE #5",
-      "nombre_corto": "Futbol Future #5",
+      "sku": "011019",
+      "nombre": "N SEMIDEPORTIVA FUTBOL CRACKCITO BLANCO C/ROJO",
+      "nombre_corto": "Semideportiva Futbol Crackcito Blanco C/Rojo",
+      "ean13": "7754807110198",
+      "ean14": "17754807110198",
       "categoria": "VINIBALL",
       "linea": "PELOTAS",
-      "un_bx": 18,
-      "precio_lista": 70.0,
-      "descuentos": [0, 0, 0, 0],
-      "precio_final": 70.0,
-      "es_remate": false
+      "grupo": "NACIONAL",
+      "tipo": "SEMI-DEPORTIVA",
+      "familia": "FUTBOL",
+      "un_bx": 60,
+      "peso_kg": 0.20,
+      "precio": 9.16,
+      "keywords": ["FUTBOL", "PELOTAS", "SEMIDEPORTIVA", "VINIBALL", "CRACKCITO"]
     }
   ]
 }
@@ -190,97 +161,37 @@ La plantilla `plantilla_precios.xlsx` contiene 4 hojas:
 
 ---
 
-## Scripts
+## Integración con API
 
-### `generar_catalogo.py`
-
-Genera el catalogo consolidado desde el Excel.
-
-**Funcionalidades:**
-- Lee hoja PRODUCTOS (datos base)
-- Lee hoja DESCUENTOS (descuentos por SKU)
-- Lee hoja PRECIOS_FIJOS (remates/liquidaciones)
-- Genera `nombre_corto` con regex
-- Genera `keywords` automaticamente
-- Calcula `precio_final` (descuentos o precio fijo)
-- Valida campos obligatorios
-- Ignora SKUs duplicados
-
-### `leer_plantilla_precios.py`
-
-Lee precios con mapeo de codigos de cliente.
+El endpoint `/api/v1/catalog/upload` recibe el JSON y lo cachea en memoria (TTL 6h).
+Los items de stock sirven con campos enriquecidos cuando se consulta con `?enrich=true`.
 
 ```bash
-.venv\Scripts\python scripts/leer_plantilla_precios.py -i data/plantilla_precios.xlsx -o output/precios_productos.json
+# Verificar estado del catálogo cargado
+curl "https://g360-stock-api.onrender.com/api/v1/catalog/health"
+
+# Subir catálogo
+curl -X POST "https://g360-stock-api.onrender.com/api/v1/catalog/upload" \
+     -F "archivo=@output/catalogo_productos.json"
 ```
 
 ---
 
-## Tests
+## Dependency
 
-```bash
-.venv\Scripts\python -m pytest scripts/tests/ -v
 ```
-
-**Funciones testeadas:**
-- `generar_nombre_corto()` - Validacion de regex y reglas
-- `validar_ean13()` - Validacion de codigos de barras
-- Calculo de descuentos consecutivos
-- Validaciones de campos obligatorios
-
----
-
-## Automatizacion
-
-### `actualizar_catalogo.bat`
-
-Script batch que automatiza la actualizacion del catalogo.
-
-**Funcionalidades:**
-- Verifica entorno virtual
-- Genera catalogo consolidado
-- Copia automaticamente a proyectos G360
-- Muestra resumen de operacion
-
-**Proyectos actualizados automaticamente:**
-- g360-order-xlsx
-- g360-stock-reporter
-- g360-return-form
-- comparador_de_precios
-
----
-
-## Contribucion
-
-1. Fork el repositorio
-2. Crea una rama (`git checkout -b feature/nueva-funcion`)
-3. Commit cambios (`git commit -m 'Agregar funcion'`)
-4. Push a la rama (`git push origin feature/nueva-funcion`)
-5. Abre un Pull Request
-
----
-
-## Licencia
-
-MIT License - ver [LICENSE](LICENSE) para mas detalles.
+python>=3.11
+openpyxl>=3.1.0
+xlrd>=2.0.0
+```
 
 ---
 
 ## Familia G360
 
-Este proyecto forma parte de la familia de microherramientas **G360** para apoyo CRM y gestion de datos en escritorio, enfocadas en areas como ventas, finanzas y logistica.
-
-### Herramientas Relacionadas
-
-- **[g360-cli](https://github.com/carloscus/g360-cli)**: Bootstrap de proyectos G360
-- **[g360-signature](https://github.com/carloscus/g360-signature)**: Web component de branding
-- **[g360-order-xlsx](https://github.com/carloscus/g360-order-xlsx)**: Procesador de cotizaciones Excel
-- **[g360-signature-creator](https://github.com/carloscus/g360-signature-creator)**: Generador de firmas corporativas
+- **[g360-cli](https://github.com/carloscus/g360-cli)**: Bootstrap de proyectos
+- **[g360-stock-api](../g360-stock-api/)**: API de stock con cache y enrich
+- **[g360-stock-reporter-lit](../g360-stock-reporter-lit/)**: Frontend PWA
 
 ---
-
-**Marca**: G360
-**Isotipo**: 3 puntos verticales paralelos (gris-verde-gris) + chevron `>`
-**Autor**: Carlos Cusi
-**Desarrollo**: Con asistencia de herramientas de codigo IA (Vibe Code)
-**Powered by**: [g360-signature](https://github.com/carloscus/g360-signature)
+**Marca**: G360 · **Autor**: Carlos Cusi

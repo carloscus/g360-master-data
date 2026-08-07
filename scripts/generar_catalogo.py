@@ -18,8 +18,8 @@ except ImportError:
     sys.exit(1)
 
 COLUMNS = [
-    "orden", "sku", "nombre", "ean13", "categoria", "subcategoria", 
-    "linea", "grupo", "tipo", "familia", "unidad_medida", "peso_kg", 
+    "orden", "sku", "nombre", "ean13", "categoria", "estado_linea", "subcategoria",
+    "linea", "grupo", "tipo", "familia", "unidad_medida", "peso_kg",
     "un_bx", "precio_lista", "moneda", "imagen_url"
 ]
 DEFAULTS = {"moneda":"PEN","unidad_medida":"UND"}
@@ -374,7 +374,10 @@ def guardar(datos,ruta):
 
 def gen_template(ruta="plantilla_catalogo.xlsx"):
     try:
-        wb=openpyxl.Workbook(); ws=wb.active; ws.title="Catalogo"
+        wb=openpyxl.Workbook()
+        wb.properties.creator="ccusi"
+        wb.properties.description="Generado por G360"
+        ws=wb.active; ws.title="Catalogo"
         hdrs=[("orden",8),("sku",15),("nombre",40),("linea",20),("categoria",20),
               ("subcategoria",20),("ean13",18),("unidad_medida",12),("peso_kg",10),
               ("un_bx",10),("precio_lista",12),("moneda",8),("imagen_url",30)]
