@@ -80,6 +80,8 @@ g360-master-data/
 | linea, grupo, tipo, familia | PRODUCTOS.xls | |
 | categoria | Derivada de linea | VINIBALL, VINIFAN, REPRESENTADAS |
 | un_bx | SKU_BX.xlsx | 42% tiene valor definido |
+| orden | SKU_BX.xlsx (col A) | Índice maestro — orden ascendente |
+| estado_linea | SKU_BX.xlsx (col D) | NACIONAL, IMPORTADO, NUEVO, TRADICIONAL |
 | precio | PRODUCTOS.xls | |
 | nombre_corto | Generado con regex | Elimina prefijos, marcas |
 | keywords | Generado automáticamente | Palabras clave del nombre + categoria |
@@ -122,7 +124,7 @@ Workflow interactivo:
 {
   "metadata": {
     "version": "3.0.0",
-    "generated_at": "2026-08-04T...",
+    "generated_at": "2026-08-09T03:20:11.919920",
     "source_erp": "PRODUCTOS.xls",
     "source_un_bx": "SKU_BX.xlsx",
     "total_productos": 2393,
@@ -135,6 +137,18 @@ Workflow interactivo:
         "REPRESENTADAS": 1187,
         "VINIFAN": 767,
         "VINIBALL": 439
+      },
+      "por_linea": {
+        "PELOTAS": 423,
+        "ARCHIVO": 308,
+        "REPRESENTADAS": 773,
+        ...
+      },
+      "por_estado_linea": {
+        "NACIONAL": 137,
+        "IMPORTADO": 265,
+        "NUEVO": 454,
+        "TRADICIONAL": 172
       }
     }
   },
@@ -144,16 +158,18 @@ Workflow interactivo:
       "nombre": "N SEMIDEPORTIVA FUTBOL CRACKCITO BLANCO C/ROJO",
       "nombre_corto": "Semideportiva Futbol Crackcito Blanco C/Rojo",
       "ean13": "7754807110198",
-      "ean14": "17754807110198",
+      "ean14": "",
       "categoria": "VINIBALL",
       "linea": "PELOTAS",
       "grupo": "NACIONAL",
       "tipo": "SEMI-DEPORTIVA",
       "familia": "FUTBOL",
       "un_bx": 60,
+      "orden": 2,
+      "estado_linea": "NACIONAL",
       "peso_kg": 0.20,
       "precio": 9.16,
-      "keywords": ["FUTBOL", "PELOTAS", "SEMIDEPORTIVA", "VINIBALL", "CRACKCITO"]
+      "keywords": ["BLANCO", "C/ROJO", "CRACKCITO", "FUTBOL", "PELOTAS", "SEMIDEPORTIVA", "VINIBALL"]
     }
   ]
 }

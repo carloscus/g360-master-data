@@ -45,6 +45,8 @@ if not exist .venv\Scripts\python.exe (
     exit /b 1
 )
 
+call :ensure_deps
+
 if not exist data\PRODUCTOS.xls (
     echo ERROR: data/PRODUCTOS.xls no encontrado
     pause
@@ -116,3 +118,18 @@ if exist output\catalogo_productos.json (
 echo.
 pause
 goto :eof
+
+:: ----------------------------------------------------------------------------
+:: Auto-instala dependencias minimas si faltan en .venv (evita "ERROR: pip install xlrd")
+:ensure_deps
+.venv\Scripts\python.exe -c "import openpyxl, xlrd" >nul 2>&1
+if not errorlevel 1 exit /b 0
+echo Instalando dependencias (openpyxl + xlrd) en .venv ...
+uv pip install --python .venv openpyxl xlrd >nul 2>&1
+if errorlevel 1 (
+    echo ERROR: pip install openpyxl xlrd
+    echo Instale manualmente: uv pip install --python .venv openpyxl xlrd
+    pause
+    exit /b 1
+)
+exit /b 0
