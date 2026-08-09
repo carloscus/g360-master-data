@@ -136,7 +136,9 @@ def leer_erp(ruta):
 
 
 def leer_unbx(ruta):
-    """Lee SKU_BX.xlsx y retorna dict {sku: un_bx} y dict {sku: estado_linea}."""
+    """Lee SKU_BX.xlsx y retorna dict {sku: orden}, {sku: un_bx} y {sku: estado_linea}.
+    ORDEN = clave-valor de orden indice maestro (col 0 de SKU_BX.xlsx)."""
+    orden_map = {}
     unbx_map = {}
     estado_map = {}
     try:
@@ -146,19 +148,26 @@ def leer_unbx(ruta):
             sku = str(row[1] or "").strip()
             un_bx = row[2]
             estado = str(row[3] or "").strip() if len(row) > 3 else ""
+            orden = row[0] if len(row) > 0 else None
+            if sku:
+                try:
+                    orden_map[sku] = int(orden) if orden is not None else 0
+                except (ValueError, TypeError):
+                    orden_map[sku] = 0
             if sku and un_bx:
                 unbx_map[sku] = int(un_bx)
             if sku and estado:
                 estado_map[sku] = estado
         wb.close()
+        print(f"  SKU_BX: {len(orden_map)} SKUs con orden (indice maestro)")
         print(f"  SKU_BX: {len(unbx_map)} SKUs con un_bx definido")
         print(f"  SKU_BX: {len(estado_map)} SKUs con estado_linea definido")
     except Exception as e:
         print(f"  WARN: No se pudo leer SKU_BX: {e}")
-    return unbx_map, estado_map
+    return orden_map, unbx_map, estado_map
 
 
-def generar_output(productos, unbx_map, estado_map, ruta_salida):
+def generar_output(productos, unbx_map, estado_map, orden_map, ruta_salida):
     """Genera el JSON de catálogo completo."""
     estadisticas = {
         "sin_ean13": 0,
@@ -199,6 +208,7 @@ def generar_output(productos, unbx_map, estado_map, ruta_salida):
             "tipo": p["tipo"],
             "familia": p["familia"],
             "un_bx": un_bx,
+            "orden": orden_map.get(p["sku"], 0),
             "estado_linea": estado_map.get(p["sku"], ""),
             "peso_kg": p["peso_kg"],
             "precio": p["precio"],
@@ -210,7 +220,7 @@ def generar_output(productos, unbx_map, estado_map, ruta_salida):
         if est:
             estadisticas["por_estado_linea"][est] = estadisticas["por_estado_linea"].get(est, 0) + 1
 
-    productos_final.sort(key=lambda x: x["sku"])
+    productos_final.sort(key=lambda x: (x.get("orden", 0) == 0, x.get("orden", 0) or 0, x["sku"]))
 
     metadata = {
         "version": "3.0.0",
@@ -254,7 +264,7 @@ def main():
     # Leer fuentes
     print("Leyendo fuentes...")
     productos, errs = leer_erp(a.erp)
-    unbx_map, estado_map = leer_unbx(a.unbx)
+    orden_map, unbx_map, estado_map = leer_unbx(a.unbx)
     if errs:
         print(f"Errores: {errs}")
 
@@ -263,6 +273,7 @@ def main():
         sys.exit(1)
 
     print(f"\nTotal productos válidos: {len(productos)}")
+    print(f"  Con orden definido:    {len(orden_map)}")
     print(f"  Con un_bx definido:    {len(unbx_map)}")
     print(f"  Sin un_bx (default 1): {len(productos) - len(unbx_map)}")
 
@@ -272,7 +283,7 @@ def main():
 
     # Generar output
     print("\nGenerando catálogo...")
-    output = generar_output(productos, unbx_map, estado_map, a.output)
+    output = generar_output(productos, unbx_map, estado_map, orden_map, a.output)
 
     print(f"\n{'=' * 50}")
     print("CATÁLOGO GENERADO")
