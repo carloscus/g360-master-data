@@ -64,13 +64,9 @@ if %ERRORLEVEL% NEQ 0 (
 
 echo.
 echo Copiando a proyectos G360...
-if exist ..\g360-stock-reporter-lit\public (
-    copy /Y output\catalogo_productos.json ..\g360-stock-reporter-lit\public\catalogo_productos.json >nul
-    echo   OK: g360-stock-reporter-lit
-)
-if exist ..\g360-order-form\public (
-    copy /Y output\catalogo_productos.json ..\g360-order-form\public\catalogo_productos.json >nul
-    echo   OK: g360-order-form
+if exist ..\g360-stock-api\data (
+    copy /Y output\catalogo_productos.json ..\g360-stock-api\data\catalog_cache.json >nul
+    echo   OK: g360-stock-api (catalog_cache.json)
 )
 
 echo.

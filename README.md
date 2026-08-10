@@ -13,8 +13,6 @@ flowchart TD
     C[SKU_BX.xlsx] --> B
     B --> D[catalogo_productos.json]
     D --> E[g360-stock-api]
-    D --> F[g360-stock-reporter-lit]
-    D --> G[g360-order-form]
 ```
 
 ---
