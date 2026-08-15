@@ -178,14 +178,18 @@ Workflow interactivo:
 ## Integración con API
 
 El endpoint `/api/v1/catalog/upload` recibe el JSON y lo cachea en memoria (TTL 6h).
-Los items de stock sirven con campos enriquecidos cuando se consulta con `?enrich=true`.
+Las operaciones de catálogo requieren el header administrativo `X-API-Key`.
+Los items de stock siempre se sirven enriquecidos y requieren la clave de lectura
+`X-API-Key` configurada para el cliente.
 
 ```bash
 # Verificar estado del catálogo cargado
-curl "https://g360-stock-api.onrender.com/api/v1/catalog/health"
+curl -H "X-API-Key: $S1_API_KEY" \
+     "https://g360-stock-api.onrender.com/api/v1/catalog/health"
 
 # Subir catálogo
 curl -X POST "https://g360-stock-api.onrender.com/api/v1/catalog/upload" \
+     -H "X-API-Key: $S1_API_KEY" \
      -F "archivo=@output/catalogo_productos.json"
 ```
 
