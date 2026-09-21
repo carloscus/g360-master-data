@@ -133,10 +133,21 @@ actualizar_catalogo.bat --auto
 
 :: Automatico local: genera + copia local, sin subir
 actualizar_catalogo.bat --auto-local
+
+:: Subir JSON existente sin regenerar (requiere API_KEY)
+actualizar_catalogo.bat --upload
 ```
 
 El upload reintenta 3 veces (cold start de Render free-tier) y requiere
-`X-API-Key` (variable `API_KEY` en la terminal).
+`X-API-Key` (variable `API_KEY` en la terminal). En modo interactivo, si
+falta la clave el BAT la pide por pantalla; los valores degenerados
+(<4 caracteres) se rechazan al instante sin consumir reintentos.
+
+Para persistirla (una sola vez, `cmd` — ojo: `setx` va SIN `=`):
+```bat
+set API_KEY=tu_clave
+setx API_KEY tu_clave
+```
 
 ---
 

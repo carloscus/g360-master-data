@@ -7,6 +7,7 @@ REM Uso:
 REM   actualizar_catalogo.bat              Modo interactivo (menu)
 REM   actualizar_catalogo.bat --auto       Genera + sube sin preguntar
 REM   actualizar_catalogo.bat --auto-local Genera + copia local, sin subir
+REM   actualizar_catalogo.bat --upload     Sube el JSON existente sin regenerar
 REM
 REM Variables de entorno opcionales:
 REM   API_KEY   Clave administrativa del API (requerida para upload)
@@ -25,7 +26,12 @@ if "%~1"=="--auto-local" (
     set "UPLOAD_MODE=0"
     goto bat1
 )
+if "%~1"=="--upload" (
+    set "AUTO_MODE=1"
+    goto upload_only
+)
 
+:menu
 echo.
 echo ==========================================
 echo G360 MASTER DATA - WORKFLOW v3.1.0
@@ -39,11 +45,15 @@ echo  Modo automatico: actualizar_catalogo.bat --auto
 echo.
 
 set /p choice="Seleccione opcion: "
+set "choice=%choice: =%"
 
 if "%choice%"=="1" goto bat1
-if "%choice%"=="2" goto bat3
+if "%choice%"=="2" goto estado
 if "%choice%"=="0" exit /b 0
-goto :eof
+echo.
+echo Opcion invalida: "%choice%"
+pause
+goto menu
 
 :bat1
 echo.
@@ -112,18 +122,28 @@ echo SUBIR AL API
 echo ==========================================
 echo.
 set /p upload="Subir catalogo al API? (s/n): "
+set "upload=%upload: =%"
 if /i "%upload%"=="s" goto do_upload
 goto done
 
 :do_upload
+call :sanitizar
+if defined API_KEY goto clave_ok
+if "%AUTO_MODE%"=="0" call :pedir_clave
 if not defined API_KEY (
-    echo ERROR: Variable API_KEY no definida
-    if "%AUTO_MODE%"=="0" (
-        echo Defina: set API_KEY=su_clave_aqui
-        pause
-    )
+    echo ERROR: Variable API_KEY no definida o vacia
+    echo Defina: set API_KEY=su_clave_aqui
+    if "%AUTO_MODE%"=="0" pause
     exit /b 1
 )
+:clave_ok
+if %KEYLEN% GEQ 1 if %KEYLEN% LSS 4 (
+    echo ERROR: La clave tiene %KEYLEN% caracteres, valor incompleto o corrupto.
+    echo Escribala a mano con: set API_KEY=su_clave_aqui
+    if "%AUTO_MODE%"=="0" pause
+    exit /b 1
+)
+if exist .venv\Scripts\python.exe .venv\Scripts\python.exe -c "import os;v=os.environ.get('API_KEY','');print('  Clave:',len(v),'caracteres, extremos:',repr(v[:1]+v[-1:]))"
 if not defined API_URL set API_URL=https://g360-stock-api.onrender.com
 echo.
 echo Subiendo a %API_URL%/api/v1/catalog/upload ...
@@ -143,7 +163,7 @@ echo ==========================================
 if "%AUTO_MODE%"=="0" pause
 exit /b 0
 
-:bat3
+:estado
 echo.
 echo ==========================================
 echo ESTADO DEL CATALOGO
@@ -158,14 +178,27 @@ echo.
 if "%AUTO_MODE%"=="0" pause
 exit /b 0
 
+:upload_only
+echo.
+echo ==========================================
+echo SUBIR JSON EXISTENTE (sin regenerar)
+echo ==========================================
+echo.
+if not exist output\catalogo_productos.json (
+    echo ERROR: output/catalogo_productos.json no existe, genere primero con opcion 1
+    exit /b 1
+)
+goto do_upload
+
 :: ----------------------------------------------------------------------------
 :: Upload con reintentos (cold start de Render free-tier)
 :upload_with_retry
 set "MAX_RETRIES=3"
 set "RETRY_DELAY=15"
+set /a "WAIT_N=RETRY_DELAY+1" >nul
 for /l %%i in (1,1,%MAX_RETRIES%) do (
     echo   Intento %%i/%MAX_RETRIES%...
-    curl -s --max-time 60 -X POST "%API_URL%/api/v1/catalog/upload" -H "X-API-Key: %API_KEY%" -F "archivo=@output/catalogo_productos.json"
+    curl -sS -f --max-time 60 -X POST "%API_URL%/api/v1/catalog/upload" -H "X-API-Key: %API_KEY%" -F "archivo=@output/catalogo_productos.json"
     echo.
     if !ERRORLEVEL! EQU 0 (
         echo   Upload exitoso en intento %%i
@@ -173,10 +206,31 @@ for /l %%i in (1,1,%MAX_RETRIES%) do (
     )
     if %%i LSS %MAX_RETRIES% (
         echo   Fallo, reintentando en %RETRY_DELAY%s...
-        timeout /t %RETRY_DELAY% /nobreak >nul
+        ping -n %WAIT_N% 127.0.0.1 >nul
     )
 )
 exit /b 1
+
+:: ----------------------------------------------------------------------------
+:: Sanitiza API_KEY (quita todo whitespace incl. invisibles) y expone KEYLEN.
+:: OJO: no usar for/f dentro de bloques if (...) — rompe el parser de batch.
+:sanitizar
+set "KEYLEN=0"
+if not exist .venv\Scripts\python.exe goto sanitizar_fb
+for /f "tokens=1* delims= " %%a in ('.venv\Scripts\python.exe scripts\sanitize_key.py') do (set "KEYLEN=%%a" & set "API_KEY=%%b")
+exit /b 0
+:sanitizar_fb
+set "API_KEY=%API_KEY: =%"
+set "API_KEY=%API_KEY:"=%"
+exit /b 0
+
+:: Pide la clave interactivamente y la sanitiza
+:pedir_clave
+echo.
+echo Variable API_KEY no definida.
+set /p "API_KEY=Pegue la clave del API: "
+call :sanitizar
+exit /b 0
 
 :: ----------------------------------------------------------------------------
 :: Auto-instala dependencias minimas si faltan en .venv

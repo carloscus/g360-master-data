@@ -8,6 +8,8 @@ docs/analisis-actualizacion-xlsx.md
 *.bak.json
 tmp_*.py
 output/test_estado_linea.json
+# Archivos de bloqueo de Excel (cuando SKU_BX.xlsx esta abierto)
+~$*
 
 # graft's local graph cache — regenerable, not committed (run `graft build`).
 /graft/
