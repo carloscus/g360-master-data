@@ -3,7 +3,7 @@
 > Sistema centralizado de datos maestros para proyectos G360.
 > Genera JSON de catálogo completo desde ERP + SKU_BX.
 
-[![Version](https://img.shields.io/badge/version-3.0.0-blue)]()
+[![Version](https://img.shields.io/badge/version-3.1.0-blue)]()
 [![Python](https://img.shields.io/badge/Python-3.11+-blue)]()
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)]()
 
@@ -30,13 +30,15 @@ g360-master-data/
 │       Columnas: ORDEN, SKU, UN_BX
 │
 ├── output/
-│   ├── catalogo_productos.json ← Catálogo generado (2,393 SKUs)
+│   ├── catalogo_productos.json ← Catálogo generado (2,411 SKUs)
 │   └── un_bx_master.csv        ← Lista simplificada SKU,un_bx (para importación manual)
 │
 ├── scripts/
-│   └── generar_catalogo_base.py ← Genera catálogo desde ERP + SKU_BX
+│   ├── generar_catalogo_base.py ← Genera catálogo desde ERP + SKU_BX (principal, v3)
+│   ├── ver_estado.py            ← Muestra estado del catálogo generado
+│   └── tests/                   ← Tests unitarios (pytest)
 │
-├── actualizar_catalogo.bat     ← Workflow interactivo (BAT 1 / BAT 2)
+├── actualizar_catalogo.bat     ← Workflow interactivo + modo automático (--auto)
 └── README.md
 ```
 
@@ -47,12 +49,19 @@ g360-master-data/
 ```
 1. Descargar PRODUCTOS.xls desde appweb.cipsa.com.pe (mensual/bimestral)
 2. Actualizar SKU_BX.xlsx con nuevos SKUs (manual, cuando ingresa stock nuevo)
-3. Ejecutar: actualizar_catalogo.bat → Opción 1
-4. Verificar output/catalogo_productos.json
-5. Subir al API: Opción s en el bat, o manualmente:
+3. Ejecutar: actualizar_catalogo.bat → Opción 1 (o `actualizar_catalogo.bat --auto` para generar + subir sin preguntar)
+4. Verificar output/catalogo_productos.json (opción 2 del bat)
+5. Subir al API: Opción s en el bat (requiere `API_KEY` definida), o manualmente:
    curl -X POST "https://g360-stock-api.onrender.com/api/v1/catalog/upload" \
+        -H "X-API-Key: %API_KEY%" \
         -F "archivo=@output/catalogo_productos.json"
 ```
+
+> El `copy` a `..\g360-stock-api\data\catalog_cache.json` solo actualiza el entorno
+> local de desarrollo. Producción (Render) **solo** se actualiza vía `POST /api/v1/catalog/upload`
+> o vía auto-carga desde GitHub (`catalogo_raw_url`, TTL 6h).
+> Definir la clave en la misma terminal antes de ejecutar:
+> `set API_KEY=tu_clave` (cmd) o `$env:API_KEY="tu_clave"` (PowerShell).
 
 ---
 
@@ -60,10 +69,12 @@ g360-master-data/
 
 | Filtro | Resultado |
 |--------|-----------|
+| Inactivos (FLG_INACTIVO) | Excluidos |
 | Descontinuados | Excluidos (~1,315) |
 | Sin precio (≤0) | Excluidos (~9,066) |
 | Líneas de proceso | Excluidas |
-| **Productos finales** | **2,393 SKUs** |
+| SKUs duplicados en ERP | Solo el primero |
+| **Productos finales** | **2,411 SKUs** |
 
 ---
 
@@ -105,14 +116,27 @@ python scripts/generar_catalogo_base.py --validate-only
 
 ### `actualizar_catalogo.bat`
 
-Workflow interactivo:
+Workflow interactivo + modo automático:
 
 ```
 1) Generar catalogo base (PRODUCTOS.xls + SKU_BX)
-2) Generar catalogo enriquecido (descuentos/precios)
-3) Ver estado del catalogo
+2) Ver estado del catalogo
 0) Salir
 ```
+
+```bat
+:: Interactivo (menu)
+actualizar_catalogo.bat
+
+:: Automatico: genera + sube al API sin preguntar (requiere API_KEY)
+actualizar_catalogo.bat --auto
+
+:: Automatico local: genera + copia local, sin subir
+actualizar_catalogo.bat --auto-local
+```
+
+El upload reintenta 3 veces (cold start de Render free-tier) y requiere
+`X-API-Key` (variable `API_KEY` en la terminal).
 
 ---
 

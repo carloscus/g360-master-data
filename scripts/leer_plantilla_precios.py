@@ -83,7 +83,7 @@ def leer_plantilla_precios(ruta):
             orden = row[idx.get('orden', 0)]
             sku = row[idx.get('sku', 1)]
             
-            if sku and orden:
+            if sku and orden is not None and str(orden).strip():
                 productos_data[str(sku).strip()] = int(orden) if orden else 0
         
         print(f"Productos leídos: {len(productos_data)}")

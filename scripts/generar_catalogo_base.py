@@ -81,10 +81,33 @@ def generar_keywords(nombre, linea, categoria):
     return sorted(keywords)
 
 
+def _safe_float(val, default=0.0):
+    """Convierte a float de forma segura, retorna default si falla."""
+    if val is None or val == "":
+        return default
+    try:
+        return float(val)
+    except (ValueError, TypeError):
+        return default
+
+
+def _clean_ean(val):
+    """Limpia EAN: quita .0 de floats serializados y espacios."""
+    if val is None:
+        return ""
+    s = str(val).strip()
+    if not s or s == "0":
+        return ""
+    if s.endswith(".0"):
+        s = s[:-2]
+    return s
+
+
 def leer_erp(ruta):
     """Lee PRODUCTOS.xls y retorna lista de productos (filtrados)."""
     productos = []
     errores = []
+    skus_vistos = {}
     try:
         wb = xlrd.open_workbook(ruta)
         ws = wb.sheet_by_index(0)
@@ -93,27 +116,37 @@ def leer_erp(ruta):
             if not sku:
                 continue
             nombre = str(ws.cell_value(r, 1)).strip()
-            ean13 = str(ws.cell_value(r, 2)).strip()
-            ean14 = str(ws.cell_value(r, 3)).strip()
-            peso_kg = float(ws.cell_value(r, 4)) if ws.cell_value(r, 4) else 0.0
+            if not nombre:
+                continue
+            ean13 = _clean_ean(ws.cell_value(r, 2))
+            ean14 = _clean_ean(ws.cell_value(r, 3))
+            peso_kg = _safe_float(ws.cell_value(r, 4))
             linea = str(ws.cell_value(r, 5)).strip()
             grupo = str(ws.cell_value(r, 6)).strip()
             tipo = str(ws.cell_value(r, 7)).strip()
             familia = str(ws.cell_value(r, 8)).strip()
+            flg_inactivo = str(ws.cell_value(r, 9)).strip().lower() == 'checked'
             flg_discont = str(ws.cell_value(r, 10)).strip().lower() == 'checked'
-            precio = float(ws.cell_value(r, 11)) if ws.cell_value(r, 11) else 0.0
+            precio = _safe_float(ws.cell_value(r, 11))
 
-            # Filtrar: descontinuados
+            if sku in skus_vistos:
+                continue
+            skus_vistos[sku] = r
+
+            if flg_inactivo:
+                continue
             if flg_discont:
                 continue
-            # Filtrar: sin precio
             if precio <= 0:
                 continue
-            # Filtrar: líneas de proceso
             if linea in LINEAS_EXCLUIR:
                 continue
 
-            categoria = LINEA_A_CATEGORIA.get(linea, "REPRESENTADAS")
+            linea_upper = linea.upper()
+            if linea_upper not in LINEA_A_CATEGORIA:
+                print(f"  WARN: Linea desconocida '{linea}' (SKU {sku}), asignando REPRESENTADAS")
+
+            categoria = LINEA_A_CATEGORIA.get(linea_upper, "REPRESENTADAS")
 
             productos.append({
                 "sku": sku,
@@ -146,7 +179,7 @@ def leer_unbx(ruta):
         ws = wb.active
         for row in ws.iter_rows(min_row=2, values_only=True):
             sku = str(row[1] or "").strip()
-            un_bx = row[2]
+            un_bx_raw = row[2]
             estado = str(row[3] or "").strip() if len(row) > 3 else ""
             orden = row[0] if len(row) > 0 else None
             if sku:
@@ -154,8 +187,11 @@ def leer_unbx(ruta):
                     orden_map[sku] = int(orden) if orden is not None else 0
                 except (ValueError, TypeError):
                     orden_map[sku] = 0
-            if sku and un_bx:
-                unbx_map[sku] = int(un_bx)
+            if sku and un_bx_raw is not None and str(un_bx_raw).strip():
+                try:
+                    unbx_map[sku] = int(un_bx_raw)
+                except (ValueError, TypeError):
+                    pass
             if sku and estado:
                 estado_map[sku] = estado
         wb.close()
@@ -181,11 +217,12 @@ def generar_output(productos, unbx_map, estado_map, orden_map, ruta_salida):
 
     productos_final = []
     for p in productos:
+        tiene_unbx = p["sku"] in unbx_map
         un_bx = unbx_map.get(p["sku"], 1)
-        if un_bx == 1:
-            estadisticas["sin_unbx"] += 1
-        else:
+        if tiene_unbx:
             estadisticas["con_unbx"] += 1
+        else:
+            estadisticas["sin_unbx"] += 1
         if not p["ean13"]:
             estadisticas["sin_ean13"] += 1
         if p["ean14"]:
@@ -195,6 +232,10 @@ def generar_output(productos, unbx_map, estado_map, orden_map, ruta_salida):
         lin = p["linea"]
         estadisticas["por_categoria"][cat] = estadisticas["por_categoria"].get(cat, 0) + 1
         estadisticas["por_linea"][lin] = estadisticas["por_linea"].get(lin, 0) + 1
+
+        est = estado_map.get(p["sku"], "")
+        if est:
+            estadisticas["por_estado_linea"][est] = estadisticas["por_estado_linea"].get(est, 0) + 1
 
         productos_final.append({
             "sku": p["sku"],
@@ -209,16 +250,11 @@ def generar_output(productos, unbx_map, estado_map, orden_map, ruta_salida):
             "familia": p["familia"],
             "un_bx": un_bx,
             "orden": orden_map.get(p["sku"], 0),
-            "estado_linea": estado_map.get(p["sku"], ""),
+            "estado_linea": est,
             "peso_kg": p["peso_kg"],
             "precio": p["precio"],
             "keywords": generar_keywords(p["nombre"], p["linea"], p["categoria"]),
         })
-
-        # Stats estado_linea
-        est = estado_map.get(p["sku"], "")
-        if est:
-            estadisticas["por_estado_linea"][est] = estadisticas["por_estado_linea"].get(est, 0) + 1
 
     productos_final.sort(key=lambda x: (x.get("orden", 0) == 0, x.get("orden", 0) or 0, x["sku"]))
 
@@ -236,6 +272,8 @@ def generar_output(productos, unbx_map, estado_map, orden_map, ruta_salida):
     p = Path(ruta_salida)
     if p.exists():
         bak = p.with_suffix(f".{datetime.now():%Y%m%d_%H%M%S}.bak.json")
+        if bak.exists():
+            bak.unlink()
         p.rename(bak)
         print(f"  Backup: {bak.name}")
 

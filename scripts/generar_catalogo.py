@@ -17,6 +17,26 @@ except ImportError:
     print("ERROR: pip install openpyxl")
     sys.exit(1)
 
+def _safe_float(val, default=0.0):
+    """Convierte a float de forma segura, retorna default si falla."""
+    if val is None or val == "":
+        return default
+    try:
+        return float(val)
+    except (ValueError, TypeError):
+        return default
+
+
+def _safe_int(val, default=0):
+    """Convierte a int de forma segura, retorna default si falla."""
+    if val is None or val == "":
+        return default
+    try:
+        return int(float(val))
+    except (ValueError, TypeError):
+        return default
+
+
 COLUMNS = [
     "orden", "sku", "nombre", "ean13", "categoria", "estado_linea", "subcategoria",
     "linea", "grupo", "tipo", "familia", "unidad_medida", "peso_kg",
@@ -216,15 +236,15 @@ def leer_excel(ruta):
                 
                 # Procesar según tipo de campo
                 if c in ["peso_kg", "precio_lista"]:
-                    p[c] = round(float(v), 2) if v not in (None, "") else 0.0
+                    p[c] = round(_safe_float(v), 2)
                 elif c in ["un_bx", "orden"]:
                     # un_bx vacío se asigna 1
                     if c == "un_bx" and v in (None, ""):
                         p[c] = 1
                     else:
-                        p[c] = int(v) if v not in (None, "") else 0
+                        p[c] = _safe_int(v)
                 else:
-                    p[c] = v or ""
+                    p[c] = v if v not in (None, "") else ""
             
             # =====================================================
             # Validaciones obligatorias
