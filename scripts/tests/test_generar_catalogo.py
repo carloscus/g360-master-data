@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Tests unitarios para G360 Catalog Generator v3
+Tests unitarios para G360 Catalog Generator v3.1
 Ejecutar: python -m pytest scripts/tests/ -v
 """
 import sys
@@ -9,8 +9,10 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from generar_catalogo_base import (
+    decidir_inclusion,
     generar_nombre_corto,
     generar_keywords,
+    generar_output,
     _safe_float,
     _clean_ean,
     LINEA_A_CATEGORIA,
@@ -102,6 +104,52 @@ class TestGenerarKeywords:
     def test_sorted_output(self):
         kw = generar_keywords("ZULU ALFA BRAVO", "", "")
         assert kw == sorted(kw)
+
+
+class TestDecidirInclusion:
+    """Regla: vigente ERP entra; descontinuado solo si está en SKU_BX."""
+
+    def test_vigente_entra(self):
+        assert decidir_inclusion(False, False, 10.0, "PELOTAS", False) == (True, False)
+
+    def test_descontinuado_en_bx_entra_marcado(self):
+        assert decidir_inclusion(False, True, 3.36, "ACCESORIOS", True) == (True, True)
+
+    def test_descontinuado_fuera_bx_se_excluye(self):
+        assert decidir_inclusion(False, True, 3.36, "ACCESORIOS", False) == (False, False)
+
+    def test_inactivo_siempre_fuera(self):
+        assert decidir_inclusion(True, False, 10.0, "PELOTAS", True) == (False, False)
+        assert decidir_inclusion(True, True, 10.0, "PELOTAS", True) == (False, False)
+
+    def test_sin_precio_siempre_fuera(self):
+        assert decidir_inclusion(False, False, 0.0, "PELOTAS", True) == (False, False)
+        assert decidir_inclusion(False, True, 0.0, "PELOTAS", True) == (False, False)
+
+    def test_linea_proceso_siempre_fuera(self):
+        assert decidir_inclusion(False, False, 10.0, "PRODUCTOS EN PROCESO", True) == (False, False)
+        assert decidir_inclusion(False, True, 10.0, "PRODUCTOS EN PROCESO", True) == (False, False)
+
+
+def _prod(sku, descontinuado=False):
+    return {
+        "sku": sku, "nombre": f"Producto {sku}", "ean13": "", "ean14": "",
+        "peso_kg": 0.1, "linea": "PELOTAS", "grupo": "G", "tipo": "T",
+        "familia": "F", "categoria": "VINIBALL", "precio": 10.0,
+        "descontinuado": descontinuado,
+    }
+
+
+class TestGenerarOutputDescontinuado:
+    def test_marca_y_cuenta_descontinuados(self, tmp_path):
+        out = tmp_path / "cat.json"
+        res = generar_output(
+            [_prod("A"), _prod("B", True)], {}, {}, {}, str(out))
+        prods = {p["sku"]: p for p in res["productos"]}
+        assert prods["A"]["descontinuado"] is False
+        assert prods["B"]["descontinuado"] is True
+        assert res["metadata"]["estadisticas"]["descontinuados"] == 1
+        assert res["metadata"]["total_productos"] == 2
 
 
 class TestLineaACategoria:

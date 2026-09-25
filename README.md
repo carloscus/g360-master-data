@@ -26,11 +26,11 @@ g360-master-data/
 │   │   Columnas: CODIGO, NOMBRE, COD_EAN, COD_EAN_14, CAN_KG_UM,
 │   │              LINEA, GRUPO, TIPO, FAMILIA, FLG_INACTIVO,
 │   │              FLG_DESCONTINUADO, PRECIO
-│   └── SKU_BX.xlsx             ← Cantidad por caja (manual, agregar cuando ingresa nuevo stock)
-│       Columnas: ORDEN, SKU, UN_BX
+│   └── SKU_BX.xlsx             ← Guía primaria: qué se vende (manual, agregar cuando ingresa nuevo stock)
+│       Columnas: ORDEN, SKU, UN_BX, ESTADO_LINEA
 │
 ├── output/
-│   ├── catalogo_productos.json ← Catálogo generado (2,411 SKUs)
+│   ├── catalogo_productos.json ← Catálogo generado (2,488 SKUs: 2411 vigentes + 77 descontinuados en BX)
 │   └── un_bx_master.csv        ← Lista simplificada SKU,un_bx (para importación manual)
 │
 ├── scripts/
@@ -67,14 +67,21 @@ g360-master-data/
 
 ## Filtros aplicados
 
+SKU_BX es la guía primaria de lo que se vende: un descontinuado se incluye
+solo si está curado en SKU_BX (llegó stock que se puede vender) y se marca
+con `descontinuado: true`. Para vender un descontinuado, agrégalo a SKU_BX
+y aparece marcado en el próximo catálogo.
+
 | Filtro | Resultado |
 |--------|-----------|
-| Inactivos (FLG_INACTIVO) | Excluidos |
-| Descontinuados | Excluidos (~1,315) |
-| Sin precio (≤0) | Excluidos (~9,066) |
-| Líneas de proceso | Excluidas |
+| Inactivos (FLG_INACTIVO) | Excluidos (siempre) |
+| Descontinuados fuera de BX | Excluidos |
+| Descontinuados en BX | **Incluidos con `descontinuado: true`** (77) |
+| Sin precio (≤0) | Excluidos (siempre) |
+| Líneas de proceso | Excluidas (siempre) |
 | SKUs duplicados en ERP | Solo el primero |
-| **Productos finales** | **2,411 SKUs** |
+| SKUs en BX sin ERP | Advertencia y se omiten (ej. `04058`) |
+| **Productos finales** | **2,488 SKUs** |
 
 ---
 
@@ -88,10 +95,11 @@ g360-master-data/
 | peso_kg | PRODUCTOS.xls | ~96% tiene valor |
 | linea, grupo, tipo, familia | PRODUCTOS.xls | |
 | categoria | Derivada de linea | VINIBALL, VINIFAN, REPRESENTADAS |
-| un_bx | SKU_BX.xlsx | 42% tiene valor definido |
+| un_bx | SKU_BX.xlsx | 41% tiene valor definido |
 | orden | SKU_BX.xlsx (col A) | Índice maestro — orden ascendente |
 | estado_linea | SKU_BX.xlsx (col D) | NACIONAL, IMPORTADO, NUEVO, TRADICIONAL |
 | precio | PRODUCTOS.xls | |
+| descontinuado | PRODUCTOS.xls (FLG_DESCONTINUADO) + SKU_BX | `true` si está descontinuado y curado en BX; el API lo propaga como badge |
 | nombre_corto | Generado con regex | Elimina prefijos, marcas |
 | keywords | Generado automáticamente | Palabras clave del nombre + categoria |
 

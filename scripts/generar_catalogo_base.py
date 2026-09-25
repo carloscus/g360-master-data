@@ -2,16 +2,21 @@
 """
 G360 Catalog Generator — Versión simplificada
 Genera catálogo enriquecido desde PRODUCTOS.xls + SKU_BX.xlsx
-Autor: CCUSI | v3.0.0
+Autor: CCUSI | v3.1.0
 
 Fuentes:
   - data/PRODUCTOS.xls       → SKU, nombre, ean13, ean14, peso, linea, grupo, tipo, familia, precio
   - data/SKU_BX.xlsx         → SKU, un_bx (cantidad por caja)
 
-Filtros:
-  - Excluye productos descontinuados
-  - Excluye productos sin precio (> 0)
-  - Excluye líneas de proceso/bonificaciones (precio <= 0)
+Regla de inclusión (SKU_BX es la guía primaria de lo que se vende):
+  - Se muestra el SKU si está vigente en ERP, o si está descontinuado
+    pero curado en SKU_BX (con precio > 0 y no inactivo).
+  - Los descontinuados incluidos se marcan con descontinuado=true.
+
+Filtros absolutos (siempre excluyen):
+  - Inactivos (FLG_INACTIVO)
+  - Sin precio (<= 0)
+  - Líneas de proceso
 """
 import argparse
 import json
@@ -103,11 +108,36 @@ def _clean_ean(val):
     return s
 
 
-def leer_erp(ruta):
-    """Lee PRODUCTOS.xls y retorna lista de productos (filtrados)."""
+def decidir_inclusion(flg_inactivo, flg_discont, precio, linea, en_bx):
+    """Decide si un SKU del ERP entra al catálogo.
+
+    SKU_BX es la guía primaria de lo que se vende: un descontinuado se
+    incluye solo si está curado en SKU_BX (llegó stock que se puede vender).
+
+    Retorna (incluir, descontinuado).
+    """
+    if flg_inactivo:
+        return False, False
+    if precio <= 0:
+        return False, False
+    if linea in LINEAS_EXCLUIR:
+        return False, False
+    if flg_discont and not en_bx:
+        return False, False
+    return True, flg_discont
+
+
+def leer_erp(ruta, bx_skus=None):
+    """Lee PRODUCTOS.xls y retorna (productos, errores, erp_skus).
+
+    bx_skus: set de SKUs curados en SKU_BX (guía primaria). Los
+    descontinuados solo se incluyen si están en este set.
+    """
     productos = []
     errores = []
     skus_vistos = {}
+    erp_skus = set()
+    bx_skus = bx_skus or set()
     try:
         wb = xlrd.open_workbook(ruta)
         ws = wb.sheet_by_index(0)
@@ -132,14 +162,11 @@ def leer_erp(ruta):
             if sku in skus_vistos:
                 continue
             skus_vistos[sku] = r
+            erp_skus.add(sku)
 
-            if flg_inactivo:
-                continue
-            if flg_discont:
-                continue
-            if precio <= 0:
-                continue
-            if linea in LINEAS_EXCLUIR:
+            incluir, descontinuado = decidir_inclusion(
+                flg_inactivo, flg_discont, precio, linea, sku in bx_skus)
+            if not incluir:
                 continue
 
             linea_upper = linea.upper()
@@ -160,12 +187,13 @@ def leer_erp(ruta):
                 "familia": familia,
                 "categoria": categoria,
                 "precio": round(precio, 2),
+                "descontinuado": descontinuado,
             })
         wb.release_resources()
         print(f"  ERP: {len(productos)} productos válidos")
     except Exception as e:
         errores.append(str(e))
-    return productos, errores
+    return productos, errores, erp_skus
 
 
 def leer_unbx(ruta):
@@ -210,6 +238,7 @@ def generar_output(productos, unbx_map, estado_map, orden_map, ruta_salida):
         "con_ean14": 0,
         "sin_unbx": 0,
         "con_unbx": 0,
+        "descontinuados": 0,
         "por_categoria": {},
         "por_linea": {},
         "por_estado_linea": {},
@@ -227,6 +256,8 @@ def generar_output(productos, unbx_map, estado_map, orden_map, ruta_salida):
             estadisticas["sin_ean13"] += 1
         if p["ean14"]:
             estadisticas["con_ean14"] += 1
+        if p.get("descontinuado"):
+            estadisticas["descontinuados"] += 1
 
         cat = p["categoria"]
         lin = p["linea"]
@@ -253,13 +284,14 @@ def generar_output(productos, unbx_map, estado_map, orden_map, ruta_salida):
             "estado_linea": est,
             "peso_kg": p["peso_kg"],
             "precio": p["precio"],
+            "descontinuado": p.get("descontinuado", False),
             "keywords": generar_keywords(p["nombre"], p["linea"], p["categoria"]),
         })
 
     productos_final.sort(key=lambda x: (x.get("orden", 0) == 0, x.get("orden", 0) or 0, x["sku"]))
 
     metadata = {
-        "version": "3.0.0",
+        "version": "3.1.0",
         "generated_at": datetime.now().isoformat(),
         "source_erp": "PRODUCTOS.xls",
         "source_un_bx": "SKU_BX.xlsx",
@@ -284,7 +316,7 @@ def generar_output(productos, unbx_map, estado_map, orden_map, ruta_salida):
 
 
 def main():
-    ap = argparse.ArgumentParser(description="G360 Catalog Generator v3")
+    ap = argparse.ArgumentParser(description="G360 Catalog Generator v3.1")
     ap.add_argument("--erp", "-e", default="data/PRODUCTOS.xls", help="Archivo ERP")
     ap.add_argument("--unbx", "-u", default="data/SKU_BX.xlsx", help="Archivo SKU_BX")
     ap.add_argument("--output", "-o", default="output/catalogo_productos.json", help="JSON salida")
@@ -292,19 +324,25 @@ def main():
     a = ap.parse_args()
 
     print("=" * 50)
-    print("G360 CATALOG GENERATOR v3.0.0")
+    print("G360 CATALOG GENERATOR v3.1.0")
     print("=" * 50)
     print(f"ERP:      {a.erp}")
     print(f"SKU_BX:   {a.unbx}")
     print(f"Output:   {a.output}")
     print()
 
-    # Leer fuentes
+    # Leer fuentes (BX primero: es la guía primaria de inclusión)
     print("Leyendo fuentes...")
-    productos, errs = leer_erp(a.erp)
     orden_map, unbx_map, estado_map = leer_unbx(a.unbx)
+    productos, errs, erp_skus = leer_erp(a.erp, bx_skus=set(orden_map))
     if errs:
         print(f"Errores: {errs}")
+
+    huerfanos = sorted(set(orden_map) - erp_skus)
+    if huerfanos:
+        print(f"  WARN: {len(huerfanos)} SKUs en SKU_BX no existen en ERP (se omiten): "
+              f"{', '.join(huerfanos[:10])}"
+              f"{'...' if len(huerfanos) > 10 else ''}")
 
     if not productos:
         print("ERROR: No hay productos válidos")
@@ -333,6 +371,7 @@ def main():
     print(f"  Sin ean13:  {est['sin_ean13']}")
     print(f"  Con un_bx:  {est['con_unbx']}")
     print(f"  Sin un_bx:  {est['sin_unbx']}")
+    print(f"  Descontinuados (en BX): {est['descontinuados']}")
     print(f"\nCategorías:")
     for cat, cnt in sorted(est["por_categoria"].items(), key=lambda x: -x[1]):
         print(f"  {cat}: {cnt}")
