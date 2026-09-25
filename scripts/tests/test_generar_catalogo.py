@@ -16,6 +16,7 @@ from generar_catalogo_base import (
     _safe_float,
     _clean_ean,
     LINEA_A_CATEGORIA,
+    LINEA_NOMBRE_A_CODIGO,
 )
 
 
@@ -131,12 +132,13 @@ class TestDecidirInclusion:
         assert decidir_inclusion(False, True, 10.0, "PRODUCTOS EN PROCESO", True) == (False, False)
 
 
-def _prod(sku, descontinuado=False):
+def _prod(sku, descontinuado=False, linea="PELOTAS"):
     return {
         "sku": sku, "nombre": f"Producto {sku}", "ean13": "", "ean14": "",
-        "peso_kg": 0.1, "linea": "PELOTAS", "grupo": "G", "tipo": "T",
+        "peso_kg": 0.1, "linea": linea, "grupo": "G", "tipo": "T",
         "familia": "F", "categoria": "VINIBALL", "precio": 10.0,
         "descontinuado": descontinuado,
+        "linea_codigo": LINEA_NOMBRE_A_CODIGO.get(linea.upper(), ""),
     }
 
 
@@ -150,6 +152,25 @@ class TestGenerarOutputDescontinuado:
         assert prods["B"]["descontinuado"] is True
         assert res["metadata"]["estadisticas"]["descontinuados"] == 1
         assert res["metadata"]["total_productos"] == 2
+
+    def test_linea_codigo_emitido(self, tmp_path):
+        out = tmp_path / "cat.json"
+        res = generar_output(
+            [_prod("A", linea="ARCHIVO"), _prod("B", linea="MASCOTAS"),
+             _prod("C", linea="LINEA INVENTADA")], {}, {}, {}, str(out))
+        prods = {p["sku"]: p for p in res["productos"]}
+        assert prods["A"]["linea_codigo"] == "78"
+        assert prods["B"]["linea_codigo"] == "MA"
+        assert prods["C"]["linea_codigo"] == ""
+        assert res["metadata"]["estadisticas"]["sin_linea_codigo"] == 1
+
+
+class TestLineaNombreACodigo:
+    def test_codigos_conocidos(self):
+        assert LINEA_NOMBRE_A_CODIGO["PELOTAS"] == "01"
+        assert LINEA_NOMBRE_A_CODIGO["ARCHIVO"] == "78"
+        assert LINEA_NOMBRE_A_CODIGO["MASCOTAS"] == "MA"
+        assert LINEA_NOMBRE_A_CODIGO["ACCESORIOS"] == "79"
 
 
 class TestLineaACategoria:

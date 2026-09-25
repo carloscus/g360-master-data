@@ -94,6 +94,7 @@ y aparece marcado en el próximo catálogo.
 | ean14 | PRODUCTOS.xls | ~34% tiene valor |
 | peso_kg | PRODUCTOS.xls | ~96% tiene valor |
 | linea, grupo, tipo, familia | PRODUCTOS.xls | |
+| linea_codigo | Mapa estático derivado del reporte de stock | Código corto 2 chars (ej. `PELOTAS`→`01`, `ARCHIVO`→`78`, `MASCOTAS`→`MA`); vacío si la línea no está en el mapa (`VARIOS`) |
 | categoria | Derivada de linea | VINIBALL, VINIFAN, REPRESENTADAS |
 | un_bx | SKU_BX.xlsx | 41% tiene valor definido |
 | orden | SKU_BX.xlsx (col A) | Índice maestro — orden ascendente |

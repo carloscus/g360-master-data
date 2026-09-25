@@ -2,7 +2,7 @@
 """
 G360 Catalog Generator — Versión simplificada
 Genera catálogo enriquecido desde PRODUCTOS.xls + SKU_BX.xlsx
-Autor: CCUSI | v3.1.0
+Autor: CCUSI | v3.2.0
 
 Fuentes:
   - data/PRODUCTOS.xls       → SKU, nombre, ean13, ean14, peso, linea, grupo, tipo, familia, precio
@@ -51,6 +51,25 @@ LINEA_A_CATEGORIA = {
     "REPRESENTADAS": "REPRESENTADAS", "PUBLICIDAD": "REPRESENTADAS",
     "PRODUCTOS INDUSTRIALES": "REPRESENTADAS", "MATERIALES AUXILIARES": "REPRESENTADAS",
     "OTROS": "REPRESENTADAS", "VARIOS": "REPRESENTADAS", "SET": "REPRESENTADAS",
+}
+
+# Mapeo nombre de línea → código corto (2 chars), derivado del reporte de
+# stock del API ("0178 - ARCHIVO" → "78", "01MA - MASCOTAS" → "MA").
+# Semilla estática: el reporte es la verdad; el funnel lo sobrescribe
+# dinámicamente por nombre si la semilla no cubre una línea nueva.
+LINEA_NOMBRE_A_CODIGO = {
+    "PELOTAS": "01", "FORROS": "02", "SENSORIALES": "09", "METALICA": "11",
+    "OTROS": "14", "PEGAMENTOS": "72", "DIDACTICOS": "73", "DIBUJO": "75",
+    "ESCRITURA": "76", "PINTURA": "77", "ARCHIVO": "78", "ACCESORIOS": "79",
+    "PUBLICIDAD": "80", "KITS": "81", "REPRESENTADAS": "85",
+    "MASCOTAS": "MA", "MANUALIDADES": "CE", "SET": "CF", "ACCESORIOS DEPORTIVOS": "AD",
+    "PRODUCTOS INDUSTRIALES": "20", "REPRESENTACIONES INDUSTRIALES": "21",
+    "SEGURIDAD Y SEÑALIZACION VIAL": "23", "CIPTECH ETIQUETAS": "30",
+    "CIPTECH CINTAS": "31", "CIPTECH CPEI": "32", "CIPTECH CIL": "33",
+    "CIPTECH SUPPLY CHAIN": "35", "MATERIA PRIMA": "40",
+    "MATERIALES AUXILIARES": "50", "INDUMENTARIA Y EPP": "57", "SCRAP": "60",
+    "MERCADERIAS VARIAS": "65", "ECONOMATO": "66", "PRODUCTOS EN PROCESO": "70",
+    "PRODUCTOS SIN EMBALAJE": "98",
 }
 
 # Lineas que NO son productos de venta
@@ -188,6 +207,7 @@ def leer_erp(ruta, bx_skus=None):
                 "categoria": categoria,
                 "precio": round(precio, 2),
                 "descontinuado": descontinuado,
+                "linea_codigo": LINEA_NOMBRE_A_CODIGO.get(linea_upper, ""),
             })
         wb.release_resources()
         print(f"  ERP: {len(productos)} productos válidos")
@@ -239,6 +259,7 @@ def generar_output(productos, unbx_map, estado_map, orden_map, ruta_salida):
         "sin_unbx": 0,
         "con_unbx": 0,
         "descontinuados": 0,
+        "sin_linea_codigo": 0,
         "por_categoria": {},
         "por_linea": {},
         "por_estado_linea": {},
@@ -258,6 +279,8 @@ def generar_output(productos, unbx_map, estado_map, orden_map, ruta_salida):
             estadisticas["con_ean14"] += 1
         if p.get("descontinuado"):
             estadisticas["descontinuados"] += 1
+        if not p.get("linea_codigo"):
+            estadisticas["sin_linea_codigo"] += 1
 
         cat = p["categoria"]
         lin = p["linea"]
@@ -285,13 +308,14 @@ def generar_output(productos, unbx_map, estado_map, orden_map, ruta_salida):
             "peso_kg": p["peso_kg"],
             "precio": p["precio"],
             "descontinuado": p.get("descontinuado", False),
+            "linea_codigo": p.get("linea_codigo", ""),
             "keywords": generar_keywords(p["nombre"], p["linea"], p["categoria"]),
         })
 
     productos_final.sort(key=lambda x: (x.get("orden", 0) == 0, x.get("orden", 0) or 0, x["sku"]))
 
     metadata = {
-        "version": "3.1.0",
+        "version": "3.2.0",
         "generated_at": datetime.now().isoformat(),
         "source_erp": "PRODUCTOS.xls",
         "source_un_bx": "SKU_BX.xlsx",
@@ -316,7 +340,7 @@ def generar_output(productos, unbx_map, estado_map, orden_map, ruta_salida):
 
 
 def main():
-    ap = argparse.ArgumentParser(description="G360 Catalog Generator v3.1")
+    ap = argparse.ArgumentParser(description="G360 Catalog Generator v3.2")
     ap.add_argument("--erp", "-e", default="data/PRODUCTOS.xls", help="Archivo ERP")
     ap.add_argument("--unbx", "-u", default="data/SKU_BX.xlsx", help="Archivo SKU_BX")
     ap.add_argument("--output", "-o", default="output/catalogo_productos.json", help="JSON salida")
@@ -324,7 +348,7 @@ def main():
     a = ap.parse_args()
 
     print("=" * 50)
-    print("G360 CATALOG GENERATOR v3.1.0")
+    print("G360 CATALOG GENERATOR v3.2.0")
     print("=" * 50)
     print(f"ERP:      {a.erp}")
     print(f"SKU_BX:   {a.unbx}")
@@ -372,6 +396,7 @@ def main():
     print(f"  Con un_bx:  {est['con_unbx']}")
     print(f"  Sin un_bx:  {est['sin_unbx']}")
     print(f"  Descontinuados (en BX): {est['descontinuados']}")
+    print(f"  Sin linea_codigo:       {est['sin_linea_codigo']}")
     print(f"\nCategorías:")
     for cat, cnt in sorted(est["por_categoria"].items(), key=lambda x: -x[1]):
         print(f"  {cat}: {cnt}")
