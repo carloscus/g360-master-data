@@ -15,8 +15,11 @@ from generar_catalogo_base import (
     generar_output,
     _safe_float,
     _clean_ean,
+    _extraer_codigo_linea,
+    asignar_categoria,
     LINEA_A_CATEGORIA,
     LINEA_NOMBRE_A_CODIGO,
+    CATEGORIA_POR_LINEA,
 )
 
 
@@ -182,8 +185,69 @@ class TestLineaACategoria:
     def test_all_vinifan_lines(self):
         for linea in ["ARCHIVO", "FORROS", "ESCRITURA", "PINTURA", "DIBUJO",
                        "DIDACTICOS", "MANUALIDADES", "PEGAMENTOS", "ACCESORIOS",
-                       "METALICA", "SENSORIALES", "KITS"]:
+                       "METALICA", "SENSORIALES"]:
             assert LINEA_A_CATEGORIA[linea] == "VINIFAN"
+
+    def test_categorias_operativas_no_caen_en_representadas(self):
+        """v3.3: las lineas operativas ya no se disfrazan de REPRESENTADAS."""
+        assert LINEA_A_CATEGORIA["PRODUCTOS INDUSTRIALES"] == "INDUSTRIAL"
+        assert LINEA_A_CATEGORIA["CIPTECH ETIQUETAS"] == "CIPTECH"
+        assert LINEA_A_CATEGORIA["MATERIA PRIMA"] == "MATERIALES"
+        assert LINEA_A_CATEGORIA["OTROS"] == "VINIBALL"
+
+    def test_mapa_por_codigo_es_la_fuente(self):
+        """El mapa por nombre se deriva del canónico por código."""
+        for nombre, codigo in LINEA_NOMBRE_A_CODIGO.items():
+            assert LINEA_A_CATEGORIA[nombre] == asignar_categoria(codigo)
+
+
+class TestTaxonomiaCanonica:
+    def test_asignar_categoria_por_codigo(self):
+        assert asignar_categoria("78") == "VINIFAN"
+        assert asignar_categoria("01") == "VINIBALL"
+        assert asignar_categoria("20") == "INDUSTRIAL"
+        assert asignar_categoria("30") == "CIPTECH"
+        assert asignar_categoria("XX") == "OTROS"
+        assert asignar_categoria("") == ""
+
+    def test_asignar_categoria_tolera_formato_compuesto(self):
+        assert asignar_categoria("78 - ARCHIVO") == "VINIFAN"
+
+    def test_toda_linea_del_maestro_tiene_categoria(self):
+        """Ninguna linea del maestro se queda sin clasificar."""
+        sin_cat = [
+            nombre
+            for nombre, codigo in LINEA_NOMBRE_A_CODIGO.items()
+            if not asignar_categoria(codigo)
+        ]
+        assert sin_cat == []
+
+    def test_extraer_codigo_linea_formatos(self):
+        assert _extraer_codigo_linea("0178 - ARCHIVO") == "78"
+        assert _extraer_codigo_linea("01MA - MASCOTAS") == "MA"
+        assert _extraer_codigo_linea("78") == "78"
+        assert _extraer_codigo_linea("PELOTAS") == ""
+        assert _extraer_codigo_linea("") == ""
+
+
+class TestInclusionConStock:
+    def test_sku_descontinuado_con_stock_entra_marcado(self):
+        """Hay carga que hacer: un descontinuado con stock entra marcado."""
+        assert decidir_inclusion(False, True, 3.0, "ARCHIVO", False, True) == (True, True)
+
+    def test_sku_vigente_con_stock_entra(self):
+        assert decidir_inclusion(False, False, 3.0, "ARCHIVO", False, True) == (True, False)
+
+    def test_sku_descontinuado_sin_stock_sigue_fuera(self):
+        assert decidir_inclusion(False, True, 3.0, "ARCHIVO", False, False) == (False, False)
+
+    def test_sku_sin_precio_sigue_fuera_aunque_haya_stock(self):
+        """Regla absoluta: sin precio no se publica (se mantiene de v3.2)."""
+        assert decidir_inclusion(False, False, 0.0, "ARCHIVO", False, True) == (False, False)
+        assert decidir_inclusion(False, True, 0.0, "ARCHIVO", True, True) == (False, False)
+
+    def test_inactivo_siempre_fuera_incluso_con_stock(self):
+        assert decidir_inclusion(True, False, 10.0, "ARCHIVO", True, True) == (False, False)
 
 
 if __name__ == "__main__":

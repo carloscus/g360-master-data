@@ -20,6 +20,7 @@ Filtros absolutos (siempre excluyen):
 """
 import argparse
 import json
+import os
 import re
 import sys
 from datetime import datetime
@@ -37,21 +38,70 @@ except ImportError:
     print("ERROR: pip install xlrd")
     sys.exit(1)
 
-# Mapeo de línea → categoría de negocio
-LINEA_A_CATEGORIA = {
-    # VINIBALL
-    "PELOTAS": "VINIBALL", "MASCOTAS": "VINIBALL",
-    "ACCESORIOS DEPORTIVOS": "VINIBALL",
-    # VINIFAN
-    "ARCHIVO": "VINIFAN", "FORROS": "VINIFAN", "ESCRITURA": "VINIFAN",
-    "PINTURA": "VINIFAN", "DIBUJO": "VINIFAN", "DIDACTICOS": "VINIFAN",
-    "MANUALIDADES": "VINIFAN", "PEGAMENTOS": "VINIFAN", "ACCESORIOS": "VINIFAN",
-    "METALICA": "VINIFAN", "SENSORIALES": "VINIFAN", "KITS": "VINIFAN",
-    # REPRESENTADAS
-    "REPRESENTADAS": "REPRESENTADAS", "PUBLICIDAD": "REPRESENTADAS",
-    "PRODUCTOS INDUSTRIALES": "REPRESENTADAS", "MATERIALES AUXILIARES": "REPRESENTADAS",
-    "OTROS": "REPRESENTADAS", "VARIOS": "REPRESENTADAS", "SET": "REPRESENTADAS",
+# ─────────────────────────────────────────────────────────────────────────────
+# Taxonomía canónica: línea (CÓDIGO) → categoría
+#
+# Clave por CODIGO de 2 chars, no por nombre: el codigo es estable y el
+# nombre puede venir escrito de varias formas. Esta taxonomia es la MISMA
+# que aplica el API de stock (g360-stock-api/app/core/constants.py) para que
+# /stock y /catalog no se contradigan, y se publica en el metadata del
+# catalogo para que ningun consumidor la duplique a mano.
+# ─────────────────────────────────────────────────────────────────────────────
+CATEGORIA_POR_LINEA: dict[str, str] = {
+    # Negocio core
+    "01": "VINIBALL", "MA": "VINIBALL", "14": "VINIBALL", "AD": "VINIBALL",
+    "02": "VINIFAN", "09": "VINIFAN", "11": "VINIFAN", "72": "VINIFAN",
+    "73": "VINIFAN", "75": "VINIFAN", "76": "VINIFAN", "77": "VINIFAN",
+    "78": "VINIFAN", "79": "VINIFAN", "CE": "VINIFAN", "CF": "VINIFAN",
+    "57": "INDUMENTARIA", "52": "INDUMENTARIA",
+    "85": "REPRESENTADAS",
+    "80": "PUBLICIDAD", "81": "PUBLICIDAD",
+    # Areas operativas (no core)
+    "20": "INDUSTRIAL", "21": "INDUSTRIAL", "22": "INDUSTRIAL",
+    "23": "INDUSTRIAL",
+    "30": "CIPTECH", "31": "CIPTECH", "32": "CIPTECH", "33": "CIPTECH",
+    "34": "CIPTECH", "35": "CIPTECH", "36": "CIPTECH", "37": "CIPTECH",
+    "38": "CIPTECH", "39": "CIPTECH",
+    "40": "MATERIALES", "41": "MATERIALES", "50": "MATERIALES",
+    "51": "MATERIALES", "52": "MATERIALES", "53": "MATERIALES",
+    "54": "MATERIALES", "55": "MATERIALES",
+    "60": "DESCARTE Y VARIOS", "65": "DESCARTE Y VARIOS",
+    "98": "DESCARTE Y VARIOS",
+    "70": "PRODUCCION",
 }
+
+# Prefijos para lineas no listadas (mas especifico primero).
+PREFIJOS_CATEGORIA_AUTO: list[tuple[str, str]] = [
+    ("20", "INDUSTRIAL"), ("21", "INDUSTRIAL"), ("22", "INDUSTRIAL"),
+    ("23", "INDUSTRIAL"),
+    ("30", "CIPTECH"), ("31", "CIPTECH"), ("32", "CIPTECH"), ("33", "CIPTECH"),
+    ("34", "CIPTECH"), ("35", "CIPTECH"), ("36", "CIPTECH"), ("37", "CIPTECH"),
+    ("38", "CIPTECH"), ("39", "CIPTECH"),
+    ("40", "MATERIALES"), ("41", "MATERIALES"), ("50", "MATERIALES"),
+    ("51", "MATERIALES"), ("52", "MATERIALES"), ("53", "MATERIALES"),
+    ("54", "MATERIALES"), ("55", "MATERIALES"),
+    ("60", "DESCARTE Y VARIOS"), ("65", "DESCARTE Y VARIOS"),
+    ("98", "DESCARTE Y VARIOS"),
+    ("70", "PRODUCCION"),
+]
+
+CATEGORIA_DEFAULT = "OTROS"
+
+
+def asignar_categoria(codigo_linea: str) -> str:
+    """Categoría de un código de línea (misma semántica que el API de stock)."""
+    if not codigo_linea:
+        return ""
+    codigo = str(codigo_linea).split(" - ")[0].strip().upper()
+    if not codigo:
+        return ""
+    if codigo in CATEGORIA_POR_LINEA:
+        return CATEGORIA_POR_LINEA[codigo]
+    for prefijo, cat in PREFIJOS_CATEGORIA_AUTO:
+        if codigo.startswith(prefijo):
+            return cat
+    return CATEGORIA_DEFAULT
+
 
 # Mapeo nombre de línea → código corto (2 chars), derivado del reporte de
 # stock del API ("0178 - ARCHIVO" → "78", "01MA - MASCOTAS" → "MA").
@@ -67,9 +117,23 @@ LINEA_NOMBRE_A_CODIGO = {
     "SEGURIDAD Y SEÑALIZACION VIAL": "23", "CIPTECH ETIQUETAS": "30",
     "CIPTECH CINTAS": "31", "CIPTECH CPEI": "32", "CIPTECH CIL": "33",
     "CIPTECH SUPPLY CHAIN": "35", "MATERIA PRIMA": "40",
-    "MATERIALES AUXILIARES": "50", "INDUMENTARIA Y EPP": "57", "SCRAP": "60",
+    "MATERIA PRIMA CIPTECH": "41", "MATERIALES AUXILIARES": "50",
+    "REPUESTO PARA MAQUINA": "51", "INSUMOS CONSUMIBLES": "53",
+    "HERRAMIENTAS - CONSUMIBLES": "54",
+    "REPUESTOS,ACCESORIOS Y SUMINIS": "55",
+    "INDUMENTARIA Y EPP": "57", "SCRAP": "60",
     "MERCADERIAS VARIAS": "65", "ECONOMATO": "66", "PRODUCTOS EN PROCESO": "70",
-    "PRODUCTOS SIN EMBALAJE": "98",
+    "PRODUCTOS SIN EMBALAJE": "98", "SERVICIOS INDUSTRIALES": "22",
+    "LICITACION": "LI", "VARIOS": "99",
+    "CIPTECH INSPECCION": "34", "CIPTECH PID": "36", "CIPTECH SOFTWARE": "37",
+    "CIPTECH SERVICIOS": "38", "CIPTECH OTROS": "39",
+}
+
+# Mapa nombre de línea → categoría (derivado del canónico por código).
+# Se mantiene por compatibilidad con consumidores que lo usan por nombre.
+LINEA_A_CATEGORIA: dict[str, str] = {
+    nombre: asignar_categoria(codigo)
+    for nombre, codigo in LINEA_NOMBRE_A_CODIGO.items()
 }
 
 # Lineas que NO son productos de venta
@@ -91,8 +155,12 @@ def generar_nombre_corto(nombre):
     return texto.title()
 
 
-def generar_keywords(nombre, linea, categoria):
-    """Genera keywords desde nombre y categorías."""
+def generar_keywords(nombre, linea, categoria, extra=""):
+    """Genera keywords desde nombre, línea y categoría.
+
+    `extra` permite sumar el código de línea (p.ej. "78") para que buscar
+    por código también encuentre el producto.
+    """
     keywords = set()
     if nombre:
         for p in nombre.upper().replace("#", "").replace(".", " ").split():
@@ -102,6 +170,8 @@ def generar_keywords(nombre, linea, categoria):
         keywords.add(linea.upper())
     if categoria:
         keywords.add(categoria.upper())
+    if extra:
+        keywords.add(str(extra).upper())
     return sorted(keywords)
 
 
@@ -127,11 +197,15 @@ def _clean_ean(val):
     return s
 
 
-def decidir_inclusion(flg_inactivo, flg_discont, precio, linea, en_bx):
+def decidir_inclusion(flg_inactivo, flg_discont, precio, linea, en_bx, tiene_stock=False):
     """Decide si un SKU del ERP entra al catálogo.
 
-    SKU_BX es la guía primaria de lo que se vende: un descontinuado se
-    incluye solo si está curado en SKU_BX (llegó stock que se puede vender).
+    SKU_BX es la guía primaria de lo que se vende. Además, un SKU que tiene
+    STOCK FÍSICO en el almacén entra igual: hay despacho que hacer y sin
+    catálogo no se conoce su peso, EAN ni caja (peso/EAN viven en el catálogo).
+
+    Un descontinuado entra si está curado en SKU_BX **o** si tiene stock
+    (queda marcado con descontinuado=true para que se negocie).
 
     Retorna (incluir, descontinuado).
     """
@@ -141,22 +215,42 @@ def decidir_inclusion(flg_inactivo, flg_discont, precio, linea, en_bx):
         return False, False
     if linea in LINEAS_EXCLUIR:
         return False, False
-    if flg_discont and not en_bx:
+    if flg_discont and not en_bx and not tiene_stock:
         return False, False
     return True, flg_discont
 
 
-def leer_erp(ruta, bx_skus=None):
+def _extraer_codigo_linea(linea):
+    """Extrae el código de 2 chars de una línea en cualquier formato.
+
+    "0178 - ARCHIVO" -> "78", "01MA - MASCOTAS" -> "MA", "78" -> "78".
+    """
+    txt = str(linea or "").strip().upper()
+    if not txt:
+        return ""
+    head = txt.split("-")[0].strip() if "-" in txt else txt
+    if re.fullmatch(r"[0-9A-Z]{2}", head):
+        return head
+    if re.fullmatch(r"01[0-9A-Z]+", head):
+        return head[2:]
+    return ""
+
+
+def leer_erp(ruta, bx_skus=None, stock_skus=None):
     """Lee PRODUCTOS.xls y retorna (productos, errores, erp_skus).
 
-    bx_skus: set de SKUs curados en SKU_BX (guía primaria). Los
-    descontinuados solo se incluyen si están en este set.
+    bx_skus:    SKUs curados en SKU_BX (guía primaria de lo que se vende).
+    stock_skus: SKUs que tienen stock fisico (API de stock). Entran al
+                catalogo aunque no esten en SKU_BX: sin catalogo no se conoce
+                su peso/EAN/caja y hay despacho que hacer.
     """
     productos = []
     errores = []
     skus_vistos = {}
     erp_skus = set()
     bx_skus = bx_skus or set()
+    stock_skus = stock_skus or set()
+    lineas_desconocidas = set()
     try:
         wb = xlrd.open_workbook(ruta)
         ws = wb.sheet_by_index(0)
@@ -184,15 +278,17 @@ def leer_erp(ruta, bx_skus=None):
             erp_skus.add(sku)
 
             incluir, descontinuado = decidir_inclusion(
-                flg_inactivo, flg_discont, precio, linea, sku in bx_skus)
+                flg_inactivo, flg_discont, precio, linea,
+                sku in bx_skus, sku in stock_skus)
             if not incluir:
                 continue
 
             linea_upper = linea.upper()
-            if linea_upper not in LINEA_A_CATEGORIA:
-                print(f"  WARN: Linea desconocida '{linea}' (SKU {sku}), asignando REPRESENTADAS")
-
-            categoria = LINEA_A_CATEGORIA.get(linea_upper, "REPRESENTADAS")
+            codigo = (LINEA_NOMBRE_A_CODIGO.get(linea_upper, "")
+                      or _extraer_codigo_linea(linea_upper))
+            if not codigo:
+                lineas_desconocidas.add(linea_upper)
+            categoria = asignar_categoria(codigo) if codigo else CATEGORIA_DEFAULT
 
             productos.append({
                 "sku": sku,
@@ -200,16 +296,24 @@ def leer_erp(ruta, bx_skus=None):
                 "ean13": ean13,
                 "ean14": ean14,
                 "peso_kg": peso_kg,
-                "linea": linea,
+                # `linea` es el CODIGO canonico (2 chars); el nombre legible
+                # va aparte. Antes iba el nombre y el codigo en otro campo:
+                # esa ambiguedad hacia que cada consumidor lo interpretara
+                # distinto y la linea apareciera como nombre o como codigo.
+                "linea": codigo or linea_upper,
+                "linea_nombre": linea_upper,
                 "grupo": grupo,
                 "tipo": tipo,
                 "familia": familia,
                 "categoria": categoria,
                 "precio": round(precio, 2),
                 "descontinuado": descontinuado,
-                "linea_codigo": LINEA_NOMBRE_A_CODIGO.get(linea_upper, ""),
+                "linea_codigo": codigo,
             })
         wb.release_resources()
+        if lineas_desconocidas:
+            print(f"  WARN: {len(lineas_desconocidas)} linea(s) sin codigo conocido: "
+                  f"{sorted(lineas_desconocidas)[:8]}")
         print(f"  ERP: {len(productos)} productos válidos")
     except Exception as e:
         errores.append(str(e))
@@ -298,7 +402,9 @@ def generar_output(productos, unbx_map, estado_map, orden_map, ruta_salida):
             "ean13": p["ean13"],
             "ean14": p["ean14"],
             "categoria": p["categoria"],
+            # linea = CODIGO canonico | linea_nombre = nombre legible
             "linea": p["linea"],
+            "linea_nombre": p.get("linea_nombre", ""),
             "grupo": p["grupo"],
             "tipo": p["tipo"],
             "familia": p["familia"],
@@ -315,12 +421,16 @@ def generar_output(productos, unbx_map, estado_map, orden_map, ruta_salida):
     productos_final.sort(key=lambda x: (x.get("orden", 0) == 0, x.get("orden", 0) or 0, x["sku"]))
 
     metadata = {
-        "version": "3.2.0",
+        "version": "3.3.0",
         "generated_at": datetime.now().isoformat(),
         "source_erp": "PRODUCTOS.xls",
         "source_un_bx": "SKU_BX.xlsx",
         "total_productos": len(productos_final),
         "estadisticas": estadisticas,
+        # Taxonomia publicada: los consumidores la leen de aca en vez de
+        # mantener su propia copia (que terminaba contradiciendose).
+        "categorias_por_linea": dict(CATEGORIA_POR_LINEA),
+        "lineas_nombre_a_codigo": dict(LINEA_NOMBRE_A_CODIGO),
     }
 
     output = {"metadata": metadata, "productos": productos_final}
@@ -339,12 +449,51 @@ def generar_output(productos, unbx_map, estado_map, orden_map, ruta_salida):
     return output
 
 
+def leer_universo_stock(api_url=None, api_key=None, timeout=90):
+    """SKUs con stock fisico segun el API de stock (opcional).
+
+    Sirve para que entren al catalogo los SKU que tienen despacho pendiente
+    aunque no esten en la guia SKU_BX: sin catalogo no se conoce su peso,
+    EAN ni caja, y hay carga que hacer.
+
+    Config: G360_STOCK_URL / G360_STOCK_API_KEY (o --stock-url / --stock-key).
+    Sin clave no se consulta: se sigue con el criterio de SKU_BX.
+    """
+    url = api_url or os.environ.get("G360_STOCK_URL", "")
+    key = api_key or os.environ.get("G360_STOCK_API_KEY", "")
+    if not url:
+        return set(), "sin URL configurada"
+    if not key:
+        return set(), "sin G360_STOCK_API_KEY"
+    try:
+        import requests
+
+        r = requests.get(
+            f"{url.rstrip('/')}/api/v1/stock",
+            params={"fuente": "todas"},
+            headers={"x-api-key": key, "Accept": "application/json"},
+            timeout=timeout,
+        )
+        r.raise_for_status()
+        items = r.json().get("items", [])
+        return ({str(i.get("sku", "")).strip() for i in items
+                 if str(i.get("sku", "")).strip()}, "")
+    except Exception as e:  # noqa: BLE001
+        return set(), str(e)
+
+
 def main():
-    ap = argparse.ArgumentParser(description="G360 Catalog Generator v3.2")
+    ap = argparse.ArgumentParser(description="G360 Catalog Generator v3.3")
     ap.add_argument("--erp", "-e", default="data/PRODUCTOS.xls", help="Archivo ERP")
     ap.add_argument("--unbx", "-u", default="data/SKU_BX.xlsx", help="Archivo SKU_BX")
     ap.add_argument("--output", "-o", default="output/catalogo_productos.json", help="JSON salida")
     ap.add_argument("--validate-only", "-v", action="store_true", help="Solo validar, no generar")
+    ap.add_argument("--stock-url", default=os.environ.get("G360_STOCK_URL", ""),
+                    help="API de stock para traer el universo con stock fisico")
+    ap.add_argument("--stock-key", default=os.environ.get("G360_STOCK_API_KEY", ""),
+                    help="Clave de lectura del API de stock (G360_STOCK_API_KEY)")
+    ap.add_argument("--sin-universo-stock", action="store_true",
+                    help="No consultar el API: solo se incluye lo que esta en SKU_BX")
     a = ap.parse_args()
 
     print("=" * 50)
@@ -358,7 +507,21 @@ def main():
     # Leer fuentes (BX primero: es la guía primaria de inclusión)
     print("Leyendo fuentes...")
     orden_map, unbx_map, estado_map = leer_unbx(a.unbx)
-    productos, errs, erp_skus = leer_erp(a.erp, bx_skus=set(orden_map))
+
+    # Universo con stock fisico: los SKU con despacho pendiente tambien
+    # necesitan catalogo (peso/EAN/caja para despachar).
+    stock_skus = set()
+    if a.sin_universo_stock:
+        print("  Universo de stock: omitido (--sin-universo-stock)")
+    else:
+        stock_skus, err = leer_universo_stock(a.stock_url, a.stock_key)
+        if err:
+            print(f"  Universo de stock: no disponible ({err}) -> solo SKU_BX")
+        else:
+            print(f"  Universo de stock: {len(stock_skus)} SKUs con stock fisico")
+
+    productos, errs, erp_skus = leer_erp(a.erp, bx_skus=set(orden_map),
+                                          stock_skus=stock_skus)
     if errs:
         print(f"Errores: {errs}")
 
