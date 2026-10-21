@@ -142,11 +142,13 @@ class TestCatalogoRealSinRegresion:
         return json.loads(RUTA_CATALOGO.read_text(encoding="utf-8"))
 
     def test_ninguna_tijera_cae_en_linea_cd(self):
-        """La linea CD es SOLO Crayola: ninguna tijera debe caer ahi."""
+        """La linea CD es SOLO Crayola (ACCESORIOS+PINCELES): ningun no-Crayola
+        ni tijera debe caer ahi. Los CD* son Crayola y van a REPRESENTADAS."""
         d = self._catalogo()
         cds = [p for p in d["productos"] if str(p.get("linea")) == "CD"]
-        assert cds, "deberia haber SKUs en CD"
+        assert cds, "debe haber SKUs en CD (los pinceles Crayola)"
         for p in cds:
+            assert p["sku"].upper().startswith("C"), f"{p['sku']} no es Crayola"
             assert "TIJERA" not in str(p.get("nombre", "")).upper(), p["sku"]
 
     def test_ningun_crayola_cae_en_linea_79(self):
@@ -182,15 +184,27 @@ class TestCatalogoRealSinRegresion:
         assert "categorias_por_linea" in meta
 
     def test_metadata_afirma_que_la_marca_manda(self):
-        """No podemos publicar una categoria por linea que contradiga la marca.
-
-        La linea 77 se mapea a VINIFAN por linea, pero sus SKUs C* deben ser
-        REPRESENTADAS: el catalogo debe tener ambos (marca > linea).
-        """
+        """Cada prefijo Crayola (CA, CB, CC, CD, CE, CF) es una linea propia
+        dentro de REPRESENTADAS. Las lineas ERP originales (72, 76, 77, 79)
+        quedan 100% VINIFAN sin contaminacion."""
         d = self._catalogo()
         por_linea = defaultdict(Counter)
         for p in d["productos"]:
             por_linea[str(p["linea"])][str(p["categoria"])] += 1
-        # 77 = PINTURA: VINIFAN (propio) + REPRESENTADAS (Crayola)
-        assert por_linea["77"]["VINIFAN"] > 0
-        assert por_linea["77"]["REPRESENTADAS"] > 0
+        # Lineas Crayola: cada una 100% REPRESENTADAS
+        for cod in ("CA", "CB", "CC", "CD", "CE", "CF"):
+            assert por_linea[cod]["REPRESENTADAS"] > 0, cod
+            assert "VINIFAN" not in por_linea[cod], f"{cod} no debe tener VINIFAN"
+        # Lineas ERP originales: 100% VINIFAN (los C* se fueron a sus lineas propias)
+        for cod in ("72", "76", "77", "79"):
+            assert por_linea[cod]["VINIFAN"] > 0, cod
+            assert "REPRESENTADAS" not in por_linea[cod], (
+                f"{cod} no debe tener REPRESENTADAS"
+            )
+        # Linea 85: REPRESENTADAS puras (no-Crayola)
+        assert por_linea["85"]["REPRESENTADAS"] > 0
+        # Todos los C* en REPRESENTADAS
+        c_skus = [p for p in d["productos"] if p["sku"].upper().startswith("C")]
+        assert all(p["categoria"] == "REPRESENTADAS" for p in c_skus)
+        # Ningun C* esta en VINIFAN
+        assert all(p["categoria"] != "VINIFAN" for p in c_skus)
