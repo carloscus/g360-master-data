@@ -1,7 +1,7 @@
 {
   "metadata": {
-    "version": "3.3.0",
-    "generated_at": "2026-10-20T16:08:20.448256",
+    "version": "3.4.0",
+    "generated_at": "2026-10-20T22:15:18.841100",
     "source_erp": "PRODUCTOS.xls",
     "source_un_bx": "SKU_BX.xlsx",
     "total_productos": 2748,
@@ -13,10 +13,10 @@
       "descontinuados": 331,
       "sin_linea_codigo": 0,
       "por_categoria": {
-        "VINIFAN": 986,
+        "VINIFAN": 944,
         "VINIBALL": 584,
         "OTROS": 50,
-        "REPRESENTADAS": 775,
+        "REPRESENTADAS": 817,
         "INDUSTRIAL": 106,
         "PUBLICIDAD": 216,
         "MATERIALES": 31
@@ -28,7 +28,7 @@
         "85": 775,
         "76": 200,
         "77": 112,
-        "79": 105,
+        "79": 101,
         "11": 36,
         "02": 32,
         "20": 106,
@@ -43,6 +43,7 @@
         "73": 31,
         "CF": 2,
         "09": 24,
+        "CD": 4,
         "AD": 1
       },
       "por_estado_linea": {
@@ -67,11 +68,12 @@
       "77": "VINIFAN",
       "78": "VINIFAN",
       "79": "VINIFAN",
-      "CE": "VINIFAN",
-      "CF": "VINIFAN",
+      "CE": "REPRESENTADAS",
+      "CF": "REPRESENTADAS",
       "57": "INDUMENTARIA",
       "52": "MATERIALES",
       "85": "REPRESENTADAS",
+      "CD": "REPRESENTADAS",
       "80": "PUBLICIDAD",
       "81": "PUBLICIDAD",
       "20": "INDUSTRIAL",
@@ -149,6 +151,9 @@
       "CIPTECH SOFTWARE": "37",
       "CIPTECH SERVICIOS": "38",
       "CIPTECH OTROS": "39"
+    },
+    "lineas_grupo_a_codigo": {
+      "ACCESORIOS|PINCELES": "CD"
     }
   },
   "productos": [
@@ -76793,7 +76798,7 @@
       "nombre_corto": "Crayola Crayones Delgados -Cajita X 16Un",
       "ean13": "7754807300018",
       "ean14": "17754807300015",
-      "categoria": "VINIFAN",
+      "categoria": "REPRESENTADAS",
       "linea": "77",
       "linea_nombre": "PINTURA",
       "grupo": "CRAYONES",
@@ -76813,7 +76818,7 @@
         "CRAYOLA",
         "CRAYONES",
         "DELGADOS",
-        "VINIFAN"
+        "REPRESENTADAS"
       ]
     },
     {
@@ -76822,7 +76827,7 @@
       "nombre_corto": "Crayola Crayones Delgados -Cajita X 64Un",
       "ean13": "7754807300049",
       "ean14": "17754807300046",
-      "categoria": "VINIFAN",
+      "categoria": "REPRESENTADAS",
       "linea": "77",
       "linea_nombre": "PINTURA",
       "grupo": "CRAYONES",
@@ -76842,7 +76847,7 @@
         "CRAYOLA",
         "CRAYONES",
         "DELGADOS",
-        "VINIFAN"
+        "REPRESENTADAS"
       ]
     },
     {
@@ -76851,7 +76856,7 @@
       "nombre_corto": "Crayola Crayones Delgados Mini Retractiles -Cajita X 10Un",
       "ean13": "7754807300056",
       "ean14": "17754807300053",
-      "categoria": "VINIFAN",
+      "categoria": "REPRESENTADAS",
       "linea": "77",
       "linea_nombre": "PINTURA",
       "grupo": "CRAYONES",
@@ -76872,8 +76877,8 @@
         "CRAYONES",
         "DELGADOS",
         "MINI",
-        "RETRACTILES",
-        "VINIFAN"
+        "REPRESENTADAS",
+        "RETRACTILES"
       ]
     },
     {
@@ -76882,7 +76887,7 @@
       "nombre_corto": "Crayola Set Crayones Mini Retractiles & Papel -Est X 65Pcs",
       "ean13": "7754807300254",
       "ean14": "17754807300251",
-      "categoria": "VINIFAN",
+      "categoria": "REPRESENTADAS",
       "linea": "77",
       "linea_nombre": "PINTURA",
       "grupo": "CRAYONES",
@@ -76903,9 +76908,9 @@
         "CRAYONES",
         "MINI",
         "PAPEL",
+        "REPRESENTADAS",
         "RETRACTILES",
-        "SET",
-        "VINIFAN"
+        "SET"
       ]
     },
     {
@@ -76914,7 +76919,7 @@
       "nombre_corto": "Crayola Crayones Jumbo -Cajita X 8 Un",
       "ean13": "7754807300032",
       "ean14": "17754807300039",
-      "categoria": "VINIFAN",
+      "categoria": "REPRESENTADAS",
       "linea": "77",
       "linea_nombre": "PINTURA",
       "grupo": "CRAYONES",
@@ -76933,7 +76938,7 @@
         "CRAYOLA",
         "CRAYONES",
         "JUMBO",
-        "VINIFAN"
+        "REPRESENTADAS"
       ]
     },
     {
@@ -76942,7 +76947,7 @@
       "nombre_corto": "Crayola Plumones Lavables Supertips -Cajita X 10Un",
       "ean13": "7754807300131",
       "ean14": "17754807300138",
-      "categoria": "VINIFAN",
+      "categoria": "REPRESENTADAS",
       "linea": "77",
       "linea_nombre": "PINTURA",
       "grupo": "PLUMONES",
@@ -76962,8 +76967,8 @@
         "CRAYOLA",
         "LAVABLES",
         "PLUMONES",
-        "SUPERTIPS",
-        "VINIFAN"
+        "REPRESENTADAS",
+        "SUPERTIPS"
       ]
     },
     {
@@ -76972,7 +76977,7 @@
       "nombre_corto": "Crayola Plumones Lavables Supertips -Cajita X 20Un",
       "ean13": "7754807300148",
       "ean14": "17754807300145",
-      "categoria": "VINIFAN",
+      "categoria": "REPRESENTADAS",
       "linea": "77",
       "linea_nombre": "PINTURA",
       "grupo": "PLUMONES",
@@ -76992,8 +76997,8 @@
         "CRAYOLA",
         "LAVABLES",
         "PLUMONES",
-        "SUPERTIPS",
-        "VINIFAN"
+        "REPRESENTADAS",
+        "SUPERTIPS"
       ]
     },
     {
@@ -77002,7 +77007,7 @@
       "nombre_corto": "Crayola Plumones Lavables Supertips -Cajita X 50Un",
       "ean13": "7754807300155",
       "ean14": "17754807300152",
-      "categoria": "VINIFAN",
+      "categoria": "REPRESENTADAS",
       "linea": "77",
       "linea_nombre": "PINTURA",
       "grupo": "PLUMONES",
@@ -77022,8 +77027,8 @@
         "CRAYOLA",
         "LAVABLES",
         "PLUMONES",
-        "SUPERTIPS",
-        "VINIFAN"
+        "REPRESENTADAS",
+        "SUPERTIPS"
       ]
     },
     {
@@ -77032,7 +77037,7 @@
       "nombre_corto": "Crayola Plumones Lavables Supertips -Cajita X 100Un",
       "ean13": "7754807300162",
       "ean14": "17754807300169",
-      "categoria": "VINIFAN",
+      "categoria": "REPRESENTADAS",
       "linea": "77",
       "linea_nombre": "PINTURA",
       "grupo": "PLUMONES",
@@ -77052,8 +77057,8 @@
         "CRAYOLA",
         "LAVABLES",
         "PLUMONES",
-        "SUPERTIPS",
-        "VINIFAN"
+        "REPRESENTADAS",
+        "SUPERTIPS"
       ]
     },
     {
@@ -77062,7 +77067,7 @@
       "nombre_corto": "Crayola Plumones Ultralavables Punta Gruesa -Cajita X 12Un",
       "ean13": "7754807300117",
       "ean14": "17754807300114",
-      "categoria": "VINIFAN",
+      "categoria": "REPRESENTADAS",
       "linea": "77",
       "linea_nombre": "PINTURA",
       "grupo": "PLUMONES",
@@ -77083,8 +77088,8 @@
         "GRUESA",
         "PLUMONES",
         "PUNTA",
-        "ULTRALAVABLES",
-        "VINIFAN"
+        "REPRESENTADAS",
+        "ULTRALAVABLES"
       ]
     },
     {
@@ -77093,7 +77098,7 @@
       "nombre_corto": "Crayola Colores Largos -Cajita X 12Un",
       "ean13": "7754807300063",
       "ean14": "17754807300060",
-      "categoria": "VINIFAN",
+      "categoria": "REPRESENTADAS",
       "linea": "77",
       "linea_nombre": "PINTURA",
       "grupo": "COLORES",
@@ -77113,7 +77118,7 @@
         "COLORES",
         "CRAYOLA",
         "LARGOS",
-        "VINIFAN"
+        "REPRESENTADAS"
       ]
     },
     {
@@ -77122,7 +77127,7 @@
       "nombre_corto": "Crayola Colores Largos -Cajita X 24Un",
       "ean13": "7754807300070",
       "ean14": "17754807300077",
-      "categoria": "VINIFAN",
+      "categoria": "REPRESENTADAS",
       "linea": "77",
       "linea_nombre": "PINTURA",
       "grupo": "COLORES",
@@ -77142,7 +77147,7 @@
         "COLORES",
         "CRAYOLA",
         "LARGOS",
-        "VINIFAN"
+        "REPRESENTADAS"
       ]
     },
     {
@@ -77151,7 +77156,7 @@
       "nombre_corto": "Crayola Colores Largos -Cajita X 50Un",
       "ean13": "7754807300087",
       "ean14": "17754807300084",
-      "categoria": "VINIFAN",
+      "categoria": "REPRESENTADAS",
       "linea": "77",
       "linea_nombre": "PINTURA",
       "grupo": "COLORES",
@@ -77171,7 +77176,7 @@
         "COLORES",
         "CRAYOLA",
         "LARGOS",
-        "VINIFAN"
+        "REPRESENTADAS"
       ]
     },
     {
@@ -77180,7 +77185,7 @@
       "nombre_corto": "Crayola Colores Retractiles Silly Scents -Cajita X 12Un",
       "ean13": "7754807300100",
       "ean14": "17754807300107",
-      "categoria": "VINIFAN",
+      "categoria": "REPRESENTADAS",
       "linea": "77",
       "linea_nombre": "PINTURA",
       "grupo": "COLORES",
@@ -77199,10 +77204,10 @@
         "77",
         "COLORES",
         "CRAYOLA",
+        "REPRESENTADAS",
         "RETRACTILES",
         "SCENTS",
-        "SILLY",
-        "VINIFAN"
+        "SILLY"
       ]
     },
     {
@@ -77211,7 +77216,7 @@
       "nombre_corto": "Crayola Set Colores Retractiles & Papel -Est X 65Pcs",
       "ean13": "7754807300247",
       "ean14": "17754807300244",
-      "categoria": "VINIFAN",
+      "categoria": "REPRESENTADAS",
       "linea": "77",
       "linea_nombre": "PINTURA",
       "grupo": "COLORES",
@@ -77231,9 +77236,9 @@
         "COLORES",
         "CRAYOLA",
         "PAPEL",
+        "REPRESENTADAS",
         "RETRACTILES",
-        "SET",
-        "VINIFAN"
+        "SET"
       ]
     },
     {
@@ -77242,7 +77247,7 @@
       "nombre_corto": "Crayola Set Plumones Color Wonder Stow & Go -Est X 35 Pcs",
       "ean13": "7754807300599",
       "ean14": "17754807300596",
-      "categoria": "VINIFAN",
+      "categoria": "REPRESENTADAS",
       "linea": "77",
       "linea_nombre": "PINTURA",
       "grupo": "PLUMONES",
@@ -77262,9 +77267,9 @@
         "CRAYOLA",
         "PCS",
         "PLUMONES",
+        "REPRESENTADAS",
         "SET",
         "STOW",
-        "VINIFAN",
         "WONDER"
       ]
     },
@@ -77274,7 +77279,7 @@
       "nombre_corto": "Crayola Plumones Maravilla Punta Fina -Cajita X 12Und",
       "ean13": "7754807300612",
       "ean14": "17754807300619",
-      "categoria": "VINIFAN",
+      "categoria": "REPRESENTADAS",
       "linea": "77",
       "linea_nombre": "PINTURA",
       "grupo": "PLUMONES",
@@ -77296,7 +77301,7 @@
         "MARAVILLA",
         "PLUMONES",
         "PUNTA",
-        "VINIFAN"
+        "REPRESENTADAS"
       ]
     },
     {
@@ -77305,7 +77310,7 @@
       "nombre_corto": "Crayola Plumones Maravilla Punta Fina -Cajita X 20Und",
       "ean13": "7754807300629",
       "ean14": "17754807300626",
-      "categoria": "VINIFAN",
+      "categoria": "REPRESENTADAS",
       "linea": "77",
       "linea_nombre": "PINTURA",
       "grupo": "PLUMONES",
@@ -77327,7 +77332,7 @@
         "MARAVILLA",
         "PLUMONES",
         "PUNTA",
-        "VINIFAN"
+        "REPRESENTADAS"
       ]
     },
     {
@@ -77336,7 +77341,7 @@
       "nombre_corto": "Crayola Crayones Neones -Cajita X24 Un",
       "ean13": "7754807300810",
       "ean14": "17754807300817",
-      "categoria": "VINIFAN",
+      "categoria": "REPRESENTADAS",
       "linea": "77",
       "linea_nombre": "PINTURA",
       "grupo": "CRAYONES",
@@ -77355,7 +77360,7 @@
         "CRAYOLA",
         "CRAYONES",
         "NEONES",
-        "VINIFAN",
+        "REPRESENTADAS",
         "X24"
       ]
     },
@@ -77365,7 +77370,7 @@
       "nombre_corto": "Crayola Crayones Para Ventanas -Cajita X 5Un",
       "ean13": "7754807300834",
       "ean14": "17754807300831",
-      "categoria": "VINIFAN",
+      "categoria": "REPRESENTADAS",
       "linea": "77",
       "linea_nombre": "PINTURA",
       "grupo": "CRAYONES",
@@ -77385,8 +77390,8 @@
         "CRAYOLA",
         "CRAYONES",
         "PARA",
-        "VENTANAS",
-        "VINIFAN"
+        "REPRESENTADAS",
+        "VENTANAS"
       ]
     },
     {
@@ -77395,7 +77400,7 @@
       "nombre_corto": "Crayola Plumones Lavables Colors Of Kindness -Cajita X 10Un",
       "ean13": "7754807300858",
       "ean14": "17754807300855",
-      "categoria": "VINIFAN",
+      "categoria": "REPRESENTADAS",
       "linea": "77",
       "linea_nombre": "PINTURA",
       "grupo": "PLUMONES",
@@ -77417,7 +77422,7 @@
         "KINDNESS",
         "LAVABLES",
         "PLUMONES",
-        "VINIFAN"
+        "REPRESENTADAS"
       ]
     },
     {
@@ -77426,7 +77431,7 @@
       "nombre_corto": "Crayola Colores Clasicos Colors Of Kindness -Cajita X 12Un",
       "ean13": "7754807300865",
       "ean14": "17754807300862",
-      "categoria": "VINIFAN",
+      "categoria": "REPRESENTADAS",
       "linea": "77",
       "linea_nombre": "PINTURA",
       "grupo": "COLORES",
@@ -77448,7 +77453,7 @@
         "COLORS",
         "CRAYOLA",
         "KINDNESS",
-        "VINIFAN"
+        "REPRESENTADAS"
       ]
     },
     {
@@ -77457,7 +77462,7 @@
       "nombre_corto": "Crayola Plumones Lavables Delgados Pip-Squeaks- Cajita X16Un",
       "ean13": "",
       "ean14": "",
-      "categoria": "VINIFAN",
+      "categoria": "REPRESENTADAS",
       "linea": "77",
       "linea_nombre": "PINTURA",
       "grupo": "PLUMONES",
@@ -77478,7 +77483,7 @@
         "LAVABLES",
         "PIP-SQUEAKS-",
         "PLUMONES",
-        "VINIFAN",
+        "REPRESENTADAS",
         "X16UN"
       ]
     },
@@ -77488,7 +77493,7 @@
       "nombre_corto": "Crayola Resaltador Duo Borrable -Blister X 1Un",
       "ean13": "7754807300186",
       "ean14": "17754807300183",
-      "categoria": "VINIFAN",
+      "categoria": "REPRESENTADAS",
       "linea": "76",
       "linea_nombre": "ESCRITURA",
       "grupo": "RESALTADOR",
@@ -77508,8 +77513,8 @@
         "BORRABLE",
         "CRAYOLA",
         "DUO",
-        "RESALTADOR",
-        "VINIFAN"
+        "REPRESENTADAS",
+        "RESALTADOR"
       ]
     },
     {
@@ -77518,7 +77523,7 @@
       "nombre_corto": "Crayola Marcadores Permanente Metalicos -Cajita X 6Un",
       "ean13": "7754807300674",
       "ean14": "17754807300671",
-      "categoria": "VINIFAN",
+      "categoria": "REPRESENTADAS",
       "linea": "76",
       "linea_nombre": "ESCRITURA",
       "grupo": "MARCADORES",
@@ -77539,7 +77544,7 @@
         "MARCADORES",
         "METALICOS",
         "PERMANENTE",
-        "VINIFAN"
+        "REPRESENTADAS"
       ]
     },
     {
@@ -77548,7 +77553,7 @@
       "nombre_corto": "Crayola Boligrafos Take Note Color Changing -Blister X 4Und",
       "ean13": "7754807300735",
       "ean14": "17754807300732",
-      "categoria": "VINIFAN",
+      "categoria": "REPRESENTADAS",
       "linea": "76",
       "linea_nombre": "ESCRITURA",
       "grupo": "BOLIGRAFOS",
@@ -77570,8 +77575,8 @@
         "COLOR",
         "CRAYOLA",
         "NOTE",
-        "TAKE",
-        "VINIFAN"
+        "REPRESENTADAS",
+        "TAKE"
       ]
     },
     {
@@ -77580,7 +77585,7 @@
       "nombre_corto": "Crayola Resaltadores Glitter Take Note -Blister X 4Unid",
       "ean13": "7754807300742",
       "ean14": "17754807300749",
-      "categoria": "VINIFAN",
+      "categoria": "REPRESENTADAS",
       "linea": "76",
       "linea_nombre": "ESCRITURA",
       "grupo": "RESALTADOR",
@@ -77600,9 +77605,9 @@
         "CRAYOLA",
         "GLITTER",
         "NOTE",
+        "REPRESENTADAS",
         "RESALTADORES",
-        "TAKE",
-        "VINIFAN"
+        "TAKE"
       ]
     },
     {
@@ -77611,7 +77616,7 @@
       "nombre_corto": "Crayola Escarchada -Blister X 5Un",
       "ean13": "7754807300230",
       "ean14": "17754807300237",
-      "categoria": "VINIFAN",
+      "categoria": "REPRESENTADAS",
       "linea": "72",
       "linea_nombre": "PEGAMENTOS",
       "grupo": "GOMA ESCARCHADA",
@@ -77631,7 +77636,7 @@
         "CRAYOLA",
         "ESCARCHADA",
         "GOMA",
-        "VINIFAN"
+        "REPRESENTADAS"
       ]
     },
     {
@@ -77640,8 +77645,8 @@
       "nombre_corto": "Crayola Pinceles Planos Angulados Y Redondos -Blister X 5Un",
       "ean13": "7754807300209",
       "ean14": "17754807300206",
-      "categoria": "VINIFAN",
-      "linea": "79",
+      "categoria": "REPRESENTADAS",
+      "linea": "CD",
       "linea_nombre": "ACCESORIOS",
       "grupo": "PINCELES",
       "tipo": "ESCOLAR",
@@ -77652,17 +77657,17 @@
       "peso_kg": 0.038,
       "precio": 19.27,
       "descontinuado": true,
-      "linea_codigo": "79",
+      "linea_codigo": "CD",
       "keywords": [
         "-BLISTER",
         "5UN",
-        "79",
         "ANGULADOS",
+        "CD",
         "CRAYOLA",
         "PINCELES",
         "PLANOS",
         "REDONDOS",
-        "VINIFAN"
+        "REPRESENTADAS"
       ]
     },
     {
@@ -77671,8 +77676,8 @@
       "nombre_corto": "Crayola Pinceles Redondos -Blister X 4 Un",
       "ean13": "7754807300520",
       "ean14": "17754807300527",
-      "categoria": "VINIFAN",
-      "linea": "79",
+      "categoria": "REPRESENTADAS",
+      "linea": "CD",
       "linea_nombre": "ACCESORIOS",
       "grupo": "PINCELES",
       "tipo": "ESCOLAR",
@@ -77683,14 +77688,14 @@
       "peso_kg": 0.053,
       "precio": 27.25,
       "descontinuado": true,
-      "linea_codigo": "79",
+      "linea_codigo": "CD",
       "keywords": [
         "-BLISTER",
-        "79",
+        "CD",
         "CRAYOLA",
         "PINCELES",
         "REDONDOS",
-        "VINIFAN"
+        "REPRESENTADAS"
       ]
     },
     {
@@ -77699,8 +77704,8 @@
       "nombre_corto": "Crayola Pinceles Planos -Blister X 4Un",
       "ean13": "",
       "ean14": "",
-      "categoria": "VINIFAN",
-      "linea": "79",
+      "categoria": "REPRESENTADAS",
+      "linea": "CD",
       "linea_nombre": "ACCESORIOS",
       "grupo": "PINCELES",
       "tipo": "ESCOLAR",
@@ -77711,15 +77716,15 @@
       "peso_kg": 0.049,
       "precio": 27.25,
       "descontinuado": true,
-      "linea_codigo": "79",
+      "linea_codigo": "CD",
       "keywords": [
         "-BLISTER",
         "4UN",
-        "79",
+        "CD",
         "CRAYOLA",
         "PINCELES",
         "PLANOS",
-        "VINIFAN"
+        "REPRESENTADAS"
       ]
     },
     {
@@ -77728,8 +77733,8 @@
       "nombre_corto": "Crayola Pinceles Clasicos Escolar -Blister X 4 Un",
       "ean13": "7754807300841",
       "ean14": "17754807300848",
-      "categoria": "VINIFAN",
-      "linea": "79",
+      "categoria": "REPRESENTADAS",
+      "linea": "CD",
       "linea_nombre": "ACCESORIOS",
       "grupo": "PINCELES",
       "tipo": "ESCOLAR",
@@ -77740,15 +77745,15 @@
       "peso_kg": 0.025,
       "precio": 11.16,
       "descontinuado": true,
-      "linea_codigo": "79",
+      "linea_codigo": "CD",
       "keywords": [
         "-BLISTER",
-        "79",
+        "CD",
         "CLASICOS",
         "CRAYOLA",
         "ESCOLAR",
         "PINCELES",
-        "VINIFAN"
+        "REPRESENTADAS"
       ]
     },
     {
@@ -77757,7 +77762,7 @@
       "nombre_corto": "Crayola Tizas Jumbo Lavables -Cajita X 12Un",
       "ean13": "7754807300339",
       "ean14": "17754807300336",
-      "categoria": "VINIFAN",
+      "categoria": "REPRESENTADAS",
       "linea": "CE",
       "linea_nombre": "MANUALIDADES",
       "grupo": "TIZAS",
@@ -77777,8 +77782,8 @@
         "CRAYOLA",
         "JUMBO",
         "LAVABLES",
-        "TIZAS",
-        "VINIFAN"
+        "REPRESENTADAS",
+        "TIZAS"
       ]
     },
     {
@@ -77787,7 +77792,7 @@
       "nombre_corto": "Crayola Model Magic Masitas Para Moldear -Paquete X 6Un",
       "ean13": "7754807300223",
       "ean14": "17754807300220",
-      "categoria": "VINIFAN",
+      "categoria": "REPRESENTADAS",
       "linea": "CE",
       "linea_nombre": "MANUALIDADES",
       "grupo": "MASITAS",
@@ -77810,7 +77815,7 @@
         "MODEL",
         "MOLDEAR",
         "PARA",
-        "VINIFAN"
+        "REPRESENTADAS"
       ]
     },
     {
@@ -77819,7 +77824,7 @@
       "nombre_corto": "Crayola Tizas Jumbo Lavables -Cajita X 24Un",
       "ean13": "7754807300544",
       "ean14": "17754807300541",
-      "categoria": "VINIFAN",
+      "categoria": "REPRESENTADAS",
       "linea": "CE",
       "linea_nombre": "MANUALIDADES",
       "grupo": "TIZAS",
@@ -77839,8 +77844,8 @@
         "CRAYOLA",
         "JUMBO",
         "LAVABLES",
-        "TIZAS",
-        "VINIFAN"
+        "REPRESENTADAS",
+        "TIZAS"
       ]
     },
     {
@@ -77849,7 +77854,7 @@
       "nombre_corto": "Crayola Plastilina Clasica -Cajita X 12Un",
       "ean13": "7754807300568",
       "ean14": "17754807300565",
-      "categoria": "VINIFAN",
+      "categoria": "REPRESENTADAS",
       "linea": "CE",
       "linea_nombre": "MANUALIDADES",
       "grupo": "PLASTILINA",
@@ -77869,7 +77874,7 @@
         "CLASICA",
         "CRAYOLA",
         "PLASTILINA",
-        "VINIFAN"
+        "REPRESENTADAS"
       ]
     },
     {
@@ -77878,7 +77883,7 @@
       "nombre_corto": "Crayola Tizas Jumbo Glitter Lavables -Cajita X 5Unid",
       "ean13": "7754807300759",
       "ean14": "17754807300756",
-      "categoria": "VINIFAN",
+      "categoria": "REPRESENTADAS",
       "linea": "CE",
       "linea_nombre": "MANUALIDADES",
       "grupo": "TIZAS",
@@ -77899,8 +77904,8 @@
         "GLITTER",
         "JUMBO",
         "LAVABLES",
-        "TIZAS",
-        "VINIFAN"
+        "REPRESENTADAS",
+        "TIZAS"
       ]
     },
     {
@@ -77909,7 +77914,7 @@
       "nombre_corto": "Crayola Tizas Jumbo Tie Dye Lavables -Cajita X 5Unid",
       "ean13": "7754807300766",
       "ean14": "17754807300763",
-      "categoria": "VINIFAN",
+      "categoria": "REPRESENTADAS",
       "linea": "CE",
       "linea_nombre": "MANUALIDADES",
       "grupo": "TIZAS",
@@ -77930,9 +77935,9 @@
         "DYE",
         "JUMBO",
         "LAVABLES",
+        "REPRESENTADAS",
         "TIE",
-        "TIZAS",
-        "VINIFAN"
+        "TIZAS"
       ]
     },
     {
@@ -77941,7 +77946,7 @@
       "nombre_corto": "Crayola Tizas Jumbo Lavables -Blister X4Unid",
       "ean13": "7754807300773",
       "ean14": "17754807300770",
-      "categoria": "VINIFAN",
+      "categoria": "REPRESENTADAS",
       "linea": "CE",
       "linea_nombre": "MANUALIDADES",
       "grupo": "TIZAS",
@@ -77960,8 +77965,8 @@
         "CRAYOLA",
         "JUMBO",
         "LAVABLES",
+        "REPRESENTADAS",
         "TIZAS",
-        "VINIFAN",
         "X4UNID"
       ]
     },
@@ -77971,7 +77976,7 @@
       "nombre_corto": "Crayola Libro Para Mezclar Y Combinar Hoy Me Siento 30Pag",
       "ean13": "7754807010054",
       "ean14": "17754807010051",
-      "categoria": "VINIFAN",
+      "categoria": "REPRESENTADAS",
       "linea": "CE",
       "linea_nombre": "MANUALIDADES",
       "grupo": "LIBROS PARA COLOREAR",
@@ -77993,8 +77998,8 @@
         "LIBRO",
         "MEZCLAR",
         "PARA",
-        "SIENTO",
-        "VINIFAN"
+        "REPRESENTADAS",
+        "SIENTO"
       ]
     },
     {
@@ -78003,7 +78008,7 @@
       "nombre_corto": "Crayola Set De Pintura Sidewalk Neon Lavable -Set X 9Pcs",
       "ean13": "7754807300346",
       "ean14": "17754807300343",
-      "categoria": "VINIFAN",
+      "categoria": "REPRESENTADAS",
       "linea": "CF",
       "linea_nombre": "SET",
       "grupo": "SET",
@@ -78024,9 +78029,9 @@
         "LAVABLE",
         "NEON",
         "PINTURA",
+        "REPRESENTADAS",
         "SET",
-        "SIDEWALK",
-        "VINIFAN"
+        "SIDEWALK"
       ]
     },
     {
@@ -78035,7 +78040,7 @@
       "nombre_corto": "Crayola Set De Actividades Dry Erase -Est X 16Pcs",
       "ean13": "",
       "ean14": "",
-      "categoria": "VINIFAN",
+      "categoria": "REPRESENTADAS",
       "linea": "CF",
       "linea_nombre": "SET",
       "grupo": "SET",
@@ -78056,8 +78061,8 @@
         "CRAYOLA",
         "DRY",
         "ERASE",
-        "SET",
-        "VINIFAN"
+        "REPRESENTADAS",
+        "SET"
       ]
     },
     {

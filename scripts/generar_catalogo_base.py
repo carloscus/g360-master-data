@@ -52,7 +52,7 @@ CATEGORIA_POR_LINEA: dict[str, str] = {
     "01": "VINIBALL", "MA": "VINIBALL", "14": "VINIBALL", "AD": "VINIBALL",
     "02": "VINIFAN", "09": "VINIFAN", "11": "VINIFAN", "72": "VINIFAN",
     "73": "VINIFAN", "75": "VINIFAN", "76": "VINIFAN", "77": "VINIFAN",
-    "78": "VINIFAN", "79": "VINIFAN", "CE": "VINIFAN", "CF": "VINIFAN",
+    "78": "VINIFAN", "79": "VINIFAN", "CE": "REPRESENTADAS", "CF": "REPRESENTADAS",
     "57": "INDUMENTARIA", "52": "INDUMENTARIA",
     "85": "REPRESENTADAS",
     "80": "PUBLICIDAD", "81": "PUBLICIDAD",
@@ -103,6 +103,26 @@ def asignar_categoria(codigo_linea: str) -> str:
     return CATEGORIA_DEFAULT
 
 
+# Prefijos de marca Crayola -> REPRESENTADAS.
+# Cualquier SKU cuyo codigo empiece con 'C' (CA/CB/CC/CD/CE/CF/CG...) es
+# 100% Crayola en el ERP; la marca sobreescribe la categoria de la linea.
+PREFIJO_MARCA_A_CATEGORIA = {
+    "C": "REPRESENTADAS",
+}
+
+
+def categoria_de_producto(sku: str, codigo_linea: str) -> str:
+    """Categoria de un producto: marca sobreescribe a linea.
+
+    Un SKU Crayola (prefijo C) siempre es REPRESENTADAS, incluso si vive en
+    una linea VINIFAN (72/76/77). Un SKU no-Crayola cae a la categoria
+    canonica de su linea.
+    """
+    if str(sku or "").upper().startswith("C"):
+        return "REPRESENTADAS"
+    return asignar_categoria(codigo_linea)
+
+
 # Mapeo nombre de línea → código corto (2 chars), derivado del reporte de
 # stock del API ("0178 - ARCHIVO" → "78", "01MA - MASCOTAS" → "MA").
 # Semilla estática: el reporte es la verdad; el funnel lo sobrescribe
@@ -128,6 +148,33 @@ LINEA_NOMBRE_A_CODIGO = {
     "CIPTECH INSPECCION": "34", "CIPTECH PID": "36", "CIPTECH SOFTWARE": "37",
     "CIPTECH SERVICIOS": "38", "CIPTECH OTROS": "39",
 }
+
+# Desambiguacion de linea por GRUPO cuando el NOMBRE designa a mas de una linea.
+# En el ERP, LINEA="ACCESORIOS" agrupa tanto VINIFAN (tijeras, tajadores...) como
+# la linea CD (pinceles Crayola, representada). El ERP NO distingue el codigo
+# por LINEA: la diferencia esta en el GRUPO. Regla de negocio:
+#   ACCESORIOS + grupo PINCELES -> CD  (Crayola, representada)
+#   ACCESORIOS + cualquier otro grupo -> 79 (VINIFAN)
+LINEA_GRUPO_A_CODIGO = {
+    ("ACCESORIOS", "PINCELES"): "CD",
+}
+
+
+def resolver_codigo_linea_grupo(linea, grupo):
+    """Codigo de linea desambiguando por GRUPO (ERP PRODUCTOS.xls).
+
+    Orden:
+      1. Desambiguacion por (nombre de linea, grupo) -> manda (caso ACCESORIOS).
+      2. Nombre de linea conocido -> codigo.
+      3. Codigo explicito embebido en el valor ("01CD" -> "CD").
+    """
+    lin = str(linea or "").strip().upper()
+    grp = str(grupo or "").strip().upper()
+    amb = LINEA_GRUPO_A_CODIGO.get((lin, grp))
+    if amb:
+        return amb
+    return LINEA_NOMBRE_A_CODIGO.get(lin, "") or _extraer_codigo_linea(lin)
+
 
 # Mapa nombre de línea → categoría (derivado del canónico por código).
 # Se mantiene por compatibilidad con consumidores que lo usan por nombre.
@@ -288,7 +335,7 @@ def leer_erp(ruta, bx_skus=None, stock_skus=None):
                       or _extraer_codigo_linea(linea_upper))
             if not codigo:
                 lineas_desconocidas.add(linea_upper)
-            categoria = asignar_categoria(codigo) if codigo else CATEGORIA_DEFAULT
+            categoria = categoria_de_producto(sku, codigo) if codigo else CATEGORIA_DEFAULT
 
             productos.append({
                 "sku": sku,
