@@ -166,6 +166,11 @@ def categoria_de_producto(sku: str, codigo_linea: str) -> str:
     Un SKU Crayola (prefijo C) siempre es REPRESENTADAS, incluso si vive en
     una linea VINIFAN (72/76/77). Un SKU no-Crayola cae a la categoria
     canonica de su linea.
+
+    Nota: esta regla asume que todo SKU que empieza con C es Crayola. Si
+    existiera un SKU CIPSA interno con prefijo C (ej: CC09150), quedaria
+    mal clasificado. Para evitarlo, esos SKUs deben omitirse en el catalogo
+    (no tienen precio o no pasan los filtros de inclusion).
     """
     if str(sku or "").upper().startswith("C"):
         return "REPRESENTADAS"
