@@ -1,113 +1,128 @@
-﻿"""Validacion cruzada entre repos: detecta inconsistencias de taxonomia.
+﻿"""Tests de la validacion de taxonomia del catalogo.
 
-Correr despues de cualquier cambio en master-data, stock-api o vigencias.
-Si hay ALERTAS, revisar antes de commitear.
+La validacion vive en scripts/validar_taxonomia.py (una sola implementacion):
+este test la EJERCE y falla si encuentra alertas. Antes este archivo era una
+copia que hacia `return 1` en vez de `assert`: pytest nunca lo daba por
+fallido y el "test de validacion autonoma" no vigilaba nada.
 """
 
 import json
 import sys
 from pathlib import Path
-from collections import Counter
+
+import pytest
+
+sys.path.insert(0, str(Path(__file__).parent.parent))
+
+from validar_taxonomia import (  # noqa: E402
+    CATALOGO_POR_DEFECTO,
+    LINEAS_CRAYOLA,
+    LINEAS_VINIFAN_PURA,
+    _taxonomia_api_stock,
+    validar,
+)
+from generar_catalogo_base import CATEGORIA_POR_LINEA  # noqa: E402
+
+RAIZ = Path(__file__).resolve().parent.parent.parent
 
 
-def test_validacion_taxonomia():
-    MASTER = Path(
-        r"C:\Users\ccusi\Documents\Proyect_Coder\G360-ecosystem\projects\g360-master-data"
-    )
-
-    # Cargar catalogo
-    cat = json.load(
-        open(MASTER / "output" / "catalogo_productos.json", encoding="utf-8")
-    )
-    ps = cat["productos"]
-
-    alerts = []
-
-    # 1. Verificar que todos los C* en catalogo sean REPRESENTADAS
-    c_skus = [p for p in ps if p["sku"].upper().startswith("C")]
-    for p in c_skus:
-        if p.get("categoria") != "REPRESENTADAS":
-            alerts.append(
-                f"ALERTA: {p['sku']} es C* pero categoria={p.get('categoria')} (debe ser REPRESENTADAS)"
-            )
-
-    # 2. Verificar que lÃ­neas 72/76/77/79 no tengan REPRESENTADAS
-    for p in ps:
-        lin = str(p.get("linea", ""))
-        cat_p = p.get("categoria", "")
-        if lin in ("72", "76", "77", "79") and cat_p == "REPRESENTADAS":
-            alerts.append(
-                f"ALERTA: {p['sku']} en linea {lin} (VINIFAN) pero categoria={cat_p}"
-            )
-
-    # 3. Verificar que lÃ­neas CA/CB/CC/CD/CE/CF sean REPRESENTADAS
-    crayola_lines = ("CA", "CB", "CC", "CD", "CE", "CF")
-    for p in ps:
-        lin = str(p.get("linea", ""))
-        cat_p = p.get("categoria", "")
-        if lin in crayola_lines and cat_p != "REPRESENTADAS":
-            alerts.append(
-                f"ALERTA: {p['sku']} en linea {lin} (Crayola) pero categoria={cat_p}"
-            )
-
-    # 4. Verificar que no haya lÃ­neas mixtas (mas de una categoria)
-    por_linea = Counter()
-    for p in ps:
-        por_linea[str(p.get("linea", ""))] += 1
-
-    mixed_lines = []
-    for p in ps:
-        lin = str(p.get("linea", ""))
-        cat_p = p.get("categoria", "")
-        # Contar categorias por linea
-        cats_en_linea = set(
-            pp.get("categoria") for pp in ps if str(pp.get("linea", "")) == lin
-        )
-        if len(cats_en_linea) > 1:
-            mixed_lines.append((lin, cats_en_linea))
-
-    # Deduplicar
-    mixed_lines = list(set(mixed_lines))
-    for lin, cats in mixed_lines:
-        alerts.append(f"ALERTA: Linea {lin} tiene categorias mixtas: {cats}")
-
-    # 5. Verificar integridad de metadata
-    meta = cat.get("metadata", {})
-    cat_por_linea = meta.get("categorias_por_linea", {})
-    for lin in crayola_lines:
-        if cat_por_linea.get(lin) != "REPRESENTADAS":
-            alerts.append(
-                f"ALERTA: metadata categorias_por_linea[{lin}] = {cat_por_linea.get(lin)} (debe ser REPRESENTADAS)"
-            )
-
-    # Reporte
-    print("=" * 70)
-    print("VALIDACION CRUZADA DE TAXONOMIA")
-    print("=" * 70)
-    print(f"Productos en catalogo: {len(ps)}")
-    print(f"SKUs C*: {len(c_skus)}")
-    print(f"Lineas Crayola: {crayola_lines}")
-    print()
-
-    if alerts:
-        print(f"!!! {len(alerts)} ALERTAS DETECTADAS !!!")
-        print()
-        for a in alerts:
-            print(f"  {a}")
-        print()
-        print("REVISAR ANTES DE COMMITEAR")
-        return 1
-    else:
-        print("OK: No hay inconsistencias de taxonomia")
-        print()
-        print("Resumen:")
-        print(f"  - C* ({len(c_skus)}): todos REPRESENTADAS")
-        print(f"  - Lineas 72/76/77/79: 100% VINIFAN")
-        print(f"  - Lineas Crayola: 100% REPRESENTADAS")
-        print(f"  - 0 lineas mixtas")
-        print(f"  - Metadata consistente")
-        return 0
+@pytest.mark.skipif(not CATALOGO_POR_DEFECTO.exists(), reason="catalogo no generado")
+def test_catalogo_real_no_tiene_alertas():
+    """El catalogo publicado no puede tener incoherencias de taxonomia."""
+    with open(CATALOGO_POR_DEFECTO, encoding="utf-8") as f:
+        catalogo = json.load(f)
+    alertas = validar(catalogo, RAIZ)
+    assert alertas == [], "\n".join(alertas)
 
 
-if __name__ == "__main__":
-    pass
+def test_detecta_crayola_fuera_de_representadas():
+    """Un C* con otra categoria debe dispararse como alerta."""
+    catalogo = {
+        "metadata": {"categorias_por_linea": {}},
+        "productos": [
+            {
+                "sku": "CA001",
+                "linea": "CA",
+                "linea_codigo": "CA",
+                "categoria": "VINIFAN",
+                "precio": 10.0,
+            }
+        ],
+    }
+    alertas = validar(catalogo, RAIZ)
+    assert any("CA001" in a for a in alertas)
+
+
+def test_detecta_linea_mixta():
+    """Una linea con dos categorias es una alerta."""
+    catalogo = {
+        "metadata": {"categorias_por_linea": {}},
+        "productos": [
+            {
+                "sku": "A001",
+                "linea": "78",
+                "linea_codigo": "",
+                "categoria": "VINIFAN",
+                "precio": 1.0,
+            },
+            {
+                "sku": "A002",
+                "linea": "78",
+                "linea_codigo": "",
+                "categoria": "REPRESENTADAS",
+                "precio": 1.0,
+            },
+        ],
+    }
+    alertas = validar(catalogo, RAIZ)
+    assert any("categorias mixtas" in a for a in alertas)
+
+
+def test_detecta_precio_cero():
+    """Publicar un producto sin precio viola la regla absoluta."""
+    catalogo = {
+        "metadata": {"categorias_por_linea": {}},
+        "productos": [
+            {
+                "sku": "A001",
+                "linea": "78",
+                "linea_codigo": "",
+                "categoria": "VINIFAN",
+                "precio": 0.0,
+            }
+        ],
+    }
+    alertas = validar(catalogo, RAIZ)
+    assert any("precio" in a for a in alertas)
+
+
+def test_taxonomia_del_maestro_es_la_misma_que_la_del_api():
+    """master-data y g360-stock-api deben clasificar igual cada linea.
+
+    /stock y /catalog leen la misma taxonomia: si divergen, el mismo SKU
+    aparece con dos categorias distintas segun el endpoint.
+    """
+    api = RAIZ.parent / "g360-stock-api" / "app" / "core" / "constants.py"
+    if not api.exists():
+        pytest.skip("g360-stock-api no esta presente")
+    tax_api = _taxonomia_api_stock(api)
+    tax_maestro = CATEGORIA_POR_LINEA
+    divergentes = {
+        cod: (tax_maestro.get(cod), cat)
+        for cod, cat in tax_api.items()
+        if cod in tax_maestro and tax_maestro[cod] != cat
+    }
+    assert divergentes == {}, f"taxonomias divergentes: {divergentes}"
+
+
+def test_lineas_crayola_publicadas_como_representadas():
+    """Las lineas Crayola del catalogo real son 100% REPRESENTADAS."""
+    if not CATALOGO_POR_DEFECTO.exists():
+        pytest.skip("catalogo no generado")
+    with open(CATALOGO_POR_DEFECTO, encoding="utf-8") as f:
+        catalogo = json.load(f)
+    for p in catalogo["productos"]:
+        if str(p.get("linea")) in LINEAS_CRAYOLA:
+            assert p.get("categoria") == "REPRESENTADAS", (p["sku"], p.get("categoria"))
+        if str(p.get("linea")) in LINEAS_VINIFAN_PURA:
+            assert p.get("categoria") != "REPRESENTADAS", p["sku"]

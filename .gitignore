@@ -13,3 +13,9 @@ output/test_estado_linea.json
 
 # graft's local graph cache — regenerable, not committed (run `graft build`).
 /graft/
+
+# Config local de ripgrep/graft (no aporta al repo).
+.ignore
+
+# Cache local del catalogo: lo regenera el BAT. No se versiona.
+data/catalog_cache.json

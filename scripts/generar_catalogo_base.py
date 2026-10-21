@@ -2,22 +2,34 @@
 """
 G360 Catalog Generator — Versión simplificada
 Genera catálogo enriquecido desde PRODUCTOS.xls + SKU_BX.xlsx
-Autor: CCUSI | v3.2.0
+Autor: CCUSI | v3.5.0
 
 Fuentes:
   - data/PRODUCTOS.xls       → SKU, nombre, ean13, ean14, peso, linea, grupo, tipo, familia, precio
   - data/SKU_BX.xlsx         → SKU, un_bx (cantidad por caja)
+  - API de stock (opcional)  → SKUs con stock físico (G360_STOCK_URL / G360_STOCK_API_KEY)
 
 Regla de inclusión (SKU_BX es la guía primaria de lo que se vende):
   - Se muestra el SKU si está vigente en ERP, o si está descontinuado
     pero curado en SKU_BX (con precio > 0 y no inactivo).
   - Los descontinuados incluidos se marcan con descontinuado=true.
+  - Un SKU vigente con STOCK FÍSICO también entra aunque no esté en SKU_BX:
+    sin catálogo no se conoce su peso/EAN/caja y hay despacho que hacer.
 
 Filtros absolutos (siempre excluyen):
   - Inactivos (FLG_INACTIVO)
   - Sin precio (<= 0)
   - Líneas de proceso
 """
+
+# Versión única del catálogo. El banner, la ayuda del CLI y el metadata del
+# JSON salen de acá: antes cada uno declaraba una versión distinta y el
+# README terminaba describiendo un producto que no existía.
+VERSION = "3.5.0"
+
+# API de stock por defecto. El universo de stock (SKUs con despacho pendiente)
+# es parte del catalogo: sin el, el catalogo sale incompleto y nadie lo nota.
+URL_STOCK_DEFAULT = "https://g360-stock-api.onrender.com"
 
 import argparse
 import json
@@ -71,6 +83,10 @@ CATEGORIA_POR_LINEA: dict[str, str] = {
     "CC": "REPRESENTADAS",
     "CD": "REPRESENTADAS",
     "57": "INDUMENTARIA",
+    # OJO: "52" estaba DUPLICADO en este dict (INDUMENTARIA arriba y
+    # MATERIALES abajo). En un literal de dict la clave repetida no avisa:
+    # gana la última y la taxonomía publicada quedaba mintiendo. Se dejó una
+    # sola vez, alineada con g360-stock-api/app/core/constants.py.
     "52": "INDUMENTARIA",
     "85": "REPRESENTADAS",
     "80": "PUBLICIDAD",
@@ -94,7 +110,6 @@ CATEGORIA_POR_LINEA: dict[str, str] = {
     "41": "MATERIALES",
     "50": "MATERIALES",
     "51": "MATERIALES",
-    "52": "MATERIALES",
     "53": "MATERIALES",
     "54": "MATERIALES",
     "55": "MATERIALES",
@@ -102,6 +117,10 @@ CATEGORIA_POR_LINEA: dict[str, str] = {
     "65": "DESCARTE Y VARIOS",
     "98": "DESCARTE Y VARIOS",
     "70": "PRODUCCION",
+    # 99 (VARIOS) la usan ~50 productos del ERP pero no estaba en el mapa:
+    # caian en el default OTROS sin que la taxonomia publicada lo dijera.
+    # Se declara explicitamente para que /stock y /catalog la resuelvan igual.
+    "99": "OTROS",
 }
 
 # Prefijos para lineas no listadas (mas especifico primero).
@@ -132,6 +151,7 @@ PREFIJOS_CATEGORIA_AUTO: list[tuple[str, str]] = [
     ("65", "DESCARTE Y VARIOS"),
     ("98", "DESCARTE Y VARIOS"),
     ("70", "PRODUCCION"),
+    ("99", "OTROS"),
 ]
 
 CATEGORIA_DEFAULT = "OTROS"
@@ -175,6 +195,22 @@ def categoria_de_producto(sku: str, codigo_linea: str) -> str:
     if str(sku or "").upper().startswith("C"):
         return "REPRESENTADAS"
     return asignar_categoria(codigo_linea)
+
+
+def codigo_linea_crayola(sku: str) -> str:
+    """Codigo de linea propio de un SKU Crayola: CA, CB, CC, CD, CE, CF...
+
+    El prefijo de 2 caracteres SOLO es valido si es alfanumerico con al menos
+    una letra: un SKU como "C0150" no define la linea "C0" (codigo de linea
+    inexistente que terminaba en la taxonomia como categoria vacia). En ese
+    caso se devuelve "" y el SKU cae a la linea real del ERP.
+    """
+    prefijo = str(sku or "").strip().upper()[:2]
+    if len(prefijo) != 2:
+        return ""
+    if not prefijo[0].isalpha() or not prefijo[1].isalnum():
+        return ""
+    return prefijo
 
 
 # Mapeo nombre de línea → código corto (2 chars), derivado del reporte de
@@ -327,6 +363,35 @@ def _clean_ean(val):
     return s
 
 
+def motivo_exclusion(
+    flg_inactivo,
+    flg_discont,
+    precio,
+    linea,
+    en_bx,
+    tiene_stock=False,
+    force_incluir=False,
+):
+    """Motivo por el que un SKU del ERP queda FUERA del catálogo (None si entra).
+
+    Única fuente de las reglas de inclusión: `decidir_inclusion` la usa y el
+    generador la usa para auditar cuántas filas se quedaron afuera y por qué.
+    """
+    if flg_inactivo:
+        return "inactivo"
+    # El precio es un filtro ABSOLUTO: sin precio no se publica, ni siquiera
+    # un Crayola (force_incluir solo salta la regla de descontinuado/BX).
+    if precio <= 0:
+        return "sin_precio"
+    if force_incluir:
+        return None
+    if linea in LINEAS_EXCLUIR:
+        return "linea_proceso"
+    if flg_discont and not en_bx and not tiene_stock:
+        return "descontinuado_sin_bx_ni_stock"
+    return None
+
+
 def decidir_inclusion(
     flg_inactivo,
     flg_discont,
@@ -347,19 +412,17 @@ def decidir_inclusion(
 
     Retorna (incluir, descontinuado).
     """
-    if flg_inactivo:
+    if motivo_exclusion(
+        flg_inactivo,
+        flg_discont,
+        precio,
+        linea,
+        en_bx,
+        tiene_stock,
+        force_incluir,
+    ):
         return False, False
-    # C* (Crayola) entra siempre que tenga precio, aunque descontinuado
-    # y sin BX/stock: es representada y hay que llevarla.
-    if force_incluir:
-        return True, bool(flg_discont)
-    if precio <= 0:
-        return False, False
-    if linea in LINEAS_EXCLUIR:
-        return False, False
-    if flg_discont and not en_bx and not tiene_stock:
-        return False, False
-    return True, flg_discont
+    return True, bool(flg_discont)
 
 
 def _extraer_codigo_linea(linea):
@@ -379,12 +442,15 @@ def _extraer_codigo_linea(linea):
 
 
 def leer_erp(ruta, bx_skus=None, stock_skus=None):
-    """Lee PRODUCTOS.xls y retorna (productos, errores, erp_skus).
+    """Lee PRODUCTOS.xls y retorna (productos, errores, erp_skus, exclusiones).
 
     bx_skus:    SKUs curados en SKU_BX (guía primaria de lo que se vende).
     stock_skus: SKUs que tienen stock fisico (API de stock). Entran al
                 catalogo aunque no esten en SKU_BX: sin catalogo no se conoce
                 su peso/EAN/caja y hay despacho que hacer.
+    exclusiones: dict {motivo: n} con cuántas filas del ERP quedaron fuera y
+                por qué. Sin esto no se puede auditar por qué el catálogo tiene
+                N SKUs y no otros.
     """
     productos = []
     errores = []
@@ -393,6 +459,7 @@ def leer_erp(ruta, bx_skus=None, stock_skus=None):
     bx_skus = bx_skus or set()
     stock_skus = stock_skus or set()
     lineas_desconocidas = set()
+    exclusiones: dict[str, int] = {}
     try:
         wb = xlrd.open_workbook(ruta)
         ws = wb.sheet_by_index(0)
@@ -415,30 +482,33 @@ def leer_erp(ruta, bx_skus=None, stock_skus=None):
             precio = _safe_float(ws.cell_value(r, 11))
 
             if sku in skus_vistos:
+                exclusiones["duplicado_erp"] = exclusiones.get("duplicado_erp", 0) + 1
                 continue
             skus_vistos[sku] = r
             erp_skus.add(sku)
 
-            # C* (Crayola) entra siempre con precio > 0, sin importar BX/stock
-            force_crayola = sku.startswith("C")
-            incluir, descontinuado = decidir_inclusion(
+            # C* (Crayola) entra sin importar BX/stock (es representada y hay
+            # que llevarla), pero el precio sigue siendo filtro absoluto.
+            force_crayola = sku.upper().startswith("C")
+            motivo = motivo_exclusion(
                 flg_inactivo,
                 flg_discont,
                 precio,
-                linea,
+                linea.upper(),
                 sku in bx_skus,
                 sku in stock_skus,
                 force_incluir=force_crayola,
             )
-            if not incluir:
+            if motivo:
+                exclusiones[motivo] = exclusiones.get(motivo, 0) + 1
                 continue
+            descontinuado = bool(flg_discont)
 
             linea_upper = linea.upper()
             # C* usan su prefijo como linea propia (CA, CB, CC, CD, CE, CF)
             # para que cada sub-marca Crayola sea identificable.
-            if sku.startswith("C"):
-                codigo = sku[:2].upper()
-            else:
+            codigo = codigo_linea_crayola(sku) if force_crayola else ""
+            if not codigo:
                 codigo = resolver_codigo_linea_grupo(linea_upper, grupo)
                 if not codigo:
                     lineas_desconocidas.add(linea_upper)
@@ -477,7 +547,7 @@ def leer_erp(ruta, bx_skus=None, stock_skus=None):
         print(f"  ERP: {len(productos)} productos válidos")
     except Exception as e:
         errores.append(str(e))
-    return productos, errores, erp_skus
+    return productos, errores, erp_skus, exclusiones
 
 
 def leer_unbx(ruta):
@@ -515,7 +585,15 @@ def leer_unbx(ruta):
     return orden_map, unbx_map, estado_map
 
 
-def generar_output(productos, unbx_map, estado_map, orden_map, ruta_salida):
+def generar_output(
+    productos,
+    unbx_map,
+    estado_map,
+    orden_map,
+    ruta_salida,
+    exclusiones=None,
+    universo_stock=None,
+):
     """Genera el JSON de catálogo completo."""
     estadisticas = {
         "sin_ean13": 0,
@@ -580,7 +658,15 @@ def generar_output(productos, unbx_map, estado_map, orden_map, ruta_salida):
                 "precio": p["precio"],
                 "descontinuado": p.get("descontinuado", False),
                 "linea_codigo": p.get("linea_codigo", ""),
-                "keywords": generar_keywords(p["nombre"], p["linea"], p["categoria"]),
+                "keywords": generar_keywords(
+                    p["nombre"],
+                    # El nombre de la linea (no el codigo) es lo que la gente
+                    # busca ("PELOTAS", "ARCHIVO"). El codigo va aparte, como
+                    # extra, para que buscar "01" tambien encuentre el SKU.
+                    p.get("linea_nombre", "") or p.get("linea", ""),
+                    p["categoria"],
+                    extra=p.get("linea", ""),
+                ),
             }
         )
 
@@ -589,7 +675,7 @@ def generar_output(productos, unbx_map, estado_map, orden_map, ruta_salida):
     )
 
     metadata = {
-        "version": "3.5.0",
+        "version": VERSION,
         "generated_at": datetime.now().isoformat(),
         "source_erp": "PRODUCTOS.xls",
         "source_un_bx": "SKU_BX.xlsx",
@@ -604,12 +690,25 @@ def generar_output(productos, unbx_map, estado_map, orden_map, ruta_salida):
         "lineas_grupo_a_codigo": {
             f"{lin}|{grp}": cod for (lin, grp), cod in LINEA_GRUPO_A_CODIGO.items()
         },
+        # Trazabilidad: que filas del ERP quedaron fuera y por que, y si el
+        # universo de stock entro en la generacion. Sin esto no se puede
+        # explicar por que el catalogo tiene N SKUs.
+        "exclusiones": dict(exclusiones or {}),
+        "universo_stock": dict(universo_stock or {"incluido": False}),
     }
 
     output = {"metadata": metadata, "productos": productos_final}
 
     p = Path(ruta_salida)
+    previo = None
     if p.exists():
+        # Guarda el total anterior para avisar si el catalogo se achica: una
+        # caida suele significar que faltó una fuente (p.ej. el universo de
+        # stock) y no que el ERP tenga menos productos.
+        try:
+            previo = json.loads(p.read_text(encoding="utf-8")).get("metadata", {})
+        except (OSError, json.JSONDecodeError):
+            previo = None
         bak = p.with_suffix(f".{datetime.now():%Y%m%d_%H%M%S}.bak.json")
         if bak.exists():
             bak.unlink()
@@ -619,6 +718,19 @@ def generar_output(productos, unbx_map, estado_map, orden_map, ruta_salida):
     with open(p, "w", encoding="utf-8") as f:
         json.dump(output, f, ensure_ascii=False, indent=2)
     print(f"  Guardado: {ruta_salida} ({p.stat().st_size / 1024:.1f} KB)")
+
+    if previo and previo.get("total_productos"):
+        antes = int(previo["total_productos"])
+        despues = len(productos_final)
+        if despues < antes:
+            print(
+                f"  ALERTA: el catalogo se achico de {antes} a {despues} SKUs "
+                f"(-{antes - despues}). Revisa el universo de stock y el ERP."
+            )
+        elif despues > antes:
+            print(
+                f"  OK: el catalogoCREcio de {antes} a {despues} SKUs (+{despues - antes})."
+            )
     return output
 
 
@@ -630,14 +742,20 @@ def leer_universo_stock(api_url=None, api_key=None, timeout=90):
     EAN ni caja, y hay carga que hacer.
 
     Config: G360_STOCK_URL / G360_STOCK_API_KEY (o --stock-url / --stock-key).
+    La clave de lectura cae a API_KEY: el API acepta la clave administrativa
+    para leer stock, asi que una sola variable alcanza para todo el flujo.
     Sin clave no se consulta: se sigue con el criterio de SKU_BX.
     """
-    url = api_url or os.environ.get("G360_STOCK_URL", "")
-    key = api_key or os.environ.get("G360_STOCK_API_KEY", "")
+    url = api_url or os.environ.get("G360_STOCK_URL", "") or URL_STOCK_DEFAULT
+    key = (
+        api_key
+        or os.environ.get("G360_STOCK_API_KEY", "")
+        or os.environ.get("API_KEY", "")
+    )
     if not url:
         return set(), "sin URL configurada"
     if not key:
-        return set(), "sin G360_STOCK_API_KEY"
+        return set(), "sin G360_STOCK_API_KEY ni API_KEY"
     try:
         import requests
 
@@ -662,7 +780,7 @@ def leer_universo_stock(api_url=None, api_key=None, timeout=90):
 
 
 def main():
-    ap = argparse.ArgumentParser(description="G360 Catalog Generator v3.3")
+    ap = argparse.ArgumentParser(description=f"G360 Catalog Generator v{VERSION}")
     ap.add_argument("--erp", "-e", default="data/PRODUCTOS.xls", help="Archivo ERP")
     ap.add_argument("--unbx", "-u", default="data/SKU_BX.xlsx", help="Archivo SKU_BX")
     ap.add_argument(
@@ -689,7 +807,7 @@ def main():
     a = ap.parse_args()
 
     print("=" * 50)
-    print("G360 CATALOG GENERATOR v3.2.0")
+    print(f"G360 CATALOG GENERATOR v{VERSION}")
     print("=" * 50)
     print(f"ERP:      {a.erp}")
     print(f"SKU_BX:   {a.unbx}")
@@ -703,16 +821,28 @@ def main():
     # Universo con stock fisico: los SKU con despacho pendiente tambien
     # necesitan catalogo (peso/EAN/caja para despachar).
     stock_skus = set()
+    universo_stock = {"incluido": False, "skus": 0, "error": ""}
     if a.sin_universo_stock:
         print("  Universo de stock: omitido (--sin-universo-stock)")
+        universo_stock["error"] = "omitido por --sin-universo-stock"
     else:
         stock_skus, err = leer_universo_stock(a.stock_url, a.stock_key)
         if err:
             print(f"  Universo de stock: no disponible ({err}) -> solo SKU_BX")
+            print(
+                "  WARN: el catalogo va a quedar INCOMPLETO: los SKUs con stock "
+                "que no esten en SKU_BX no entran."
+            )
+            universo_stock["error"] = err
         else:
             print(f"  Universo de stock: {len(stock_skus)} SKUs con stock fisico")
+            universo_stock = {
+                "incluido": True,
+                "skus": len(stock_skus),
+                "error": "",
+            }
 
-    productos, errs, erp_skus = leer_erp(
+    productos, errs, erp_skus, exclusiones = leer_erp(
         a.erp, bx_skus=set(orden_map), stock_skus=stock_skus
     )
     if errs:
@@ -734,6 +864,10 @@ def main():
     print(f"  Con orden definido:    {len(orden_map)}")
     print(f"  Con un_bx definido:    {len(unbx_map)}")
     print(f"  Sin un_bx (default 1): {len(productos) - len(unbx_map)}")
+    if exclusiones:
+        print("  Exclusiones del ERP:")
+        for motivo, cnt in sorted(exclusiones.items(), key=lambda x: -x[1]):
+            print(f"    {motivo}: {cnt}")
 
     if a.validate_only:
         print("\nValidación completada")
@@ -741,7 +875,15 @@ def main():
 
     # Generar output
     print("\nGenerando catálogo...")
-    output = generar_output(productos, unbx_map, estado_map, orden_map, a.output)
+    output = generar_output(
+        productos,
+        unbx_map,
+        estado_map,
+        orden_map,
+        a.output,
+        exclusiones=exclusiones,
+        universo_stock=universo_stock,
+    )
 
     print(f"\n{'=' * 50}")
     print("CATÁLOGO GENERADO")
@@ -753,8 +895,13 @@ def main():
     print(f"  Sin ean13:  {est['sin_ean13']}")
     print(f"  Con un_bx:  {est['con_unbx']}")
     print(f"  Sin un_bx:  {est['sin_unbx']}")
-    print(f"  Descontinuados (en BX): {est['descontinuados']}")
-    print(f"  Sin linea_codigo:       {est['sin_linea_codigo']}")
+    print(f"  Descontinuados:           {est['descontinuados']}")
+    print(f"  Sin linea_codigo:          {est['sin_linea_codigo']}")
+    uni = meta.get("universo_stock", {})
+    print(
+        f"  Universo de stock:         "
+        f"{'incluido (' + str(uni.get('skus', 0)) + ' SKUs)' if uni.get('incluido') else 'NO INCLUIDO'}"
+    )
     print(f"\nCategorías:")
     for cat, cnt in sorted(est["por_categoria"].items(), key=lambda x: -x[1]):
         print(f"  {cat}: {cnt}")

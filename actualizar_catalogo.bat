@@ -1,7 +1,7 @@
 @echo off
 setlocal enabledelayedexpansion
 REM G360 Master Data - Workflow de generacion
-REM Autor: CCUSI | v3.1.0
+REM Autor: CCUSI | v3.5.0
 REM
 REM Uso:
 REM   actualizar_catalogo.bat              Modo interactivo (menu)
@@ -10,11 +10,17 @@ REM   actualizar_catalogo.bat --auto-local Genera + copia local, sin subir
 REM   actualizar_catalogo.bat --upload     Sube el JSON existente sin regenerar
 REM
 REM Variables de entorno opcionales:
-REM   API_KEY   Clave administrativa del API (requerida para upload)
+REM   API_KEY   Clave administrativa del API (requerida para upload y para el
+REM             universo de stock: el API acepta la misma clave para leer)
 REM   API_URL   URL del API (default: https://g360-stock-api.onrender.com)
+REM
+REM El universo de stock (SKUs con despacho pendiente) se consulta en el mismo
+REM API: sin el, el catalogo sale incompleto y no se nota. Por eso la clave
+REM se pide ANTES de generar, no solo al momento de subir.
 
 set "AUTO_MODE=0"
 set "UPLOAD_MODE=0"
+set "PYTHONIOENCODING=utf-8"
 
 if "%~1"=="--auto" (
     set "AUTO_MODE=1"
@@ -34,10 +40,10 @@ if "%~1"=="--upload" (
 :menu
 echo.
 echo ==========================================
-echo G360 MASTER DATA - WORKFLOW v3.1.0
+echo G360 MASTER DATA - WORKFLOW v3.5.0
 echo ==========================================
 echo.
-echo  1) Generar catalogo base (PRODUCTOS.xls + SKU_BX)
+echo  1) Generar catalogo base (PRODUCTOS.xls + SKU_BX + universo de stock)
 echo  2) Ver estado del catalogo
 echo  0) Salir
 echo.
@@ -82,6 +88,20 @@ if not exist data\SKU_BX.xlsx (
     if "%AUTO_MODE%"=="0" pause
     exit /b 1
 )
+
+REM La clave hace falta para el universo de stock (generacion) y para el
+REM upload. En modo interactivo se pide aqui, antes de generar.
+if "%AUTO_MODE%"=="1" if not defined API_KEY (
+    echo ERROR: API_KEY no esta definida.
+    echo El universo de stock y la subida al API la necesitan: sin clave el
+    echo catalogo sale incompleto y no lo vas a notar.
+    echo Defina: set API_KEY=su_clave_aqui
+    exit /b 1
+)
+if "%AUTO_MODE%"=="0" (
+    if not defined API_KEY call :pedir_clave
+)
+call :preparar_entorno
 
 echo Generando catalogo...
 .venv\Scripts\python.exe scripts/generar_catalogo_base.py
@@ -144,7 +164,7 @@ if %KEYLEN% GEQ 1 if %KEYLEN% LSS 4 (
     exit /b 1
 )
 if exist .venv\Scripts\python.exe .venv\Scripts\python.exe -c "import os;v=os.environ.get('API_KEY','');print('  Clave:',len(v),'caracteres, extremos:',repr(v[:1]+v[-1:]))"
-if not defined API_URL set API_URL=https://g360-stock-api.onrender.com
+call :preparar_entorno
 echo.
 echo Subiendo a %API_URL%/api/v1/catalog/upload ...
 call :upload_with_retry
@@ -189,6 +209,17 @@ if not exist output\catalogo_productos.json (
     exit /b 1
 )
 goto do_upload
+
+:: ----------------------------------------------------------------------------
+:: Prepara el entorno de generacion: el universo de stock se consulta en el
+:: MISMO API que recibe el catalogo. Sin G360_STOCK_API_KEY el catalogo sale
+:: incompleto (se pierden los SKUs con despacho que no estan en SKU_BX).
+:: La clave de lectura cae a API_KEY: el API acepta la admin para leer.
+:preparar_entorno
+if not defined API_URL set "API_URL=https://g360-stock-api.onrender.com"
+if not defined G360_STOCK_URL set "G360_STOCK_URL=%API_URL%"
+if not defined G360_STOCK_API_KEY if defined API_KEY set "G360_STOCK_API_KEY=%API_KEY%"
+exit /b 0
 
 :: ----------------------------------------------------------------------------
 :: Upload con reintentos (cold start de Render free-tier)
