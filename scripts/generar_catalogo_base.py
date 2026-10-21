@@ -18,6 +18,7 @@ Filtros absolutos (siempre excluyen):
   - Sin precio (<= 0)
   - Líneas de proceso
 """
+
 import argparse
 import json
 import os
@@ -49,38 +50,86 @@ except ImportError:
 # ─────────────────────────────────────────────────────────────────────────────
 CATEGORIA_POR_LINEA: dict[str, str] = {
     # Negocio core
-    "01": "VINIBALL", "MA": "VINIBALL", "14": "VINIBALL", "AD": "VINIBALL",
-    "02": "VINIFAN", "09": "VINIFAN", "11": "VINIFAN", "72": "VINIFAN",
-    "73": "VINIFAN", "75": "VINIFAN", "76": "VINIFAN", "77": "VINIFAN",
-    "78": "VINIFAN", "79": "VINIFAN", "CE": "REPRESENTADAS", "CF": "REPRESENTADAS",
-    "57": "INDUMENTARIA", "52": "INDUMENTARIA",
+    "01": "VINIBALL",
+    "MA": "VINIBALL",
+    "14": "VINIBALL",
+    "AD": "VINIBALL",
+    "02": "VINIFAN",
+    "09": "VINIFAN",
+    "11": "VINIFAN",
+    "72": "VINIFAN",
+    "73": "VINIFAN",
+    "75": "VINIFAN",
+    "76": "VINIFAN",
+    "77": "VINIFAN",
+    "78": "VINIFAN",
+    "79": "VINIFAN",
+    "CE": "REPRESENTADAS",
+    "CF": "REPRESENTADAS",
+    "CA": "REPRESENTADAS",
+    "CB": "REPRESENTADAS",
+    "CC": "REPRESENTADAS",
+    "CD": "REPRESENTADAS",
+    "57": "INDUMENTARIA",
+    "52": "INDUMENTARIA",
     "85": "REPRESENTADAS",
-    "80": "PUBLICIDAD", "81": "PUBLICIDAD",
+    "80": "PUBLICIDAD",
+    "81": "PUBLICIDAD",
     # Areas operativas (no core)
-    "20": "INDUSTRIAL", "21": "INDUSTRIAL", "22": "INDUSTRIAL",
+    "20": "INDUSTRIAL",
+    "21": "INDUSTRIAL",
+    "22": "INDUSTRIAL",
     "23": "INDUSTRIAL",
-    "30": "CIPTECH", "31": "CIPTECH", "32": "CIPTECH", "33": "CIPTECH",
-    "34": "CIPTECH", "35": "CIPTECH", "36": "CIPTECH", "37": "CIPTECH",
-    "38": "CIPTECH", "39": "CIPTECH",
-    "40": "MATERIALES", "41": "MATERIALES", "50": "MATERIALES",
-    "51": "MATERIALES", "52": "MATERIALES", "53": "MATERIALES",
-    "54": "MATERIALES", "55": "MATERIALES",
-    "60": "DESCARTE Y VARIOS", "65": "DESCARTE Y VARIOS",
+    "30": "CIPTECH",
+    "31": "CIPTECH",
+    "32": "CIPTECH",
+    "33": "CIPTECH",
+    "34": "CIPTECH",
+    "35": "CIPTECH",
+    "36": "CIPTECH",
+    "37": "CIPTECH",
+    "38": "CIPTECH",
+    "39": "CIPTECH",
+    "40": "MATERIALES",
+    "41": "MATERIALES",
+    "50": "MATERIALES",
+    "51": "MATERIALES",
+    "52": "MATERIALES",
+    "53": "MATERIALES",
+    "54": "MATERIALES",
+    "55": "MATERIALES",
+    "60": "DESCARTE Y VARIOS",
+    "65": "DESCARTE Y VARIOS",
     "98": "DESCARTE Y VARIOS",
     "70": "PRODUCCION",
 }
 
 # Prefijos para lineas no listadas (mas especifico primero).
 PREFIJOS_CATEGORIA_AUTO: list[tuple[str, str]] = [
-    ("20", "INDUSTRIAL"), ("21", "INDUSTRIAL"), ("22", "INDUSTRIAL"),
+    ("20", "INDUSTRIAL"),
+    ("21", "INDUSTRIAL"),
+    ("22", "INDUSTRIAL"),
     ("23", "INDUSTRIAL"),
-    ("30", "CIPTECH"), ("31", "CIPTECH"), ("32", "CIPTECH"), ("33", "CIPTECH"),
-    ("34", "CIPTECH"), ("35", "CIPTECH"), ("36", "CIPTECH"), ("37", "CIPTECH"),
-    ("38", "CIPTECH"), ("39", "CIPTECH"),
-    ("40", "MATERIALES"), ("41", "MATERIALES"), ("50", "MATERIALES"),
-    ("51", "MATERIALES"), ("52", "MATERIALES"), ("53", "MATERIALES"),
-    ("54", "MATERIALES"), ("55", "MATERIALES"),
-    ("60", "DESCARTE Y VARIOS"), ("65", "DESCARTE Y VARIOS"),
+    ("30", "CIPTECH"),
+    ("31", "CIPTECH"),
+    ("32", "CIPTECH"),
+    ("33", "CIPTECH"),
+    ("34", "CIPTECH"),
+    ("35", "CIPTECH"),
+    ("36", "CIPTECH"),
+    ("37", "CIPTECH"),
+    ("38", "CIPTECH"),
+    ("39", "CIPTECH"),
+    ("40", "MATERIALES"),
+    ("41", "MATERIALES"),
+    ("50", "MATERIALES"),
+    ("51", "MATERIALES"),
+    ("52", "MATERIALES"),
+    ("53", "MATERIALES"),
+    ("54", "MATERIALES"),
+    ("55", "MATERIALES"),
+    ("60", "DESCARTE Y VARIOS"),
+    ("65", "DESCARTE Y VARIOS"),
     ("98", "DESCARTE Y VARIOS"),
     ("70", "PRODUCCION"),
 ]
@@ -128,25 +177,54 @@ def categoria_de_producto(sku: str, codigo_linea: str) -> str:
 # Semilla estática: el reporte es la verdad; el funnel lo sobrescribe
 # dinámicamente por nombre si la semilla no cubre una línea nueva.
 LINEA_NOMBRE_A_CODIGO = {
-    "PELOTAS": "01", "FORROS": "02", "SENSORIALES": "09", "METALICA": "11",
-    "OTROS": "14", "PEGAMENTOS": "72", "DIDACTICOS": "73", "DIBUJO": "75",
-    "ESCRITURA": "76", "PINTURA": "77", "ARCHIVO": "78", "ACCESORIOS": "79",
-    "PUBLICIDAD": "80", "KITS": "81", "REPRESENTADAS": "85",
-    "MASCOTAS": "MA", "MANUALIDADES": "CE", "SET": "CF", "ACCESORIOS DEPORTIVOS": "AD",
-    "PRODUCTOS INDUSTRIALES": "20", "REPRESENTACIONES INDUSTRIALES": "21",
-    "SEGURIDAD Y SEÑALIZACION VIAL": "23", "CIPTECH ETIQUETAS": "30",
-    "CIPTECH CINTAS": "31", "CIPTECH CPEI": "32", "CIPTECH CIL": "33",
-    "CIPTECH SUPPLY CHAIN": "35", "MATERIA PRIMA": "40",
-    "MATERIA PRIMA CIPTECH": "41", "MATERIALES AUXILIARES": "50",
-    "REPUESTO PARA MAQUINA": "51", "INSUMOS CONSUMIBLES": "53",
+    "PELOTAS": "01",
+    "FORROS": "02",
+    "SENSORIALES": "09",
+    "METALICA": "11",
+    "OTROS": "14",
+    "PEGAMENTOS": "72",
+    "DIDACTICOS": "73",
+    "DIBUJO": "75",
+    "ESCRITURA": "76",
+    "PINTURA": "77",
+    "ARCHIVO": "78",
+    "ACCESORIOS": "79",
+    "PUBLICIDAD": "80",
+    "KITS": "81",
+    "REPRESENTADAS": "85",
+    "MASCOTAS": "MA",
+    "MANUALIDADES": "CE",
+    "SET": "CF",
+    "ACCESORIOS DEPORTIVOS": "AD",
+    "PRODUCTOS INDUSTRIALES": "20",
+    "REPRESENTACIONES INDUSTRIALES": "21",
+    "SEGURIDAD Y SEÑALIZACION VIAL": "23",
+    "CIPTECH ETIQUETAS": "30",
+    "CIPTECH CINTAS": "31",
+    "CIPTECH CPEI": "32",
+    "CIPTECH CIL": "33",
+    "CIPTECH SUPPLY CHAIN": "35",
+    "MATERIA PRIMA": "40",
+    "MATERIA PRIMA CIPTECH": "41",
+    "MATERIALES AUXILIARES": "50",
+    "REPUESTO PARA MAQUINA": "51",
+    "INSUMOS CONSUMIBLES": "53",
     "HERRAMIENTAS - CONSUMIBLES": "54",
     "REPUESTOS,ACCESORIOS Y SUMINIS": "55",
-    "INDUMENTARIA Y EPP": "57", "SCRAP": "60",
-    "MERCADERIAS VARIAS": "65", "ECONOMATO": "66", "PRODUCTOS EN PROCESO": "70",
-    "PRODUCTOS SIN EMBALAJE": "98", "SERVICIOS INDUSTRIALES": "22",
-    "LICITACION": "LI", "VARIOS": "99",
-    "CIPTECH INSPECCION": "34", "CIPTECH PID": "36", "CIPTECH SOFTWARE": "37",
-    "CIPTECH SERVICIOS": "38", "CIPTECH OTROS": "39",
+    "INDUMENTARIA Y EPP": "57",
+    "SCRAP": "60",
+    "MERCADERIAS VARIAS": "65",
+    "ECONOMATO": "66",
+    "PRODUCTOS EN PROCESO": "70",
+    "PRODUCTOS SIN EMBALAJE": "98",
+    "SERVICIOS INDUSTRIALES": "22",
+    "LICITACION": "LI",
+    "VARIOS": "99",
+    "CIPTECH INSPECCION": "34",
+    "CIPTECH PID": "36",
+    "CIPTECH SOFTWARE": "37",
+    "CIPTECH SERVICIOS": "38",
+    "CIPTECH OTROS": "39",
 }
 
 # Desambiguacion de linea por GRUPO cuando el NOMBRE designa a mas de una linea.
@@ -192,13 +270,13 @@ def generar_nombre_corto(nombre):
     if not nombre:
         return ""
     texto = nombre.upper().strip()
-    texto = re.sub(r'^PELOTA(\s+DE)?\s+', '', texto)
-    texto = re.sub(r'\b(N|INFLABLE|PELOTA|BALON|JUEGO)\s+', '', texto)
-    texto = re.sub(r'\b(GOMA|PVC|CUERO|PU)\b', '', texto)
-    texto = re.sub(r'\bVINIFAN\w*\b', '', texto)
-    texto = re.sub(r'\bVFAN\w*\b', '', texto)
-    texto = re.sub(r'\bN\b', '', texto)
-    texto = re.sub(r'\s+', ' ', texto).strip()
+    texto = re.sub(r"^PELOTA(\s+DE)?\s+", "", texto)
+    texto = re.sub(r"\b(N|INFLABLE|PELOTA|BALON|JUEGO)\s+", "", texto)
+    texto = re.sub(r"\b(GOMA|PVC|CUERO|PU)\b", "", texto)
+    texto = re.sub(r"\bVINIFAN\w*\b", "", texto)
+    texto = re.sub(r"\bVFAN\w*\b", "", texto)
+    texto = re.sub(r"\bN\b", "", texto)
+    texto = re.sub(r"\s+", " ", texto).strip()
     return texto.title()
 
 
@@ -244,7 +322,15 @@ def _clean_ean(val):
     return s
 
 
-def decidir_inclusion(flg_inactivo, flg_discont, precio, linea, en_bx, tiene_stock=False):
+def decidir_inclusion(
+    flg_inactivo,
+    flg_discont,
+    precio,
+    linea,
+    en_bx,
+    tiene_stock=False,
+    force_incluir=False,
+):
     """Decide si un SKU del ERP entra al catálogo.
 
     SKU_BX es la guía primaria de lo que se vende. Además, un SKU que tiene
@@ -258,6 +344,10 @@ def decidir_inclusion(flg_inactivo, flg_discont, precio, linea, en_bx, tiene_sto
     """
     if flg_inactivo:
         return False, False
+    # C* (Crayola) entra siempre que tenga precio, aunque descontinuado
+    # y sin BX/stock: es representada y hay que llevarla.
+    if force_incluir:
+        return True, bool(flg_discont)
     if precio <= 0:
         return False, False
     if linea in LINEAS_EXCLUIR:
@@ -315,8 +405,8 @@ def leer_erp(ruta, bx_skus=None, stock_skus=None):
             grupo = str(ws.cell_value(r, 6)).strip()
             tipo = str(ws.cell_value(r, 7)).strip()
             familia = str(ws.cell_value(r, 8)).strip()
-            flg_inactivo = str(ws.cell_value(r, 9)).strip().lower() == 'checked'
-            flg_discont = str(ws.cell_value(r, 10)).strip().lower() == 'checked'
+            flg_inactivo = str(ws.cell_value(r, 9)).strip().lower() == "checked"
+            flg_discont = str(ws.cell_value(r, 10)).strip().lower() == "checked"
             precio = _safe_float(ws.cell_value(r, 11))
 
             if sku in skus_vistos:
@@ -324,43 +414,61 @@ def leer_erp(ruta, bx_skus=None, stock_skus=None):
             skus_vistos[sku] = r
             erp_skus.add(sku)
 
+            # C* (Crayola) entra siempre con precio > 0, sin importar BX/stock
+            force_crayola = sku.startswith("C")
             incluir, descontinuado = decidir_inclusion(
-                flg_inactivo, flg_discont, precio, linea,
-                sku in bx_skus, sku in stock_skus)
+                flg_inactivo,
+                flg_discont,
+                precio,
+                linea,
+                sku in bx_skus,
+                sku in stock_skus,
+                force_incluir=force_crayola,
+            )
             if not incluir:
                 continue
 
             linea_upper = linea.upper()
-            codigo = (LINEA_NOMBRE_A_CODIGO.get(linea_upper, "")
-                      or _extraer_codigo_linea(linea_upper))
-            if not codigo:
-                lineas_desconocidas.add(linea_upper)
-            categoria = categoria_de_producto(sku, codigo) if codigo else CATEGORIA_DEFAULT
+            # C* usan su prefijo como linea propia (CA, CB, CC, CD, CE, CF)
+            # para que cada sub-marca Crayola sea identificable.
+            if sku.startswith("C"):
+                codigo = sku[:2].upper()
+            else:
+                codigo = resolver_codigo_linea_grupo(linea_upper, grupo)
+                if not codigo:
+                    lineas_desconocidas.add(linea_upper)
+            categoria = (
+                categoria_de_producto(sku, codigo) if codigo else CATEGORIA_DEFAULT
+            )
 
-            productos.append({
-                "sku": sku,
-                "nombre": nombre,
-                "ean13": ean13,
-                "ean14": ean14,
-                "peso_kg": peso_kg,
-                # `linea` es el CODIGO canonico (2 chars); el nombre legible
-                # va aparte. Antes iba el nombre y el codigo en otro campo:
-                # esa ambiguedad hacia que cada consumidor lo interpretara
-                # distinto y la linea apareciera como nombre o como codigo.
-                "linea": codigo or linea_upper,
-                "linea_nombre": linea_upper,
-                "grupo": grupo,
-                "tipo": tipo,
-                "familia": familia,
-                "categoria": categoria,
-                "precio": round(precio, 2),
-                "descontinuado": descontinuado,
-                "linea_codigo": codigo,
-            })
+            productos.append(
+                {
+                    "sku": sku,
+                    "nombre": nombre,
+                    "ean13": ean13,
+                    "ean14": ean14,
+                    "peso_kg": peso_kg,
+                    # `linea` es el CODIGO canonico (2 chars); el nombre legible
+                    # va aparte. Antes iba el nombre y el codigo en otro campo:
+                    # esa ambiguedad hacia que cada consumidor lo interpretara
+                    # distinto y la linea apareciera como nombre o como codigo.
+                    "linea": codigo or linea_upper,
+                    "linea_nombre": linea_upper,
+                    "grupo": grupo,
+                    "tipo": tipo,
+                    "familia": familia,
+                    "categoria": categoria,
+                    "precio": round(precio, 2),
+                    "descontinuado": descontinuado,
+                    "linea_codigo": codigo,
+                }
+            )
         wb.release_resources()
         if lineas_desconocidas:
-            print(f"  WARN: {len(lineas_desconocidas)} linea(s) sin codigo conocido: "
-                  f"{sorted(lineas_desconocidas)[:8]}")
+            print(
+                f"  WARN: {len(lineas_desconocidas)} linea(s) sin codigo conocido: "
+                f"{sorted(lineas_desconocidas)[:8]}"
+            )
         print(f"  ERP: {len(productos)} productos válidos")
     except Exception as e:
         errores.append(str(e))
@@ -435,40 +543,48 @@ def generar_output(productos, unbx_map, estado_map, orden_map, ruta_salida):
 
         cat = p["categoria"]
         lin = p["linea"]
-        estadisticas["por_categoria"][cat] = estadisticas["por_categoria"].get(cat, 0) + 1
+        estadisticas["por_categoria"][cat] = (
+            estadisticas["por_categoria"].get(cat, 0) + 1
+        )
         estadisticas["por_linea"][lin] = estadisticas["por_linea"].get(lin, 0) + 1
 
         est = estado_map.get(p["sku"], "")
         if est:
-            estadisticas["por_estado_linea"][est] = estadisticas["por_estado_linea"].get(est, 0) + 1
+            estadisticas["por_estado_linea"][est] = (
+                estadisticas["por_estado_linea"].get(est, 0) + 1
+            )
 
-        productos_final.append({
-            "sku": p["sku"],
-            "nombre": p["nombre"],
-            "nombre_corto": generar_nombre_corto(p["nombre"]),
-            "ean13": p["ean13"],
-            "ean14": p["ean14"],
-            "categoria": p["categoria"],
-            # linea = CODIGO canonico | linea_nombre = nombre legible
-            "linea": p["linea"],
-            "linea_nombre": p.get("linea_nombre", ""),
-            "grupo": p["grupo"],
-            "tipo": p["tipo"],
-            "familia": p["familia"],
-            "un_bx": un_bx,
-            "orden": orden_map.get(p["sku"], 0),
-            "estado_linea": est,
-            "peso_kg": p["peso_kg"],
-            "precio": p["precio"],
-            "descontinuado": p.get("descontinuado", False),
-            "linea_codigo": p.get("linea_codigo", ""),
-            "keywords": generar_keywords(p["nombre"], p["linea"], p["categoria"]),
-        })
+        productos_final.append(
+            {
+                "sku": p["sku"],
+                "nombre": p["nombre"],
+                "nombre_corto": generar_nombre_corto(p["nombre"]),
+                "ean13": p["ean13"],
+                "ean14": p["ean14"],
+                "categoria": p["categoria"],
+                # linea = CODIGO canonico | linea_nombre = nombre legible
+                "linea": p["linea"],
+                "linea_nombre": p.get("linea_nombre", ""),
+                "grupo": p["grupo"],
+                "tipo": p["tipo"],
+                "familia": p["familia"],
+                "un_bx": un_bx,
+                "orden": orden_map.get(p["sku"], 0),
+                "estado_linea": est,
+                "peso_kg": p["peso_kg"],
+                "precio": p["precio"],
+                "descontinuado": p.get("descontinuado", False),
+                "linea_codigo": p.get("linea_codigo", ""),
+                "keywords": generar_keywords(p["nombre"], p["linea"], p["categoria"]),
+            }
+        )
 
-    productos_final.sort(key=lambda x: (x.get("orden", 0) == 0, x.get("orden", 0) or 0, x["sku"]))
+    productos_final.sort(
+        key=lambda x: (x.get("orden", 0) == 0, x.get("orden", 0) or 0, x["sku"])
+    )
 
     metadata = {
-        "version": "3.3.0",
+        "version": "3.5.0",
         "generated_at": datetime.now().isoformat(),
         "source_erp": "PRODUCTOS.xls",
         "source_un_bx": "SKU_BX.xlsx",
@@ -478,6 +594,11 @@ def generar_output(productos, unbx_map, estado_map, orden_map, ruta_salida):
         # mantener su propia copia (que terminaba contradiciendose).
         "categorias_por_linea": dict(CATEGORIA_POR_LINEA),
         "lineas_nombre_a_codigo": dict(LINEA_NOMBRE_A_CODIGO),
+        # Desambiguacion por GRUPO: "ACCESORIOS" designa a mas de una linea
+        # en el ERP; el grupo desempata. Serializado como "LINEA|GRUPO".
+        "lineas_grupo_a_codigo": {
+            f"{lin}|{grp}": cod for (lin, grp), cod in LINEA_GRUPO_A_CODIGO.items()
+        },
     }
 
     output = {"metadata": metadata, "productos": productos_final}
@@ -523,8 +644,14 @@ def leer_universo_stock(api_url=None, api_key=None, timeout=90):
         )
         r.raise_for_status()
         items = r.json().get("items", [])
-        return ({str(i.get("sku", "")).strip() for i in items
-                 if str(i.get("sku", "")).strip()}, "")
+        return (
+            {
+                str(i.get("sku", "")).strip()
+                for i in items
+                if str(i.get("sku", "")).strip()
+            },
+            "",
+        )
     except Exception as e:  # noqa: BLE001
         return set(), str(e)
 
@@ -533,14 +660,27 @@ def main():
     ap = argparse.ArgumentParser(description="G360 Catalog Generator v3.3")
     ap.add_argument("--erp", "-e", default="data/PRODUCTOS.xls", help="Archivo ERP")
     ap.add_argument("--unbx", "-u", default="data/SKU_BX.xlsx", help="Archivo SKU_BX")
-    ap.add_argument("--output", "-o", default="output/catalogo_productos.json", help="JSON salida")
-    ap.add_argument("--validate-only", "-v", action="store_true", help="Solo validar, no generar")
-    ap.add_argument("--stock-url", default=os.environ.get("G360_STOCK_URL", ""),
-                    help="API de stock para traer el universo con stock fisico")
-    ap.add_argument("--stock-key", default=os.environ.get("G360_STOCK_API_KEY", ""),
-                    help="Clave de lectura del API de stock (G360_STOCK_API_KEY)")
-    ap.add_argument("--sin-universo-stock", action="store_true",
-                    help="No consultar el API: solo se incluye lo que esta en SKU_BX")
+    ap.add_argument(
+        "--output", "-o", default="output/catalogo_productos.json", help="JSON salida"
+    )
+    ap.add_argument(
+        "--validate-only", "-v", action="store_true", help="Solo validar, no generar"
+    )
+    ap.add_argument(
+        "--stock-url",
+        default=os.environ.get("G360_STOCK_URL", ""),
+        help="API de stock para traer el universo con stock fisico",
+    )
+    ap.add_argument(
+        "--stock-key",
+        default=os.environ.get("G360_STOCK_API_KEY", ""),
+        help="Clave de lectura del API de stock (G360_STOCK_API_KEY)",
+    )
+    ap.add_argument(
+        "--sin-universo-stock",
+        action="store_true",
+        help="No consultar el API: solo se incluye lo que esta en SKU_BX",
+    )
     a = ap.parse_args()
 
     print("=" * 50)
@@ -567,16 +707,19 @@ def main():
         else:
             print(f"  Universo de stock: {len(stock_skus)} SKUs con stock fisico")
 
-    productos, errs, erp_skus = leer_erp(a.erp, bx_skus=set(orden_map),
-                                          stock_skus=stock_skus)
+    productos, errs, erp_skus = leer_erp(
+        a.erp, bx_skus=set(orden_map), stock_skus=stock_skus
+    )
     if errs:
         print(f"Errores: {errs}")
 
     huerfanos = sorted(set(orden_map) - erp_skus)
     if huerfanos:
-        print(f"  WARN: {len(huerfanos)} SKUs en SKU_BX no existen en ERP (se omiten): "
-              f"{', '.join(huerfanos[:10])}"
-              f"{'...' if len(huerfanos) > 10 else ''}")
+        print(
+            f"  WARN: {len(huerfanos)} SKUs en SKU_BX no existen en ERP (se omiten): "
+            f"{', '.join(huerfanos[:10])}"
+            f"{'...' if len(huerfanos) > 10 else ''}"
+        )
 
     if not productos:
         print("ERROR: No hay productos válidos")
