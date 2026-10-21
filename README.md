@@ -3,7 +3,7 @@
 > Sistema centralizado de datos maestros para proyectos G360.
 > Genera JSON de catálogo completo desde ERP + SKU_BX.
 
-[![Version](https://img.shields.io/badge/version-3.1.0-blue)]()
+[![Version](https://img.shields.io/badge/version-3.5.0-blue)]()
 [![Python](https://img.shields.io/badge/Python-3.11+-blue)]()
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)]()
 
@@ -30,7 +30,7 @@ g360-master-data/
 │       Columnas: ORDEN, SKU, UN_BX, ESTADO_LINEA
 │
 ├── output/
-│   ├── catalogo_productos.json ← Catálogo generado (2,488 SKUs: 2411 vigentes + 77 descontinuados en BX)
+│   ├── catalogo_productos.json ← Catálogo generado (2,768 SKUs: 2,436 vigentes + 332 descontinuados curados en BX)
 │   └── un_bx_master.csv        ← Lista simplificada SKU,un_bx (para importación manual)
 │
 ├── scripts/
@@ -81,7 +81,7 @@ y aparece marcado en el próximo catálogo.
 | Líneas de proceso | Excluidas (siempre) |
 | SKUs duplicados en ERP | Solo el primero |
 | SKUs en BX sin ERP | Advertencia y se omiten (ej. `04058`) |
-| **Productos finales** | **2,488 SKUs** |
+| **Productos finales** | **2,768 SKUs** |
 
 ---
 
@@ -94,7 +94,7 @@ y aparece marcado en el próximo catálogo.
 | ean14 | PRODUCTOS.xls | ~34% tiene valor |
 | peso_kg | PRODUCTOS.xls | ~96% tiene valor |
 | linea, grupo, tipo, familia | PRODUCTOS.xls | |
-| linea_codigo | Mapa estático derivado del reporte de stock | Código corto 2 chars (ej. `PELOTAS`→`01`, `ARCHIVO`→`78`, `MASCOTAS`→`MA`); vacío si la línea no está en el mapa (`VARIOS`) |
+| linea_codigo | Mapa estático + desambiguación por grupo | Código corto 2 chars. SKUs Crayola (`C*`) usan su prefijo como línea propia (CA/CB/CC/CD/CE/CF → REPRESENTADAS); líneas ERP genéricas (72/76/77/79) quedan 100% VINIFAN. Grupo desempata cuando el nombre es ambiguo (`ACCESORIOS|PINCELES`→`CD`) |
 | categoria | Derivada de linea | VINIBALL, VINIFAN, REPRESENTADAS |
 | un_bx | SKU_BX.xlsx | 41% tiene valor definido |
 | orden | SKU_BX.xlsx (col A) | Índice maestro — orden ascendente |
@@ -165,24 +165,24 @@ setx API_KEY tu_clave
 ```json
 {
   "metadata": {
-    "version": "3.0.0",
+    "version": "3.5.0",
     "generated_at": "2026-08-09T03:20:11.919920",
     "source_erp": "PRODUCTOS.xls",
     "source_un_bx": "SKU_BX.xlsx",
-    "total_productos": 2393,
+    "total_productos": 2768,
     "estadisticas": {
       "sin_ean13": 1398,
       "con_ean14": 813,
       "sin_unbx": 1378,
       "con_unbx": 1015,
       "por_categoria": {
-        "REPRESENTADAS": 1187,
+        "REPRESENTADAS": 837,
         "VINIFAN": 767,
         "VINIBALL": 439
       },
       "por_linea": {
         "PELOTAS": 423,
-        "ARCHIVO": 308,
+        "ARCHIVO": 391,
         "REPRESENTADAS": 773,
         ...
       },
