@@ -200,17 +200,38 @@ def categoria_de_producto(sku: str, codigo_linea: str) -> str:
 def codigo_linea_crayola(sku: str) -> str:
     """Codigo de linea propio de un SKU Crayola: CA, CB, CC, CD, CE, CF...
 
-    El prefijo de 2 caracteres SOLO es valido si es alfanumerico con al menos
-    una letra: un SKU como "C0150" no define la linea "C0" (codigo de linea
-    inexistente que terminaba en la taxonomia como categoria vacia). En ese
-    caso se devuelve "" y el SKU cae a la linea real del ERP.
+    El prefijo de 2 caracteres SOLO es valido si son DOS LETRAS: un SKU como
+    "C0150" no define la linea "C0" (codigo de linea inexistente que quedaba
+    colgado en la taxonomia). En ese caso se devuelve "" y el SKU cae a la
+    linea real del ERP.
     """
     prefijo = str(sku or "").strip().upper()[:2]
     if len(prefijo) != 2:
         return ""
-    if not prefijo[0].isalpha() or not prefijo[1].isalnum():
+    if not prefijo.isalpha():
         return ""
     return prefijo
+
+
+def taxonomias_crayola_nuevas(productos) -> dict[str, str]:
+    """Sub-marcas Crayola detectadas que NO estan en CATEGORIA_POR_LINEA.
+
+    Si aparece una sub-marca nueva (CG, CH...) su linea tiene que estar
+    declarada en la taxonomia: si no, el consumidor que resuelva linea ->
+    categoria la deja en el default (OTROS) y el SKU queda con linea y
+    categoria incoherentes. Se declaran como REPRESENTADAS (son Crayola)
+    y se avisa para que queden fijas en CATEGORIA_POR_LINEA.
+    """
+    nuevos: dict[str, str] = {}
+    for p in productos:
+        sku = str(p.get("sku", "")).upper()
+        if not sku.startswith("C"):
+            continue
+        codigo = codigo_linea_crayola(sku)
+        if not codigo or codigo in CATEGORIA_POR_LINEA:
+            continue
+        nuevos.setdefault(codigo, "REPRESENTADAS")
+    return nuevos
 
 
 # Mapeo nombre de línea → código corto (2 chars), derivado del reporte de
@@ -593,6 +614,7 @@ def generar_output(
     ruta_salida,
     exclusiones=None,
     universo_stock=None,
+    taxonomia_extra=None,
 ):
     """Genera el JSON de catálogo completo."""
     estadisticas = {
@@ -674,6 +696,14 @@ def generar_output(
         key=lambda x: (x.get("orden", 0) == 0, x.get("orden", 0) or 0, x["sku"])
     )
 
+    # Taxonomia publicada: los consumidores la leen de aca en vez de
+    # mantener su propia copia (que terminaba contradiciendose).
+    # `taxonomia_extra` son las sub-marcas Crayola nuevas detectadas: se
+    # publican ya clasificadas para que ningun consumidor las deje en el
+    # default (y el generador avisa para que queden fijas en el codigo).
+    taxonomia_publicada = dict(CATEGORIA_POR_LINEA)
+    taxonomia_publicada.update(taxonomia_extra or {})
+
     metadata = {
         "version": VERSION,
         "generated_at": datetime.now().isoformat(),
@@ -681,9 +711,7 @@ def generar_output(
         "source_un_bx": "SKU_BX.xlsx",
         "total_productos": len(productos_final),
         "estadisticas": estadisticas,
-        # Taxonomia publicada: los consumidores la leen de aca en vez de
-        # mantener su propia copia (que terminaba contradiciendose).
-        "categorias_por_linea": dict(CATEGORIA_POR_LINEA),
+        "categorias_por_linea": taxonomia_publicada,
         "lineas_nombre_a_codigo": dict(LINEA_NOMBRE_A_CODIGO),
         # Desambiguacion por GRUPO: "ACCESORIOS" designa a mas de una linea
         # en el ERP; el grupo desempata. Serializado como "LINEA|GRUPO".
@@ -734,7 +762,7 @@ def generar_output(
     return output
 
 
-def leer_universo_stock(api_url=None, api_key=None, timeout=90):
+def leer_universo_stock(api_url=None, api_key=None, timeout=120, intentos=3):
     """SKUs con stock fisico segun el API de stock (opcional).
 
     Sirve para que entren al catalogo los SKU que tienen despacho pendiente
@@ -745,7 +773,13 @@ def leer_universo_stock(api_url=None, api_key=None, timeout=90):
     La clave de lectura cae a API_KEY: el API acepta la clave administrativa
     para leer stock, asi que una sola variable alcanza para todo el flujo.
     Sin clave no se consulta: se sigue con el criterio de SKU_BX.
+
+    Reintenta: el endpoint /stock es pesado y en Render free-tier puede
+    dar 504 por cold start. Un fallo puntual NO debe dejar el catalogo
+    incompleto en silencio (eso costaba 212 SKUs).
     """
+    import time
+
     url = api_url or os.environ.get("G360_STOCK_URL", "") or URL_STOCK_DEFAULT
     key = (
         api_key
@@ -758,25 +792,37 @@ def leer_universo_stock(api_url=None, api_key=None, timeout=90):
         return set(), "sin G360_STOCK_API_KEY ni API_KEY"
     try:
         import requests
+    except ImportError:
+        return set(), "falta requests (pip install requests)"
 
-        r = requests.get(
-            f"{url.rstrip('/')}/api/v1/stock",
-            params={"fuente": "todas"},
-            headers={"x-api-key": key, "Accept": "application/json"},
-            timeout=timeout,
-        )
-        r.raise_for_status()
-        items = r.json().get("items", [])
-        return (
-            {
-                str(i.get("sku", "")).strip()
-                for i in items
-                if str(i.get("sku", "")).strip()
-            },
-            "",
-        )
-    except Exception as e:  # noqa: BLE001
-        return set(), str(e)
+    ultimo_error = ""
+    for intento in range(1, intentos + 1):
+        try:
+            r = requests.get(
+                f"{url.rstrip('/')}/api/v1/stock",
+                params={"fuente": "todas"},
+                headers={"x-api-key": key, "Accept": "application/json"},
+                timeout=timeout,
+            )
+            r.raise_for_status()
+            items = r.json().get("items", [])
+            return (
+                {
+                    str(i.get("sku", "")).strip()
+                    for i in items
+                    if str(i.get("sku", "")).strip()
+                },
+                "",
+            )
+        except Exception as e:  # noqa: BLE001
+            ultimo_error = str(e)
+            if intento < intentos:
+                print(
+                    f"    intento {intento}/{intentos} fallido ({ultimo_error}); "
+                    f"reintentando en {intento * 5}s"
+                )
+                time.sleep(intento * 5)
+    return set(), ultimo_error
 
 
 def main():
@@ -873,6 +919,19 @@ def main():
         print("\nValidación completada")
         return
 
+    # Sub-marcas Crayola nuevas: se publican ya clasificadas y se avisa para
+    # que queden fijas en CATEGORIA_POR_LINEA (y en el API de stock).
+    crayolas_nuevas = taxonomias_crayola_nuevas(productos)
+    if crayolas_nuevas:
+        print("\n  ALERTA: sub-marca(s) Crayola nueva(s) detectada(s):")
+        for cod, cat in sorted(crayolas_nuevas.items()):
+            print(f"    {cod} -> {cat}")
+        print(
+            "    Agregalas a CATEGORIA_POR_LINEA (scripts/generar_catalogo_base.py)\n"
+            "    y a CATEGORIAS (g360-stock-api/app/core/constants.py) para que\n"
+            "    la taxonomia quede fija y no dependa de esta generacion."
+        )
+
     # Generar output
     print("\nGenerando catálogo...")
     output = generar_output(
@@ -883,6 +942,7 @@ def main():
         a.output,
         exclusiones=exclusiones,
         universo_stock=universo_stock,
+        taxonomia_extra=crayolas_nuevas,
     )
 
     print(f"\n{'=' * 50}")

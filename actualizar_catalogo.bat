@@ -112,6 +112,20 @@ if %ERRORLEVEL% NEQ 0 (
     exit /b 1
 )
 
+REM Gate: un catalogo incoherente no se sube. Las lineas nuevas de marca
+REM (p.ej. una sub-marca Crayola) y la divergencia con el API de stock
+REM se detectan aqui, antes de publicar.
+echo.
+echo Validando taxonomia...
+.venv\Scripts\python.exe scripts\validar_taxonomia.py
+if %ERRORLEVEL% NEQ 0 (
+    echo.
+    echo ERROR: El catalogo tiene incoherencias de taxonomia. NO se sube al API.
+    echo Corregi y vuelve a generar.
+    if "%AUTO_MODE%"=="0" pause
+    exit /b 1
+)
+
 echo.
 echo Copiando a proyectos G360...
 if exist ..\g360-stock-api\data (

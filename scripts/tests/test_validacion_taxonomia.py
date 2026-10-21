@@ -1,7 +1,7 @@
 ﻿"""Tests de la validacion de taxonomia del catalogo.
 
 La validacion vive en scripts/validar_taxonomia.py (una sola implementacion):
-este test la EJERCE y falla si encuentra alertas. Antes este archivo era una
+este test la EJERCE y falla si encuentra errores. Antes este archivo era una
 copia que hacia `return 1` en vez de `assert`: pytest nunca lo daba por
 fallido y el "test de validacion autonoma" no vigilaba nada.
 """
@@ -27,16 +27,18 @@ RAIZ = Path(__file__).resolve().parent.parent.parent
 
 
 @pytest.mark.skipif(not CATALOGO_POR_DEFECTO.exists(), reason="catalogo no generado")
-def test_catalogo_real_no_tiene_alertas():
+def test_catalogo_real_no_tiene_errores():
     """El catalogo publicado no puede tener incoherencias de taxonomia."""
     with open(CATALOGO_POR_DEFECTO, encoding="utf-8") as f:
         catalogo = json.load(f)
-    alertas = validar(catalogo, RAIZ)
-    assert alertas == [], "\n".join(alertas)
+    errores, avisos = validar(catalogo, RAIZ)
+    assert errores == [], "\n".join(errores)
+    # Avisos: la taxonomia publicada tiene que coincidir con el codigo.
+    assert avisos == [], "\n".join(avisos)
 
 
 def test_detecta_crayola_fuera_de_representadas():
-    """Un C* con otra categoria debe dispararse como alerta."""
+    """Un C* con otra categoria debe dispararse como error."""
     catalogo = {
         "metadata": {"categorias_por_linea": {}},
         "productos": [
@@ -49,12 +51,12 @@ def test_detecta_crayola_fuera_de_representadas():
             }
         ],
     }
-    alertas = validar(catalogo, RAIZ)
-    assert any("CA001" in a for a in alertas)
+    errores, _ = validar(catalogo, RAIZ)
+    assert any("CA001" in e for e in errores)
 
 
 def test_detecta_linea_mixta():
-    """Una linea con dos categorias es una alerta."""
+    """Una linea con dos categorias es un error."""
     catalogo = {
         "metadata": {"categorias_por_linea": {}},
         "productos": [
@@ -74,8 +76,8 @@ def test_detecta_linea_mixta():
             },
         ],
     }
-    alertas = validar(catalogo, RAIZ)
-    assert any("categorias mixtas" in a for a in alertas)
+    errores, _ = validar(catalogo, RAIZ)
+    assert any("categorias mixtas" in e for e in errores)
 
 
 def test_detecta_precio_cero():
@@ -92,8 +94,51 @@ def test_detecta_precio_cero():
             }
         ],
     }
-    alertas = validar(catalogo, RAIZ)
-    assert any("precio" in a for a in alertas)
+    errores, _ = validar(catalogo, RAIZ)
+    assert any("precio" in e for e in errores)
+
+
+def test_detecta_linea_sin_declarar():
+    """Una linea publicada que no esta en la taxonomia es un error."""
+    catalogo = {
+        "metadata": {"categorias_por_linea": {}},
+        "productos": [
+            {
+                "sku": "X990",
+                "linea": "ZZ",
+                "linea_codigo": "ZZ",
+                "categoria": "OTROS",
+                "precio": 5.0,
+            }
+        ],
+    }
+    errores, _ = validar(catalogo, RAIZ)
+    assert any("linea_codigo=ZZ" in e for e in errores)
+
+
+def test_sub_marca_nueva_es_aviso_no_error():
+    """Una sub-marca Crayola nueva: aviso de mantenimiento, no bloquea.
+
+    El generador la declara al vuelo en la taxonomia publicada (para que
+    /stock la resuelva), pero hay que dejarla fija en el codigo.
+    """
+    catalogo = {
+        "metadata": {
+            "categorias_por_linea": {**CATEGORIA_POR_LINEA, "CG": "REPRESENTADAS"}
+        },
+        "productos": [
+            {
+                "sku": "CG990",
+                "linea": "CG",
+                "linea_codigo": "CG",
+                "categoria": "REPRESENTADAS",
+                "precio": 5.0,
+            }
+        ],
+    }
+    errores, avisos = validar(catalogo, RAIZ)
+    assert not any("CG990" in e for e in errores)
+    assert any("CG" in a and "CATEGORIA_POR_LINEA" in a for a in avisos)
 
 
 def test_taxonomia_del_maestro_es_la_misma_que_la_del_api():

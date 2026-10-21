@@ -25,8 +25,10 @@ from generar_catalogo_base import (  # noqa: E402
     PREFIJO_MARCA_A_CATEGORIA,
     asignar_categoria,
     categoria_de_producto,
+    codigo_linea_crayola,
     decidir_inclusion,
     resolver_codigo_linea_grupo,
+    taxonomias_crayola_nuevas,
 )
 
 RUTA_CATALOGO = (
@@ -62,6 +64,35 @@ class TestProcesosNuevos:
         """ACCESORIOS + grupo no mapeado -> 79 (fail-safe, nunca CD)."""
         assert resolver_codigo_linea_grupo("ACCESORIOS", "BROCHES") == "79"
         assert resolver_codigo_linea_grupo("ACCESORIOS", "") == "79"
+
+    def test_prefijo_crayola_con_digito_no_es_linea_valida(self):
+        """'C0150' no define la linea 'C0': cae a la linea real del ERP."""
+        assert codigo_linea_crayola("C0150") == ""
+        assert codigo_linea_crayola("CA001") == "CA"
+        assert codigo_linea_crayola("CG990") == "CG"
+
+    def test_sub_marca_crayola_nueva_se_declara_sola(self):
+        """Una sub-marca nueva (CG) se publica como REPRESENTADAS.
+
+        Si no se declarara, el consumidor que resuelva linea -> categoria la
+        dejaria en el default (OTROS) y el SKU quedaria con linea y
+        categoria incoherentes.
+        """
+        productos = [
+            {"sku": "CG990", "linea": "CG"},
+            {"sku": "CA001", "linea": "CA"},
+            {"sku": "X001", "linea": "78"},
+        ]
+        nuevos = taxonomias_crayola_nuevas(productos)
+        assert nuevos == {"CG": "REPRESENTADAS"}
+        # Las sub-marcas ya conocidas no se redeclaran.
+        assert "CA" not in nuevos
+
+    def test_categoria_de_crayola_no_depende_de_la_linea(self):
+        """La marca manda: un C* en linea generica sigue siendo REPRESENTADAS."""
+        assert categoria_de_producto("CG990", "77") == "REPRESENTADAS"
+        assert categoria_de_producto("CB999", "76") == "REPRESENTADAS"
+        assert categoria_de_producto("CA001", "") == "REPRESENTADAS"
 
     def test_grupo_pinceles_es_estable_en_ambas_cajas(self):
         """La regla de negocio no depende de mayusculas/minusculas."""

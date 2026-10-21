@@ -1,7 +1,7 @@
 {
   "metadata": {
     "version": "3.5.0",
-    "generated_at": "2026-10-21T17:28:45.971676",
+    "generated_at": "2026-10-21T17:51:38.868527",
     "source_erp": "PRODUCTOS.xls",
     "source_un_bx": "SKU_BX.xlsx",
     "total_productos": 2759,
@@ -169,7 +169,7 @@
     },
     "universo_stock": {
       "incluido": true,
-      "skus": 2269,
+      "skus": 2268,
       "error": ""
     }
   },

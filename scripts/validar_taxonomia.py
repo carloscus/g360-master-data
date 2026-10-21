@@ -1,7 +1,7 @@
 """Validacion cruzada entre repos: detecta inconsistencias de taxonomia.
 
 Correr despues de cualquier cambio en master-data, stock-api o vigencias.
-Si hay ALERTAS, revisar antes de commitear.
+Si hay ERRORES, el catalogo no debe subirse al API.
 
 Uso:
     python scripts/validar_taxonomia.py
@@ -11,14 +11,12 @@ Uso:
 import argparse
 import ast
 import json
-import re
 import sys
-from collections import Counter, defaultdict
+from collections import defaultdict
 from pathlib import Path
 
 RAIZ = Path(__file__).resolve().parent.parent
 CATALOGO_POR_DEFECTO = RAIZ / "output" / "catalogo_productos.json"
-API_STOCK_RELATIVO = RAIZ.parent / "g360-stock-api" / "app" / "core" / "constants.py"
 
 LINEAS_CRAYOLA = ("CA", "CB", "CC", "CD", "CE", "CF")
 LINEAS_VINIFAN_PURA = ("72", "76", "77", "79")
@@ -46,54 +44,76 @@ def _asignacion_nombre(nodo) -> str | None:
     return None
 
 
+def _dict_de_fuente(ruta_fuente: Path, nombre_constante: str) -> ast.Dict | None:
+    """Localiza el dict literal de una constante en un fuente (AST)."""
+    if not ruta_fuente.exists():
+        return None
+    arbol = ast.parse(ruta_fuente.read_text(encoding="utf-8"))
+    for nodo in ast.walk(arbol):
+        if _asignacion_nombre(nodo) != nombre_constante:
+            continue
+        if isinstance(nodo.value, ast.Dict):
+            return nodo.value
+    return None
+
+
 def _claves_duplicadas(ruta_fuente: Path, nombre_constante: str) -> list[str]:
     """Claves repetidas en un dict literal del fuente (AST).
 
     En un dict de Python una clave repetida no avisa: gana la ultima. Por eso
     la taxonomia podia "cambiar" sin que nadie se diera cuenta.
     """
-    if not ruta_fuente.exists():
+    d = _dict_de_fuente(ruta_fuente, nombre_constante)
+    if d is None:
         return []
-    arbol = ast.parse(ruta_fuente.read_text(encoding="utf-8"))
     repetidas: list[str] = []
-    for nodo in ast.walk(arbol):
-        if _asignacion_nombre(nodo) != nombre_constante:
-            continue
-        if not isinstance(nodo.value, ast.Dict):
-            continue
-        vistas: set[str] = set()
-        for key in nodo.value.keys:
-            if isinstance(key, ast.Constant) and isinstance(key.value, str):
-                if key.value in vistas:
-                    repetidas.append(key.value)
-                vistas.add(key.value)
+    vistas: set[str] = set()
+    for key in d.keys:
+        if isinstance(key, ast.Constant) and isinstance(key.value, str):
+            if key.value in vistas:
+                repetidas.append(key.value)
+            vistas.add(key.value)
     return repetidas
+
+
+def _taxonomia_de_fuente(ruta_fuente: Path, nombre_constante: str) -> dict[str, str]:
+    """Dict literal simple {str: str} de una constante del fuente."""
+    d = _dict_de_fuente(ruta_fuente, nombre_constante)
+    if d is None:
+        return {}
+    mapa: dict[str, str] = {}
+    for k, v in zip(d.keys, d.values):
+        if isinstance(k, ast.Constant) and isinstance(v, ast.Constant):
+            mapa[str(k.value)] = str(v.value)
+    return mapa
 
 
 def _taxonomia_api_stock(ruta: Path) -> dict[str, str] | None:
     """Taxonomia linea->categoria declarada en el API de stock (constants.py)."""
-    if not ruta.exists():
+    d = _dict_de_fuente(ruta, "CATEGORIAS")
+    if d is None:
         return None
-    arbol = ast.parse(ruta.read_text(encoding="utf-8"))
     mapa: dict[str, str] = {}
-    for nodo in ast.walk(arbol):
-        if _asignacion_nombre(nodo) != "CATEGORIAS":
+    for k, v in zip(d.keys, d.values):
+        if not isinstance(k, ast.Constant) or not isinstance(v, ast.List):
             continue
-        if not isinstance(nodo.value, ast.Dict):
-            continue
-        for k, v in zip(nodo.value.keys, nodo.value.values):
-            if not isinstance(k, ast.Constant) or not isinstance(v, ast.List):
-                continue
-            categoria = str(k.value)
-            for cod in v.elts:
-                if isinstance(cod, ast.Constant):
-                    mapa[str(cod.value)] = categoria
+        categoria = str(k.value)
+        for cod in v.elts:
+            if isinstance(cod, ast.Constant):
+                mapa[str(cod.value)] = categoria
     return mapa
 
 
-def validar(catalogo: dict, raiz: Path = RAIZ) -> list[str]:
-    """Devuelve la lista de alertas del catálogo (vacía = todo coherente)."""
-    alertas: list[str] = []
+def validar(catalogo: dict, raiz: Path = RAIZ) -> tuple[list[str], list[str]]:
+    """Valida el catálogo.
+
+    Devuelve (errores, avisos):
+      - errores: incoherencias reales. Bloquean la subida al API.
+      - avisos:  mantenimiento pendiente (p.ej. una sub-marca Crayola nueva
+                 que hay que dejar fija en el codigo). No bloquean.
+    """
+    errores: list[str] = []
+    avisos: list[str] = []
     ps = catalogo.get("productos", [])
     meta = catalogo.get("metadata", {})
 
@@ -101,7 +121,7 @@ def validar(catalogo: dict, raiz: Path = RAIZ) -> list[str]:
     c_skus = [p for p in ps if str(p.get("sku", "")).upper().startswith("C")]
     for p in c_skus:
         if p.get("categoria") != "REPRESENTADAS":
-            alertas.append(
+            errores.append(
                 f"ALERTA: {p['sku']} es C* pero categoria={p.get('categoria')} "
                 "(debe ser REPRESENTADAS)"
             )
@@ -110,7 +130,7 @@ def validar(catalogo: dict, raiz: Path = RAIZ) -> list[str]:
     for p in ps:
         lin = str(p.get("linea", ""))
         if lin in LINEAS_VINIFAN_PURA and p.get("categoria") == "REPRESENTADAS":
-            alertas.append(
+            errores.append(
                 f"ALERTA: {p['sku']} en linea {lin} (VINIFAN) pero "
                 f"categoria={p.get('categoria')}"
             )
@@ -119,7 +139,7 @@ def validar(catalogo: dict, raiz: Path = RAIZ) -> list[str]:
     for p in ps:
         lin = str(p.get("linea", ""))
         if lin in LINEAS_CRAYOLA and p.get("categoria") != "REPRESENTADAS":
-            alertas.append(
+            errores.append(
                 f"ALERTA: {p['sku']} en linea {lin} (Crayola) pero "
                 f"categoria={p.get('categoria')}"
             )
@@ -130,7 +150,7 @@ def validar(catalogo: dict, raiz: Path = RAIZ) -> list[str]:
         cats_por_linea[str(p.get("linea", ""))].add(str(p.get("categoria", "")))
     for lin, cats in sorted(cats_por_linea.items()):
         if len(cats) > 1:
-            alertas.append(
+            errores.append(
                 f"ALERTA: Linea {lin} tiene categorias mixtas: {sorted(cats)}"
             )
 
@@ -138,7 +158,7 @@ def validar(catalogo: dict, raiz: Path = RAIZ) -> list[str]:
     cat_por_linea = meta.get("categorias_por_linea", {})
     for lin in LINEAS_CRAYOLA:
         if cat_por_linea.get(lin) != "REPRESENTADAS":
-            alertas.append(
+            errores.append(
                 f"ALERTA: metadata categorias_por_linea[{lin}] = "
                 f"{cat_por_linea.get(lin)} (debe ser REPRESENTADAS)"
             )
@@ -146,7 +166,7 @@ def validar(catalogo: dict, raiz: Path = RAIZ) -> list[str]:
         lin = str(p.get("linea", ""))
         cod = str(p.get("linea_codigo", ""))
         if cod and lin and cat_por_linea.get(cod) not in (None, p.get("categoria")):
-            alertas.append(
+            errores.append(
                 f"ALERTA: {p['sku']} linea={lin} categoria={p.get('categoria')} "
                 f"no coincide con metadata categorias_por_linea[{cod}]="
                 f"{cat_por_linea.get(cod)}"
@@ -156,7 +176,7 @@ def validar(catalogo: dict, raiz: Path = RAIZ) -> list[str]:
     for p in ps:
         cod = str(p.get("linea_codigo", ""))
         if cod and cod not in cat_por_linea:
-            alertas.append(
+            errores.append(
                 f"ALERTA: {p['sku']} tiene linea_codigo={cod} que no esta en la "
                 "taxonomia publicada"
             )
@@ -165,7 +185,7 @@ def validar(catalogo: dict, raiz: Path = RAIZ) -> list[str]:
     for cod in _claves_duplicadas(
         raiz / "scripts" / "generar_catalogo_base.py", "CATEGORIA_POR_LINEA"
     ):
-        alertas.append(
+        errores.append(
             f"ALERTA: CATEGORIA_POR_LINEA tiene la clave duplicada '{cod}' "
             "(gana la ultima en silencio)"
         )
@@ -179,7 +199,7 @@ def validar(catalogo: dict, raiz: Path = RAIZ) -> list[str]:
             if categoria_maestro is None:
                 continue  # el API tiene lineas que el maestro no publica
             if categoria_maestro != categoria_api:
-                alertas.append(
+                errores.append(
                     f"ALERTA: linea {cod}: master-data dice {categoria_maestro} y "
                     f"g360-stock-api dice {categoria_api} (/stock y /catalog se "
                     "contradicen)"
@@ -192,12 +212,53 @@ def validar(catalogo: dict, raiz: Path = RAIZ) -> list[str]:
         except (TypeError, ValueError):
             precio = 0.0
         if precio <= 0:
-            alertas.append(
+            errores.append(
                 f"ALERTA: {p['sku']} esta publicado con precio={precio} "
                 "(sin precio no se publica)"
             )
 
-    return alertas
+    # 10. La taxonomia publicada debe coincidir con la del codigo fuente.
+    #     Si difiere, la generacion detecto una sub-marca Crayola nueva y la
+    #     declaro al vuelo: hay que dejarla fija en el codigo.
+    tax_codigo = _taxonomia_de_fuente(
+        raiz / "scripts" / "generar_catalogo_base.py", "CATEGORIA_POR_LINEA"
+    )
+    if tax_codigo:
+        for cod, cat in sorted(cat_por_linea.items()):
+            if cod not in tax_codigo:
+                avisos.append(
+                    f"AVISO: la linea {cod} ({cat}) se publico pero no esta fija "
+                    "en CATEGORIA_POR_LINEA: agregala a "
+                    "scripts/generar_catalogo_base.py y a CATEGORIAS en "
+                    "g360-stock-api/app/core/constants.py"
+                )
+        for cod, cat in sorted(tax_codigo.items()):
+            if cod not in cat_por_linea:
+                avisos.append(
+                    f"AVISO: CATEGORIA_POR_LINEA declara {cod} ({cat}) pero la "
+                    "taxonomia publicada no: revisa que no se haya quedado obsoleta"
+                )
+
+    # 11. El universo de stock tiene que haber entrado en la generacion.
+    #     Sin el, el catalogo pierde los SKUs con despacho que no estan en
+    #     SKU_BX (212 SKUs en la ultima corrida). Salvo que se haya omitido
+    #     a proposito.
+    uni = meta.get("universo_stock", {})
+    if uni and not uni.get("incluido"):
+        error = str(uni.get("error", ""))
+        if "omitido" in error:
+            avisos.append(
+                "AVISO: el catalogo se genero SIN universo de stock "
+                f"({error}): faltan los SKUs con stock que no estan en SKU_BX"
+            )
+        else:
+            errores.append(
+                f"ALERTA: el catalogo se genero SIN universo de stock ({error}): "
+                "el catalogo esta incompleto (212 SKUs en la ultima corrida). "
+                "No lo subas: regenera cuando el API de stock responda."
+            )
+
+    return errores, avisos
 
 
 def main() -> int:
@@ -216,7 +277,7 @@ def main() -> int:
 
     catalogo = _cargar_catalogo(ruta)
     ps = catalogo.get("productos", [])
-    alertas = validar(catalogo, RAIZ)
+    errores, avisos = validar(catalogo, RAIZ)
     c_skus = [p for p in ps if str(p.get("sku", "")).upper().startswith("C")]
 
     print("=" * 70)
@@ -227,11 +288,17 @@ def main() -> int:
     print(f"Lineas Crayola: {LINEAS_CRAYOLA}")
     print()
 
-    if alertas:
-        print(f"!!! {len(alertas)} ALERTAS DETECTADAS !!!")
-        print()
-        for a in alertas:
+    if avisos:
+        print(f"--- {len(avisos)} AVISOS (no bloquean la subida) ---")
+        for a in avisos:
             print(f"  {a}")
+        print()
+
+    if errores:
+        print(f"!!! {len(errores)} ERRORES: NO SUBIR EL CATALOGO AL API !!!")
+        print()
+        for e in errores:
+            print(f"  {e}")
         print()
         print("REVISAR ANTES DE COMMITEAR")
         return 1

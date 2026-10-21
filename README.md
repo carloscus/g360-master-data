@@ -88,6 +88,10 @@ El BAT define `G360_STOCK_URL` y `G360_STOCK_API_KEY` a partir de `API_KEY`, y
 **pide la clave antes de generar** (en modo interactivo). En modo `--auto` sin
 `API_KEY` aborta: no deja generar un catálogo a medias.
 
+Después de generar, el BAT **valida** el catálogo (`validar_taxonomia.py`) y
+**no sube nada** si hay incoherencias: un catálogo con líneas mixtas, precios
+en cero o taxonomía divergente del API no llega a producción.
+
 Para generar sin universo (a propósito): `python scripts/generar_catalogo_base.py --sin-universo-stock`.
 
 ---
@@ -133,7 +137,7 @@ del anterior (suele ser una fuente faltante, no menos productos).
 | peso_kg | PRODUCTOS.xls | |
 | linea, grupo, tipo, familia | PRODUCTOS.xls | `linea` es el **código canónico** (2 chars); el nombre va en `linea_nombre` |
 | linea_codigo | Mapa estático + desambiguación por grupo | SKUs Crayola (`C*`) usan su prefijo como línea propia (CA/CB/CC/CD/CE/CF → REPRESENTADAS); líneas ERP genéricas (72/76/77/79) quedan 100% VINIFAN. Grupo desempata cuando el nombre es ambiguo (`ACCESORIOS|PINCELES`→`CD`) |
-| categoria | Derivada de linea | VINIBALL, VINIFAN, REPRESENTADAS, INDUMENTARIA, PUBLICIDAD, INDUSTRIAL, CIPTECH, MATERIALES, DESCARTE Y VARIOS, PRODUCCION, OTROS |
+| categoria | Marca > línea | La **marca manda**: todo SKU `C*` es `REPRESENTADAS` con línea propia (su prefijo de 2 letras), aunque la línea del ERP sea genérica o la sub-marca aún no exista en la taxonomía. Para el resto, la categoría sale de la línea |
 | un_bx | SKU_BX.xlsx | 37% tiene valor definido (1 por default) |
 | orden | SKU_BX.xlsx (col A) | Índice maestro — orden ascendente |
 | estado_linea | SKU_BX.xlsx (col D) | NACIONAL, IMPORTADO, NUEVO, TRADICIONAL |
@@ -206,15 +210,44 @@ setx API_KEY tu_clave
 ### `validar_taxonomia.py`
 
 Validación cruzada: taxonomía del catálogo, líneas Crayola, líneas mixtas,
-líneas sin código, claves duplicadas en la taxonomía, precios en cero y
-**divergencia con `g360-stock-api`**.
+líneas sin código, precios en cero, universo de stock incluido y **divergencia
+con `g360-stock-api`**.
 
 ```bash
 python scripts/validar_taxonomia.py
 python scripts/validar_taxonomia.py --catalogo output/catalogo_productos.json
 ```
 
-Sale con código 1 si encuentra alertas. El mismo chequeo corre en los tests.
+Devuelve **errores** (bloquean la subida al API) y **avisos** (mantenimiento
+pendiente, no bloquean). El BAT la ejecuta después de generar: si hay errores,
+**no sube el catálogo**.
+
+> Un catálogo generado sin universo de stock es un **error**, no un aviso:
+> pierde los SKUs con despacho que no están en SKU_BX (212 en la última
+> corrida). Si el API de stock no responde, reintenta 3 veces y, si sigue
+> caído, regenera antes de subir.
+
+### Sub-marca Crayola nueva
+
+Si aparece una sub-marca nueva (CG, CH…), el generador:
+
+1. la **publica ya clasificada** como `REPRESENTADAS` en la taxonomía del
+   metadata (así ningún consumidor la deja en el default `OTROS`);
+2. avisa en consola que hay que dejarla fija en el código.
+
+Para dejarla fija hay que tocar **dos** archivos:
+
+```python
+# scripts/generar_catalogo_base.py
+CATEGORIA_POR_LINEA = { ..., "CG": "REPRESENTADAS" }
+
+# g360-stock-api/app/core/constants.py
+CATEGORIAS = { ..., "REPRESENTADAS": ["85", "CE", "CF", "CA", "CB", "CC", "CD", "CG"] }
+```
+
+Mientras no se fije, el validador lo reporta como **aviso** (no bloquea) y el
+API de stock sigue clasificando bien los C* por marca (todo C* es
+REPRESENTADAS, incluso sin catálogo).
 
 ### `simular_actualizacion.py`
 
