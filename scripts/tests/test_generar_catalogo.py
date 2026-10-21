@@ -183,10 +183,17 @@ class TestLineaACategoria:
         assert LINEA_A_CATEGORIA["REPRESENTADAS"] == "REPRESENTADAS"
 
     def test_all_vinifan_lines(self):
-        for linea in ["ARCHIVO", "FORROS", "ESCRITURA", "PINTURA", "DIBUJO",
-                       "DIDACTICOS", "MANUALIDADES", "PEGAMENTOS", "ACCESORIOS",
-                       "METALICA", "SENSORIALES"]:
+        # MANUALIDADES (CE) y SET (CF) son lineas 100% Crayola -> REPRESENTADAS
+        vinifan = [
+            "ARCHIVO", "FORROS", "ESCRITURA", "PINTURA", "DIBUJO",
+            "DIDACTICOS", "PEGAMENTOS", "ACCESORIOS",
+            "METALICA", "SENSORIALES",
+        ]
+        representadas = ["MANUALIDADES", "SET"]
+        for linea in vinifan:
             assert LINEA_A_CATEGORIA[linea] == "VINIFAN"
+        for linea in representadas:
+            assert LINEA_A_CATEGORIA[linea] == "REPRESENTADAS"
 
     def test_categorias_operativas_no_caen_en_representadas(self):
         """v3.3: las lineas operativas ya no se disfrazan de REPRESENTADAS."""
