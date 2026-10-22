@@ -18,7 +18,7 @@ from pathlib import Path
 RAIZ = Path(__file__).resolve().parent.parent
 CATALOGO_POR_DEFECTO = RAIZ / "output" / "catalogo_productos.json"
 
-LINEAS_CRAYOLA = ("CA", "CB", "CC", "CD", "CE", "CF")
+LINEAS_CRAYOLA = ("CA", "CB", "CC", "CD", "CE", "CF", "CG")
 LINEAS_VINIFAN_PURA = ("72", "76", "77", "79")
 
 
@@ -205,57 +205,140 @@ def validar(catalogo: dict, raiz: Path = RAIZ) -> tuple[list[str], list[str]]:
                     "contradicen)"
                 )
 
-    # 9. Coherencia de precios: la regla "sin precio no se publica" es absoluta
+    # 8b. Sub-marcas Crayola publicadas al vuelo: el generador las declara en
+    #     el metadata, pero si no estan fijas en CATEGORIA_POR_LINEA la
+    #     taxonomia depende de cada generacion (y el API las deja en OTROS
+    #     hasta el proximo deploy). Es mantenimiento pendiente, no un error.
+    taxonomia_codigo = _taxonomia_de_fuente(
+        raiz / "scripts" / "generar_catalogo_base.py", "CATEGORIA_POR_LINEA"
+    )
+    for cod, cat in sorted(cat_por_linea.items()):
+        if (
+            isinstance(cod, str)
+            and len(cod) == 2
+            and cod.startswith("C")
+            and cod[1].isalpha()
+            and cod not in taxonomia_codigo
+        ):
+            avisos.append(
+                f"AVISO: linea {cod} -> {cat} publicada al vuelo pero no esta "
+                "fija en CATEGORIA_POR_LINEA (agregala al generador y a "
+                "CATEGORIAS del API)"
+            )
+
+    # 9. Coherencia de precio y flags de negocio (v3.6.0).    #    El precio NO decide la presencia (todo SKU con stock/compromiso
+    #    esta en el catalogo aunque no tenga precio), pero si la
+    #    cotizabilidad: lo que no tiene precio no se cotiza.
     for p in ps:
+        sku = p.get("sku", "")
         try:
             precio = float(p.get("precio", 0))
         except (TypeError, ValueError):
             precio = 0.0
-        if precio <= 0:
-            errores.append(
-                f"ALERTA: {p['sku']} esta publicado con precio={precio} "
-                "(sin precio no se publica)"
-            )
-
-    # 10. La taxonomia publicada debe coincidir con la del codigo fuente.
-    #     Si difiere, la generacion detecto una sub-marca Crayola nueva y la
-    #     declaro al vuelo: hay que dejarla fija en el codigo.
-    tax_codigo = _taxonomia_de_fuente(
-        raiz / "scripts" / "generar_catalogo_base.py", "CATEGORIA_POR_LINEA"
-    )
-    if tax_codigo:
-        for cod, cat in sorted(cat_por_linea.items()):
-            if cod not in tax_codigo:
-                avisos.append(
-                    f"AVISO: la linea {cod} ({cat}) se publico pero no esta fija "
-                    "en CATEGORIA_POR_LINEA: agregala a "
-                    "scripts/generar_catalogo_base.py y a CATEGORIAS en "
-                    "g360-stock-api/app/core/constants.py"
+        # Los flags viejos (catalogo de version < 3.6.0) no los juzgamos:
+        # solo se aplica la regla cuando el producto ya trae flags.
+        if "cotizable" not in p:
+            if precio <= 0:
+                errores.append(
+                    f"ALERTA: {sku} esta publicado con precio={precio} "
+                    "(sin precio no se publica)"
                 )
-        for cod, cat in sorted(tax_codigo.items()):
-            if cod not in cat_por_linea:
+            continue
+        if p.get("cotizable") and precio <= 0:
+            errores.append(
+                f"ALERTA: {sku} esta marcado cotizable con precio={precio} "
+                "(sin precio no se cotiza)"
+            )
+        if precio > 0 and p.get("por_activar"):
+            errores.append(
+                f"ALERTA: {sku} tiene precio={precio} pero por_activar=true "
+                "(por_activar es solo para SKUs sin precio)"
+            )
+        if p.get("por_activar") and p.get("cotizable"):
+            errores.append(
+                f"ALERTA: {sku} tiene por_activar=true y cotizable=true a la vez "
+                "(un SKU por activar no se cotiza)"
+            )
+        origen = str(p.get("origen", ""))
+        if origen and origen not in ("erp", "s1"):
+            errores.append(
+                f"ALERTA: {sku} tiene origen={origen} (debe ser 'erp' o 's1')"
+            )
+        cat_venta = p.get("categoria_venta", "")
+        if cat_venta:
+            cat = str(p.get("categoria", "")).upper()
+            if cat in ("VINIBALL", "VINIFAN", "REPRESENTADAS") and cat != cat_venta:
+                errores.append(
+                    f"ALERTA: {sku} categoria={p.get('categoria')} pero "
+                    f"categoria_venta={cat_venta} (deberia ser {cat})"
+                )
+            if cat not in ("VINIBALL", "VINIFAN", "REPRESENTADAS") and (
+                cat_venta != "REVISION_VENTA"
+            ):
+                errores.append(
+                    f"ALERTA: {sku} categoria={p.get('categoria')} pero "
+                    f"categoria_venta={cat_venta} (deberia ser REVISION_VENTA)"
+                )
+        predespacho = p.get("predespacho_snapshot", None)
+        if predespacho is not None and bool(p.get("compromiso")) != (
+            float(predespacho) > 0
+        ):
+            errores.append(
+                f"ALERTA: {sku} tiene predespacho_snapshot={predespacho} y "
+                f"compromiso={p.get('compromiso')} (incoherentes)"
+            )
+        if p.get("derivado_de"):
+            base = str(p["derivado_de"])
+            if base == sku:
+                errores.append(
+                    f"ALERTA: {sku} se deriva de si mismo (derivado_de={base})"
+                )
+            elif base in {q.get("sku", "") for q in ps}:
+                padre = next(q for q in ps if q.get("sku") == base)
+                for campo in ("linea", "categoria"):
+                    if p.get(campo) != padre.get(campo):
+                        errores.append(
+                            f"ALERTA: {sku} derivado de {base} tiene "
+                            f"{campo}={p.get(campo)} y su base "
+                            f"{padre.get(campo)} (deben coincidir)"
+                        )
+            else:
+                # La base puede estar fuera del catalogo (descontinuada, sin
+                # precio): se heredo la ficha comercial igual, pero conviene
+                # saberlo al revisar la ficha.
                 avisos.append(
-                    f"AVISO: CATEGORIA_POR_LINEA declara {cod} ({cat}) pero la "
-                    "taxonomia publicada no: revisa que no se haya quedado obsoleta"
+                    f"AVISO: {sku} se deriva de {base}, que no esta publicado "
+                    "(se heredo la ficha comercial del ERP)"
                 )
 
-    # 11. El universo de stock tiene que haber entrado en la generacion.
-    #     Sin el, el catalogo pierde los SKUs con despacho que no estan en
-    #     SKU_BX (212 SKUs en la ultima corrida). Salvo que se haya omitido
-    #     a proposito.
-    uni = meta.get("universo_stock", {})
-    if uni and not uni.get("incluido"):
-        error = str(uni.get("error", ""))
-        if "omitido" in error:
-            avisos.append(
-                "AVISO: el catalogo se genero SIN universo de stock "
-                f"({error}): faltan los SKUs con stock que no estan en SKU_BX"
-            )
-        else:
+    # 9b. Invariante de cobertura: TODO SKU con stock o compromiso tiene
+    #     que estar en el catalogo (salvo lineas de proceso). El generador
+    #     publica la lista y sus faltantes; los faltantes deben ser cero.
+    faltantes = meta.get("cobertura_faltante", None)
+    if faltantes is None and meta.get("universo_stock", {}).get("incluido"):
+        errores.append(
+            "ALERTA: el metadata no publica cobertura_faltante: regenera con "
+            "generar_catalogo_base.py v3.6.0 o superior"
+        )
+    elif faltantes:
+        errores.append(
+            f"ALERTA: {len(faltantes)} SKUs con stock/compromiso quedaron fuera "
+            f"del catalogo: {', '.join(str(s) for s in faltantes[:10])}"
+            f"{'...' if len(faltantes) > 10 else ''}"
+        )
+
+    # 9c. Cross-check independiente: la lista del universo publicada tiene
+    #     que estar entera en el catalogo (asi el invariante no depende de
+    #     que el generador reporte bien sus propios faltantes).
+    universo_skus = meta.get("universo_skus", [])
+    if universo_skus:
+        en_catalogo = {str(p.get("sku", "")) for p in ps}
+        fuera = [s for s in universo_skus if s not in en_catalogo]
+        if fuera:
             errores.append(
-                f"ALERTA: el catalogo se genero SIN universo de stock ({error}): "
-                "el catalogo esta incompleto (212 SKUs en la ultima corrida). "
-                "No lo subas: regenera cuando el API de stock responda."
+                f"ALERTA: {len(fuera)} SKUs publicados en universo_skus no estan "
+                f"en productos: {', '.join(str(s) for s in fuera[:10])}"
+                f"{'...' if len(fuera) > 10 else ''}"
             )
 
     return errores, avisos

@@ -38,7 +38,13 @@ except AttributeError:  # pragma: no cover - Python < 3.7
 RAIZ = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(RAIZ / "scripts"))
 
-from generar_catalogo_base import generar_output, leer_erp, leer_unbx  # noqa: E402
+from generar_catalogo_base import (  # noqa: E402
+    aplicar_derivados,
+    generar_output,
+    leer_erp,
+    leer_unbx,
+    productos_desde_universo,
+)
 
 ERP_POR_DEFECTO = RAIZ / "data" / "PRODUCTOS.xls"
 BX_POR_DEFECTO = RAIZ / "data" / "SKU_BX.xlsx"
@@ -49,6 +55,8 @@ SKU_ESCENARIO_1 = "990001"  # nuevo vigente + curado en SKU_BX
 SKU_ESCENARIO_2 = "990002"  # nuevo descontinuado, sin BX, sin stock
 SKU_ESCENARIO_3 = "990003"  # nuevo descontinuado, sin BX, con stock fisico
 SKU_ESCENARIO_4 = "CG990"  # nuevo Crayola (sub-marca CG)
+SKU_ESCENARIO_5 = "S199001"  # con stock y compromiso, NUNCA registrado en el ERP
+SKU_ESCENARIO_6 = "03077D"  # derivado metodo D (existe la base 03077)
 
 FILAS_NUEVAS = [
     # sku, nombre, ean13, ean14, peso, linea, grupo, tipo, familia,
@@ -205,23 +213,34 @@ def escribir_bx_minimo(ruta_destino: Path, skus=()) -> Path:
     return ruta_destino
 
 
-def _universo_stock_real() -> set[str]:
-    """SKUs con stock fisico segun el API configurado (vacio si no hay clave)."""
+def _universo_stock_real() -> dict[str, dict]:
+    """Universo real (stock + compromiso) segun el API configurado."""
     from generar_catalogo_base import leer_universo_stock
 
-    skus, err = leer_universo_stock()
+    universo, err = leer_universo_stock()
     if err:
-        return set()
-    return skus
+        return {}
+    return universo
 
 
-def _generar(erp: Path, bx: Path, salida: Path, stock_skus) -> dict:
+def _generar(erp: Path, bx: Path, salida: Path, stock_skus, universo=None) -> dict:
+    """Genera un catalogo completo (misma secuencia que main)."""
+    universo = universo or {
+        s: {"stock": 1, "predespacho": 0} for s in (stock_skus or set())
+    }
     orden_map, unbx_map, estado_map = leer_unbx(str(bx))
-    productos, errs, erp_skus, exclusiones = leer_erp(
-        str(erp), bx_skus=set(orden_map), stock_skus=set(stock_skus)
+    productos, errs, erp_skus, exclusiones, erp_todos = leer_erp(
+        str(erp),
+        bx_skus=set(orden_map),
+        stock_skus={s for s, d in universo.items() if d.get("stock", 0) > 0},
+        compromiso_skus={s for s, d in universo.items() if d.get("predespacho", 0) > 0},
     )
     if errs:
         raise RuntimeError(f"Error leyendo ERP simulado: {errs}")
+    productos.extend(productos_desde_universo(universo, productos, erp_todos))
+    nombres = {sku: d.get("nombre", "") for sku, d in erp_todos.items()}
+    nombres.update({p["sku"]: p["nombre"] for p in productos})
+    aplicar_derivados(productos, nombres)
     return generar_output(
         productos,
         unbx_map,
@@ -229,7 +248,8 @@ def _generar(erp: Path, bx: Path, salida: Path, stock_skus) -> dict:
         orden_map,
         str(salida),
         exclusiones=exclusiones,
-        universo_stock={"incluido": True, "skus": len(stock_skus), "error": ""},
+        universo_stock={"incluido": True, "skus": len(universo), "error": ""},
+        universo=universo,
     )
 
 
@@ -313,17 +333,67 @@ def ejecutar(api_url: str = "", api_key: str = "") -> int:
             f"categoria={p4['categoria']}"
         )
 
-    # -- Escenario 5: impacto real del universo de stock -------------------
-    print("\n-- Escenario 5: impacto del universo de stock sobre el catalogo")
+    # -- Escenario 5: SKU no registrado que llega con stock y compromiso ---
+    universo_s5 = {
+        SKU_ESCENARIO_3: {"stock": 5, "predespacho": 0},
+        SKU_ESCENARIO_5: {
+            "stock": 40,
+            "predespacho": 12,
+            "descripcion": "G360 SIMULACION CUADERNO ANILLADO A4",
+            "um": "UND",
+            "linea": "0178 - ARCHIVO",
+            "grupo": "01 - CUADERNOS",
+            "tipo": "02 - ANILLADO",
+            "familia": "03 - A4",
+        },
+        # Derivado método D: mismo nombre que su base 03077 (FOLDER ...).
+        SKU_ESCENARIO_6: {
+            "stock": 7,
+            "predespacho": 0,
+            "descripcion": "FOLDER N VINIFAN TAPA FANTASIA OFICIO MIX SURTIDO",
+            "um": "UND",
+            "linea": "0198 - PRODUCTOS SIN EMBALAJE",
+            "grupo": "01 - FOLDER",
+            "tipo": "02 - FANTASIA",
+            "familia": "03 - OFICIO",
+        },
+    }
+    cat_s5 = tmp / "catalogo_no_registrado.json"
+    out5 = _generar(erp_sim, bx_sim, cat_s5, set(), universo=universo_s5)
+    skus5 = {p["sku"]: p for p in out5["productos"]}
+    print("\n-- Escenario 5: SKU con stock/compromiso que NO existe en el ERP")
+    p5 = skus5.get(SKU_ESCENARIO_5)
+    if p5:
+        print(
+            f"   {SKU_ESCENARIO_5}: linea={p5['linea']} grupo={p5['grupo']} "
+            f"categoria={p5['categoria']} categoria_venta={p5['categoria_venta']} "
+            f"por_activar={p5['por_activar']} cotizable={p5['cotizable']} "
+            f"compromiso={p5['compromiso']}"
+        )
+    else:
+        print(f"   {SKU_ESCENARIO_5}: FUERA del catalogo")
+    print("\n-- Escenario 6: metodo D (mismo producto sin embalaje, stock propio)")
+    p6 = skus5.get(SKU_ESCENARIO_6)
+    if p6:
+        print(
+            f"   {SKU_ESCENARIO_6}: derivado_de={p6['derivado_de']} "
+            f"linea={p6['linea']} categoria={p6['categoria']} "
+            f"precio={p6['precio']} stock_snapshot={p6['stock_snapshot']}"
+        )
+    else:
+        print(f"   {SKU_ESCENARIO_6}: FUERA del catalogo")
+
+    # -- Escenario 7: impacto real del universo de stock -------------------
+    print("\n-- Escenario 7: impacto del universo de stock sobre el catalogo")
     universo_real = _universo_stock_real()
     if universo_real:
         cat_completo = tmp / "catalogo_completo.json"
-        out3 = _generar(erp_sim, bx_sim, cat_completo, stock_skus=universo_real)
+        out3 = _generar(erp_sim, bx_sim, cat_completo, set(), universo=universo_real)
         skus3 = {p["sku"] for p in out3["productos"]}
         perdidos = skus3 - skus1
         print(
             f"   sin universo: {len(skus1)} SKUs | con universo: {len(skus3)} SKUs "
-            f"({len(perdidos)} SKUs con stock se perdian sin el universo)"
+            f"({len(perdidos)} SKUs con stock/compromiso se perdian sin el universo)"
         )
     else:
         print("   (sin API de stock disponible: se omite el contraste real)")
@@ -334,17 +404,19 @@ def ejecutar(api_url: str = "", api_key: str = "") -> int:
         SKU_ESCENARIO_2: (False, "descontinuado sin BX ni stock: queda fuera"),
         SKU_ESCENARIO_3: (True, "universo de stock: entra aunque no este en BX"),
         SKU_ESCENARIO_4: (True, "Crayola: entra con linea propia"),
+        SKU_ESCENARIO_5: (True, "no registrado con movimiento: ficha minima S1"),
+        SKU_ESCENARIO_6: (True, "metodo D: entra enlazado a su base"),
     }
     print("\n" + "=" * 70)
     print("RESULTADO")
     print("=" * 70)
     fallos = 0
     for sku, (esperado, motivo) in esperados.items():
-        ok = (sku in skus2) == esperado
+        ok = (sku in skus5) == esperado
         fallos += 0 if ok else 1
         print(
             f"  [{'OK ' if ok else 'FALLA'}] {sku}: "
-            f"{'incluido' if sku in skus2 else 'fuera'} - {motivo}"
+            f"{'incluido' if sku in skus5 else 'fuera'} - {motivo}"
         )
 
     # -- Subida al API de stock -------------------------------------------

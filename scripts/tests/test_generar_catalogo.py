@@ -3,6 +3,8 @@
 Tests unitarios para G360 Catalog Generator v3.1
 Ejecutar: python -m pytest scripts/tests/ -v
 """
+
+import json
 import sys
 from pathlib import Path
 
@@ -17,6 +19,13 @@ from generar_catalogo_base import (
     _clean_ean,
     _extraer_codigo_linea,
     asignar_categoria,
+    categoria_venta,
+    nombre_sin_codigo,
+    sku_base_derivado,
+    aplicar_derivados,
+    productos_desde_universo,
+    leer_universo_stock,
+    _agregar_universo,
     LINEA_A_CATEGORIA,
     LINEA_NOMBRE_A_CODIGO,
     CATEGORIA_POR_LINEA,
@@ -43,7 +52,10 @@ class TestGenerarNombreCorto:
         assert generar_nombre_corto("N DEPORTIVA FUTBOL") == "Deportiva Futbol"
 
     def test_combina_reglas(self):
-        assert generar_nombre_corto("PELOTA DE PVC SEMIDEPORTIVA VOLEY STITCH") == "Semideportiva Voley Stitch"
+        assert (
+            generar_nombre_corto("PELOTA DE PVC SEMIDEPORTIVA VOLEY STITCH")
+            == "Semideportiva Voley Stitch"
+        )
 
     def test_vacio_retorna_vacio(self):
         assert generar_nombre_corto("") == ""
@@ -111,7 +123,7 @@ class TestGenerarKeywords:
 
 
 class TestDecidirInclusion:
-    """Regla: vigente ERP entra; descontinuado solo si está en SKU_BX."""
+    """Regla v3.6.0: guía ∨ stock ∨ compromiso ∨ (vigente ∧ precio > 0)."""
 
     def test_vigente_entra(self):
         assert decidir_inclusion(False, False, 10.0, "PELOTAS", False) == (True, False)
@@ -120,26 +132,48 @@ class TestDecidirInclusion:
         assert decidir_inclusion(False, True, 3.36, "ACCESORIOS", True) == (True, True)
 
     def test_descontinuado_fuera_bx_se_excluye(self):
-        assert decidir_inclusion(False, True, 3.36, "ACCESORIOS", False) == (False, False)
+        assert decidir_inclusion(False, True, 3.36, "ACCESORIOS", False) == (
+            False,
+            False,
+        )
 
     def test_inactivo_siempre_fuera(self):
         assert decidir_inclusion(True, False, 10.0, "PELOTAS", True) == (False, False)
         assert decidir_inclusion(True, True, 10.0, "PELOTAS", True) == (False, False)
 
-    def test_sin_precio_siempre_fuera(self):
-        assert decidir_inclusion(False, False, 0.0, "PELOTAS", True) == (False, False)
-        assert decidir_inclusion(False, True, 0.0, "PELOTAS", True) == (False, False)
+    def test_sin_precio_en_guia_entra_no_cotizable(self):
+        """El precio decide la COTIZABILIDAD, no la presencia (v3.6.0)."""
+        assert decidir_inclusion(False, False, 0.0, "PELOTAS", True) == (True, False)
+        assert decidir_inclusion(False, True, 0.0, "PELOTAS", True) == (True, True)
+
+    def test_sin_precio_ni_movimiento_queda_fuera(self):
+        assert decidir_inclusion(False, False, 0.0, "PELOTAS", False) == (False, False)
+        assert decidir_inclusion(False, True, 0.0, "PELOTAS", False) == (False, False)
 
     def test_linea_proceso_siempre_fuera(self):
-        assert decidir_inclusion(False, False, 10.0, "PRODUCTOS EN PROCESO", True) == (False, False)
-        assert decidir_inclusion(False, True, 10.0, "PRODUCTOS EN PROCESO", True) == (False, False)
+        assert decidir_inclusion(False, False, 10.0, "PRODUCTOS EN PROCESO", True) == (
+            False,
+            False,
+        )
+        assert decidir_inclusion(False, True, 10.0, "PRODUCTOS EN PROCESO", True) == (
+            False,
+            False,
+        )
 
 
 def _prod(sku, descontinuado=False, linea="PELOTAS"):
     return {
-        "sku": sku, "nombre": f"Producto {sku}", "ean13": "", "ean14": "",
-        "peso_kg": 0.1, "linea": linea, "grupo": "G", "tipo": "T",
-        "familia": "F", "categoria": "VINIBALL", "precio": 10.0,
+        "sku": sku,
+        "nombre": f"Producto {sku}",
+        "ean13": "",
+        "ean14": "",
+        "peso_kg": 0.1,
+        "linea": linea,
+        "grupo": "G",
+        "tipo": "T",
+        "familia": "F",
+        "categoria": "VINIBALL",
+        "precio": 10.0,
         "descontinuado": descontinuado,
         "linea_codigo": LINEA_NOMBRE_A_CODIGO.get(linea.upper(), ""),
     }
@@ -148,8 +182,7 @@ def _prod(sku, descontinuado=False, linea="PELOTAS"):
 class TestGenerarOutputDescontinuado:
     def test_marca_y_cuenta_descontinuados(self, tmp_path):
         out = tmp_path / "cat.json"
-        res = generar_output(
-            [_prod("A"), _prod("B", True)], {}, {}, {}, str(out))
+        res = generar_output([_prod("A"), _prod("B", True)], {}, {}, {}, str(out))
         prods = {p["sku"]: p for p in res["productos"]}
         assert prods["A"]["descontinuado"] is False
         assert prods["B"]["descontinuado"] is True
@@ -159,8 +192,16 @@ class TestGenerarOutputDescontinuado:
     def test_linea_codigo_emitido(self, tmp_path):
         out = tmp_path / "cat.json"
         res = generar_output(
-            [_prod("A", linea="ARCHIVO"), _prod("B", linea="MASCOTAS"),
-             _prod("C", linea="LINEA INVENTADA")], {}, {}, {}, str(out))
+            [
+                _prod("A", linea="ARCHIVO"),
+                _prod("B", linea="MASCOTAS"),
+                _prod("C", linea="LINEA INVENTADA"),
+            ],
+            {},
+            {},
+            {},
+            str(out),
+        )
         prods = {p["sku"]: p for p in res["productos"]}
         assert prods["A"]["linea_codigo"] == "78"
         assert prods["B"]["linea_codigo"] == "MA"
@@ -185,9 +226,16 @@ class TestLineaACategoria:
     def test_all_vinifan_lines(self):
         # MANUALIDADES (CE) y SET (CF) son lineas 100% Crayola -> REPRESENTADAS
         vinifan = [
-            "ARCHIVO", "FORROS", "ESCRITURA", "PINTURA", "DIBUJO",
-            "DIDACTICOS", "PEGAMENTOS", "ACCESORIOS",
-            "METALICA", "SENSORIALES",
+            "ARCHIVO",
+            "FORROS",
+            "ESCRITURA",
+            "PINTURA",
+            "DIBUJO",
+            "DIDACTICOS",
+            "PEGAMENTOS",
+            "ACCESORIOS",
+            "METALICA",
+            "SENSORIALES",
         ]
         representadas = ["MANUALIDADES", "SET"]
         for linea in vinifan:
@@ -240,23 +288,406 @@ class TestTaxonomiaCanonica:
 class TestInclusionConStock:
     def test_sku_descontinuado_con_stock_entra_marcado(self):
         """Hay carga que hacer: un descontinuado con stock entra marcado."""
-        assert decidir_inclusion(False, True, 3.0, "ARCHIVO", False, True) == (True, True)
+        assert decidir_inclusion(False, True, 3.0, "ARCHIVO", False, True) == (
+            True,
+            True,
+        )
 
     def test_sku_vigente_con_stock_entra(self):
-        assert decidir_inclusion(False, False, 3.0, "ARCHIVO", False, True) == (True, False)
+        assert decidir_inclusion(False, False, 3.0, "ARCHIVO", False, True) == (
+            True,
+            False,
+        )
 
     def test_sku_descontinuado_sin_stock_sigue_fuera(self):
-        assert decidir_inclusion(False, True, 3.0, "ARCHIVO", False, False) == (False, False)
+        assert decidir_inclusion(False, True, 3.0, "ARCHIVO", False, False) == (
+            False,
+            False,
+        )
 
-    def test_sku_sin_precio_sigue_fuera_aunque_haya_stock(self):
-        """Regla absoluta: sin precio no se publica (se mantiene de v3.2)."""
-        assert decidir_inclusion(False, False, 0.0, "ARCHIVO", False, True) == (False, False)
-        assert decidir_inclusion(False, True, 0.0, "ARCHIVO", True, True) == (False, False)
+    def test_sku_sin_precio_entra_con_stock_pero_no_cotiza(self, tmp_path):
+        """v3.6.0: hay producto fisico -> se publica; sin precio -> por_activar."""
+        assert decidir_inclusion(False, False, 0.0, "ARCHIVO", False, True) == (
+            True,
+            False,
+        )
+        assert decidir_inclusion(False, True, 0.0, "ARCHIVO", True, True) == (
+            True,
+            True,
+        )
+
+        out = tmp_path / "cat.json"
+        prod = _prod("SINPRECIO")
+        prod["precio"] = 0.0
+        prod["origen"] = "s1"
+        res = generar_output(
+            [prod],
+            {},
+            {},
+            {},
+            str(out),
+            universo={"SINPRECIO": {"stock": 4, "predespacho": 0, "linea": ""}},
+        )
+        p = res["productos"][0]
+        assert p["cotizable"] is False
+        assert p["por_activar"] is True
+        assert p["stock_snapshot"] == 4
+
+    def test_sku_con_compromiso_sin_stock_entra(self):
+        """Un SKU con compromiso de venta y sin stock tambien debe estar."""
+        assert decidir_inclusion(
+            False,
+            False,
+            0.0,
+            "ARCHIVO",
+            False,
+            tiene_stock=False,
+            tiene_compromiso=True,
+        ) == (True, False)
 
     def test_inactivo_siempre_fuera_incluso_con_stock(self):
-        assert decidir_inclusion(True, False, 10.0, "ARCHIVO", True, True) == (False, False)
+        assert decidir_inclusion(True, False, 10.0, "ARCHIVO", True, True) == (
+            False,
+            False,
+        )
+
+
+class TestNombreSinCodigo:
+    def test_quita_el_codigo_del_reporte_s1(self):
+        assert nombre_sin_codigo("03 - BORRADOR") == "BORRADOR"
+        assert nombre_sin_codigo("01 - RESALTADOR") == "RESALTADOR"
+        assert nombre_sin_codigo("02 - BLANCO BLISTER") == "BLANCO BLISTER"
+
+    def test_respeta_nombres_sin_codigo(self):
+        assert nombre_sin_codigo("FOLDER") == "FOLDER"
+        assert nombre_sin_codigo("") == ""
+
+
+class TestCategoriaVenta:
+    def test_las_tres_categorias_de_negocio_se_mantienen(self):
+        for cat in ("VINIBALL", "VINIFAN", "REPRESENTADAS"):
+            assert categoria_venta(cat) == cat
+
+    def test_el_resto_es_revision_de_venta(self):
+        for cat in ("MATERIALES", "INDUSTRIAL", "CIPTECH", "PRODUCCION", "OTROS", ""):
+            assert categoria_venta(cat) == "REVISION_VENTA"
+
+
+class TestMetodoD:
+    """03077D es 03077 sin embalaje: se enlaza, nunca se fusiona."""
+
+    def test_enlaza_si_coincide_el_nombre_y_la_linea(self):
+        base = "FOLDER N VINIFAN FANTASIA OFICIO MIX SURTIDO"
+        derivado = "FOLDER N VINIFAN TAPA FANTASIA OFICIO MIX SURTIDO"
+        assert sku_base_derivado("03077D", derivado, "98", base) == "03077"
+
+    def test_normaliza_acentos_y_guiones(self):
+        base = "FOLDER N VINIFAN FANTASIA A4 SPIDERMAN"
+        derivado = "FOLDER N VINIFAN FANTAS\u00cdA A-4 SPIDERMAN"
+        assert sku_base_derivado("78095D", derivado, "98", base) == "78095"
+
+    def test_no_enlaza_si_el_nombre_es_otro_producto(self):
+        assert (
+            sku_base_derivado("03077D", "FOLDER DRAGON BALL", "98", "CUADERNO A4") == ""
+        )
+
+    def test_no_enlaza_fuera_de_la_linea_sin_embalaje(self):
+        nombre = "FOLDER N VINIFAN FANTASIA OFICIO MIX SURTIDO"
+        assert sku_base_derivado("03077D", nombre, "78", nombre) == ""
+
+    def test_no_enlaza_si_no_termina_en_d(self):
+        nombre = "FOLDER N VINIFAN FANTASIA OFICIO MIX SURTIDO"
+        assert sku_base_derivado("03077", nombre, "98", nombre) == ""
+
+    def test_aplicar_derivados_no_enlaza_por_el_codigo_solo(self):
+        """Un D en linea 98 con nombre distinto NO es derivado (regresion).
+
+        Antes se comparaba el nombre del SKU contra si mismo (ratio 1.0), asi
+        que cualquier D con base existente se enlazaba aunque fuera otro
+        producto. La similitud tiene que medirse contra el nombre de la base.
+        """
+        base = _prod("03077", linea="ARCHIVO")
+        base["nombre"] = "CUADERNO A4 RAYADO 100 HOJAS"
+        base["linea"] = "78"
+        base["linea_codigo"] = "78"
+        otro = _prod("03077D", linea="ARCHIVO")
+        otro["nombre"] = "FOLDER PLASTICO OFICIO TAPA TRANSPARENTE"
+        otro["linea"] = "98"
+        otro["linea_codigo"] = "98"
+        nombres = {"03077": base["nombre"], "03077D": otro["nombre"]}
+        assert aplicar_derivados([base, otro], nombres) == 0
+        assert otro.get("derivado_de", "") == ""
+
+    def test_hereda_ficha_pero_conserva_su_stock(self, tmp_path):
+        base = _prod("03077")
+        base["nombre"] = "FOLDER N VINIFAN FANTASIA OFICIO MIX SURTIDO"
+        base["precio"] = 4.17
+        base["linea"] = "78"
+        base["linea_codigo"] = "78"
+        derivado = _prod("03077D")
+        derivado["nombre"] = "FOLDER N VINIFAN TAPA FANTASIA OFICIO MIX SURTIDO"
+        derivado["precio"] = 0.0
+        derivado["linea"] = "98"
+        derivado["linea_codigo"] = "98"
+        derivado["categoria"] = "DESCARTE Y VARIOS"
+        derivado["origen"] = "s1"
+        nombres = {"03077": base["nombre"], "03077D": derivado["nombre"]}
+        assert aplicar_derivados([base, derivado], nombres) == 1
+        assert derivado["derivado_de"] == "03077"
+        assert derivado["linea"] == "78"
+        assert derivado["categoria"] == base["categoria"]
+        assert derivado["precio"] == 4.17
+
+        universo = {
+            "03077": {"stock": 100, "predespacho": 0, "linea": "0178 - ARCHIVO"},
+            "03077D": {"stock": 7, "predespacho": 0, "linea": "0198 - SIN EMBALAJE"},
+        }
+        out = tmp_path / "cat.json"
+        res = generar_output([base, derivado], {}, {}, {}, str(out), universo=universo)
+        prod = {p["sku"]: p for p in res["productos"]}
+        assert prod["03077"]["stock_snapshot"] == 100
+        assert prod["03077D"]["stock_snapshot"] == 7
+        assert prod["03077D"]["cotizable"] is True
+        assert res["metadata"]["estadisticas"]["derivados"] == 1
+
+
+class TestFichaDesdeUniverso:
+    def test_arma_la_ficha_minima_con_lo_que_trae_s1(self):
+        universo = {
+            "S199001": {
+                "stock": 40,
+                "predespacho": 12,
+                "descripcion": "CUADERNO ANILLADO A4",
+                "um": "UND",
+                "linea": "0178 - ARCHIVO",
+                "grupo": "01 - CUADERNOS",
+                "tipo": "02 - ANILLADO",
+                "familia": "03 - A4",
+            }
+        }
+        nuevos = productos_desde_universo(universo, [], {})
+        assert len(nuevos) == 1
+        p = nuevos[0]
+        assert p["sku"] == "S199001"
+        assert p["origen"] == "s1"
+        assert p["precio"] == 0.0
+        assert p["linea"] == "78"
+        assert p["linea_codigo"] == "78"
+        assert p["grupo"] == "CUADERNOS"
+        assert p["tipo"] == "ANILLADO"
+        assert p["familia"] == "A4"
+        assert p["um"] == "UND"
+        assert p["categoria"] == "VINIFAN"
+
+    def test_no_duplica_ni_publica_lineas_de_proceso(self):
+        universo = {
+            "YA_ESTA": {"stock": 1, "descripcion": "X", "linea": "0178 - ARCHIVO"},
+            "PROC001": {
+                "stock": 1,
+                "descripcion": "MATERIA EN PROCESO",
+                "linea": "0171 - PRODUCTOS EN PROCESO CIPTECH",
+            },
+        }
+        incluidos = [{"sku": "YA_ESTA"}]
+        nuevos = productos_desde_universo(universo, incluidos, {})
+        assert nuevos == []
+
+
+class TestCobertura:
+    def test_universo_completo_no_deja_faltantes(self, tmp_path):
+        universo = {
+            "A": {"stock": 3, "predespacho": 0, "linea": "0178 - ARCHIVO"},
+            "B": {"stock": 0, "predespacho": 2, "linea": "0178 - ARCHIVO"},
+        }
+        out = tmp_path / "cat.json"
+        res = generar_output(
+            [_prod("A"), _prod("B")], {}, {}, {}, str(out), universo=universo
+        )
+        meta = res["metadata"]
+        assert meta["cobertura_faltante"] == []
+        assert meta["universo_skus"] == ["A", "B"]
+
+    def test_detecta_un_sku_con_stock_fuera_del_catalogo(self, tmp_path, capsys):
+        universo = {
+            "A": {"stock": 3, "predespacho": 0, "linea": "0178 - ARCHIVO"},
+            "HUERFANO": {"stock": 9, "predespacho": 0, "linea": "0178 - ARCHIVO"},
+        }
+        out = tmp_path / "cat.json"
+        res = generar_output([_prod("A")], {}, {}, {}, str(out), universo=universo)
+        assert res["metadata"]["cobertura_faltante"] == ["HUERFANO"]
+        assert "HUERFANO" in capsys.readouterr().out
+
+    def test_las_lineas_de_proceso_no_cuentan_para_la_cobertura(self, tmp_path):
+        universo = {
+            "A": {"stock": 3, "predespacho": 0, "linea": "0178 - ARCHIVO"},
+            "PROC": {
+                "stock": 50,
+                "predespacho": 0,
+                "linea": "0171 - PRODUCTOS EN PROCESO CIPTECH",
+            },
+        }
+        out = tmp_path / "cat.json"
+        res = generar_output([_prod("A")], {}, {}, {}, str(out), universo=universo)
+        assert res["metadata"]["cobertura_faltante"] == []
+        assert "PROC" not in res["metadata"]["universo_skus"]
+
+
+class _Respuesta:
+    """Respuesta minima de requests para monkeypatch."""
+
+    def __init__(self, status, payload):
+        self.status_code = status
+        self._payload = payload
+
+    def json(self):
+        return self._payload
+
+    def raise_for_status(self):
+        if self.status_code >= 400:
+            import requests
+
+            raise requests.HTTPError(f"{self.status_code}")
+
+
+class TestUniversoStock:
+    """La cobertura del catalogo depende de leer bien el universo de stock.
+
+    Un fallo silencioso aca no rompe el catalogo: lo deja incompleto (y el
+    inventario con despacho queda sin precio, peso ni caja).
+    """
+
+    def test_usa_el_endpoint_compacto(self, monkeypatch):
+        import requests
+
+        llamadas = []
+
+        def fake_get(url, **kw):
+            llamadas.append(url)
+            return _Respuesta(
+                200,
+                {
+                    "items": [
+                        {
+                            "sku": "A",
+                            "stock": 10,
+                            "predespacho": 2,
+                            "descripcion": "PRODUCTO A",
+                            "um": "UND",
+                            "linea": "0178 - ARCHIVO",
+                            "grupo": "FOLDER",
+                            "tipo": "OFICIO",
+                            "familia": "A4",
+                        },
+                        {"sku": "B", "stock": 0, "predespacho": 5},
+                    ]
+                },
+            )
+
+        monkeypatch.setattr(requests, "get", fake_get)
+        universo, error = leer_universo_stock(
+            api_url="http://api.local", api_key="k", intentos=1
+        )
+        assert error == ""
+        assert llamadas == ["http://api.local/api/v1/stock/skus"]
+        assert universo["A"]["stock"] == 10
+        assert universo["A"]["predespacho"] == 2
+        assert universo["A"]["familia"] == "A4"
+        assert universo["B"]["predespacho"] == 5
+
+    def test_cae_al_endpoint_pesado_si_no_hay_compacto(self, monkeypatch):
+        import requests
+
+        llamadas = []
+
+        def fake_get(url, **kw):
+            llamadas.append(url)
+            if url.endswith("/api/v1/stock/skus"):
+                return _Respuesta(404, {"detail": "Not Found"})
+            return _Respuesta(
+                200,
+                {
+                    "items": [
+                        {
+                            "sku": "A",
+                            "almacenes": [
+                                {"almacen": "VES", "stock": 4, "predespacho": 1},
+                                {"almacen": "40", "stock": 6, "predespacho": 2},
+                            ],
+                        }
+                    ]
+                },
+            )
+
+        monkeypatch.setattr(requests, "get", fake_get)
+        universo, error = leer_universo_stock(
+            api_url="http://api.local", api_key="k", intentos=1
+        )
+        assert error == ""
+        assert len(llamadas) == 2
+        assert llamadas[0].endswith("/api/v1/stock/skus")
+        assert llamadas[1].endswith("/api/v1/stock")
+        assert universo["A"]["stock"] == 10
+        assert universo["A"]["predespacho"] == 3
+
+    def test_lee_el_cache_local_del_s1(self, tmp_path):
+        cache = tmp_path / "stock_cache.json"
+        cache.write_text(
+            json.dumps(
+                {
+                    "fecha_descarga": "2026-10-22T10:00:00",
+                    "datos": {
+                        "VES": {
+                            "A": {
+                                "stock": 7,
+                                "predespacho": 1,
+                                "descripcion": "PRODUCTO A",
+                                "linea": "0178 - ARCHIVO",
+                            }
+                        },
+                        "40": {"A": {"stock": 3, "predespacho": 0}},
+                    },
+                }
+            ),
+            encoding="utf-8",
+        )
+        universo, error = leer_universo_stock(cache_local=str(cache))
+        assert error == ""
+        assert universo["A"]["stock"] == 10
+        assert universo["A"]["predespacho"] == 1
+        assert universo["A"]["linea"] == "0178 - ARCHIVO"
+
+    def test_cache_inexistente_devuelve_error(self, tmp_path):
+        universo, error = leer_universo_stock(cache_local=str(tmp_path / "no.json"))
+        assert universo == {}
+        assert "no existe" in error
+
+    def test_sin_clave_lo_dice(self, monkeypatch):
+        monkeypatch.delenv("G360_STOCK_API_KEY", raising=False)
+        monkeypatch.delenv("API_KEY", raising=False)
+        universo, error = leer_universo_stock(
+            api_url="http://api.local", api_key="", intentos=1
+        )
+        assert universo == {}
+        assert "API_KEY" in error
+
+    def test_agregar_universo_suma_almacenes(self):
+        datos = {
+            "VES": {
+                "A": {"stock": 5, "predespacho": 2, "descripcion": "PRODUCTO A"},
+            },
+            "40": {
+                "A": {"stock": 1, "predespacho": 0},
+                "B": {"stock": 9, "predespacho": 0, "linea": "0178 - ARCHIVO"},
+            },
+        }
+        universo = _agregar_universo(datos)
+        assert universo["A"]["stock"] == 6
+        assert universo["A"]["predespacho"] == 2
+        assert universo["B"]["stock"] == 9
+        assert universo["B"]["linea"] == "0178 - ARCHIVO"
 
 
 if __name__ == "__main__":
     import pytest
+
     pytest.main([__file__, "-v"])

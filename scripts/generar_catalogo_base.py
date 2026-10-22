@@ -1,41 +1,52 @@
 #!/usr/bin/env python3
 """
-G360 Catalog Generator — Versión simplificada
-Genera catálogo enriquecido desde PRODUCTOS.xls + SKU_BX.xlsx
-Autor: CCUSI | v3.5.0
+G360 Catalog Generator
+Genera el catálogo maestro (el ALLOWLIST real del API) desde las fuentes
+disponibles. El API de stock no tiene allowlist propia: lo que no está en
+este catálogo se ve como `sin_catalogo` (precio 0, caja 1, sin peso/EAN).
+Autor: CCUSI | v3.6.0
 
 Fuentes:
   - data/PRODUCTOS.xls       → SKU, nombre, ean13, ean14, peso, linea, grupo, tipo, familia, precio
-  - data/SKU_BX.xlsx         → SKU, un_bx (cantidad por caja)
-  - API de stock (opcional)  → SKUs con stock físico (G360_STOCK_URL / G360_STOCK_API_KEY)
+  - data/SKU_BX.xlsx         → SKU, un_bx (cantidad por caja) + orden de la guía
+  - API de stock / cache S1  → stock y predespacho por SKU + ficha mínima
+                               (descripción, línea, grupo, tipo, familia, UM)
 
-Regla de inclusión (SKU_BX es la guía primaria de lo que se vende):
-  - Se muestra el SKU si está vigente en ERP, o si está descontinuado
-    pero curado en SKU_BX (con precio > 0 y no inactivo).
-  - Los descontinuados incluidos se marcan con descontinuado=true.
-  - Un SKU vigente con STOCK FÍSICO también entra aunque no esté en SKU_BX:
-    sin catálogo no se conoce su peso/EAN/caja y hay despacho que hacer.
+Regla de inclusión (una sola, en `motivo_exclusion`):
+
+    en catálogo  <=>  en guía  ∨  stock > 0  ∨  compromiso > 0
+                      ∨  (vigente ∧ precio > 0)
+
+O sea: el catálogo cubre TODO lo que se puede vender, despachar o cotizar.
+Las filas que entran por movimiento (stock/compromiso/guía) pero sin precio
+se publican igual, marcadas `por_activar=true` y `cotizable=false`: hay
+producto y hay que activarlo, pero todavía no se cotiza.
 
 Filtros absolutos (siempre excluyen):
-  - Inactivos (FLG_INACTIVO)
-  - Sin precio (<= 0)
-  - Líneas de proceso
+  - Inactivos (FLG_INACTIVO): al pasar a inactivo el producto desaparece
+    del ERP, así que no existe "inactivo con stock".
+  - Líneas de proceso (materia prima en proceso, productos en proceso).
+
+Semáforo de venta (`categoria_venta`): VINIBALL / VINIFAN / REPRESENTADAS
+son las tres categorías de negocio; todo el resto queda en REVISION_VENTA.
 """
 
 # Versión única del catálogo. El banner, la ayuda del CLI y el metadata del
 # JSON salen de acá: antes cada uno declaraba una versión distinta y el
 # README terminaba describiendo un producto que no existía.
-VERSION = "3.5.0"
+VERSION = "3.6.0"
 
 # API de stock por defecto. El universo de stock (SKUs con despacho pendiente)
 # es parte del catalogo: sin el, el catalogo sale incompleto y nadie lo nota.
 URL_STOCK_DEFAULT = "https://g360-stock-api.onrender.com"
 
 import argparse
+import difflib
 import json
 import os
 import re
 import sys
+import unicodedata
 from datetime import datetime
 from pathlib import Path
 
@@ -82,6 +93,10 @@ CATEGORIA_POR_LINEA: dict[str, str] = {
     "CB": "REPRESENTADAS",
     "CC": "REPRESENTADAS",
     "CD": "REPRESENTADAS",
+    # CG = JUGUETES (Silly Putty y demás juguetes Crayola). Se validó sobre
+    # los 68.003 artículos del KARDEX: la regla "todo C* es Crayola" tiene 0
+    # falsos positivos y CG es una sub-marca más, no una línea ajena.
+    "CG": "REPRESENTADAS",
     "57": "INDUMENTARIA",
     # OJO: "52" estaba DUPLICADO en este dict (INDUMENTARIA arriba y
     # MATERIALES abajo). En un literal de dict la clave repetida no avisa:
@@ -187,14 +202,94 @@ def categoria_de_producto(sku: str, codigo_linea: str) -> str:
     una linea VINIFAN (72/76/77). Un SKU no-Crayola cae a la categoria
     canonica de su linea.
 
-    Nota: esta regla asume que todo SKU que empieza con C es Crayola. Si
-    existiera un SKU CIPSA interno con prefijo C (ej: CC09150), quedaria
-    mal clasificado. Para evitarlo, esos SKUs deben omitirse en el catalogo
-    (no tienen precio o no pasan los filtros de inclusion).
+    Regla validada sobre los 68.003 artículos del KARDEX: TODO SKU que
+    empieza con C es Crayola (CA/CB/CC/CD/CE/CF/CG y las sub-marcas que
+    aparezcan), sin falsos positivos. Si algún día apareciera un SKU interno
+    con prefijo C, `validar_taxonomia.py` lo delata (linea mixta / categoria
+    incoherente) antes de subir el catálogo.
     """
     if str(sku or "").upper().startswith("C"):
         return "REPRESENTADAS"
     return asignar_categoria(codigo_linea)
+
+
+# Categorias de negocio que se VENDEN. Todo lo demás (MATERIALES, CIPTECH,
+# INDUSTRIAL, DESCARTE Y VARIOS, OTROS...) queda en REVISION_VENTA: puede
+# estar en el catálogo (allowlist) pero necesita una revisión comercial
+# antes de cotizarse.
+CATEGORIAS_VENTA = ("VINIBALL", "VINIFAN", "REPRESENTADAS")
+CATEGORIA_VENTA_REVISION = "REVISION_VENTA"
+
+
+def categoria_venta(categoria: str) -> str:
+    """Semaforo de venta: VINIBALL/VINIFAN/REPRESENTADAS o REVISION_VENTA."""
+    cat = str(categoria or "").strip().upper()
+    return cat if cat in CATEGORIAS_VENTA else CATEGORIA_VENTA_REVISION
+
+
+def normalizar_texto(valor) -> str:
+    """Mayúsculas, sin acentos ni signos, espacios colapsados.
+
+    Sirve para comparar nombres entre fuentes que escriben distinto el mismo
+    producto ("FANTASÍA A-4" vs "FANTASIA A4").
+    """
+    txt = unicodedata.normalize("NFKD", str(valor or "").upper())
+    txt = "".join(c for c in txt if not unicodedata.combining(c))
+    txt = re.sub(r"[^0-9A-Z ]", " ", txt)
+    return re.sub(r"\s+", " ", txt).strip()
+
+
+def nombre_sin_codigo(valor) -> str:
+    """'03 - BORRADOR' -> 'BORRADOR'.
+
+    El reporte S1 entrega grupo/tipo/familia con el código adelante; el
+    catálogo publica el nombre limpio (y antes /stock y /catalog mostraban
+    el mismo campo en dos formatos distintos).
+    """
+    txt = str(valor or "").strip()
+    if not txt:
+        return ""
+    sin_codigo = re.sub(r"^[0-9A-Z]{2,4}\s*-\s*", "", txt).strip()
+    return sin_codigo or txt
+
+
+# Similitud mínima entre el nombre del SKU "D" y el de su base para
+# considerarlo derivado. Los pares reales dan >= 0.84 (FANTASÍA A-4 vs
+# FANTASIA A4); un umbral más bajo mezclaría productos distintos.
+SIMILITUD_MINIMA_DERIVADO = 0.80
+
+# Línea del KARDEX/S1 donde viven los SKUs "sin embalaje" (método D:
+# traslado/refacción). El SKU con sufijo D es SIEMPRE stock distinto de su
+# base aunque comparta precio, peso y almacén: nunca se fusiona.
+LINEA_SIN_EMBALAJE = "98"
+
+
+def sku_base_derivado(sku: str, nombre: str, linea_codigo: str, nombre_base) -> str:
+    """SKU base de un derivado por método D, o "" si no aplica.
+
+    Condiciones (todas):
+      1. El SKU termina en D y el base existe (nombre_base no vacío).
+      2. Vive en la línea "sin embalaje" (98).
+      3. El nombre es el mismo producto (similitud >= 0.80): evita enlazar
+         por accidente dos SKUs que solo comparten el código.
+
+    El vínculo NO fusiona: solo documenta de dónde sale la ficha comercial.
+    El stock se mantiene propio (eso es justamente el método D).
+    """
+    sku = str(sku or "").strip().upper()
+    if not sku.endswith("D") or len(sku) < 3:
+        return ""
+    if str(linea_codigo or "").strip().upper() not in ("", LINEA_SIN_EMBALAJE):
+        return ""
+    if not nombre_base:
+        return ""
+    a = normalizar_texto(nombre)
+    b = normalizar_texto(nombre_base)
+    if not a or not b:
+        return ""
+    if difflib.SequenceMatcher(None, a, b).ratio() < SIMILITUD_MINIMA_DERIVADO:
+        return ""
+    return sku[:-1]
 
 
 def codigo_linea_crayola(sku: str) -> str:
@@ -257,6 +352,7 @@ LINEA_NOMBRE_A_CODIGO = {
     "MASCOTAS": "MA",
     "MANUALIDADES": "CE",
     "SET": "CF",
+    "JUGUETES": "CG",
     "ACCESORIOS DEPORTIVOS": "AD",
     "PRODUCTOS INDUSTRIALES": "20",
     "REPRESENTACIONES INDUSTRIALES": "21",
@@ -326,6 +422,11 @@ LINEA_A_CATEGORIA: dict[str, str] = {
 # Lineas que NO son productos de venta
 LINEAS_EXCLUIR = {"PRODUCTOS EN PROCESO", "PRODUCTOS EN PROCESO CIPTECH"}
 
+# Los mismos procesos por CODIGO: el reporte S1 trae "0171 - PRODUCTOS EN
+# PROCESO CIPTECH", no el nombre. Un SKU de proceso nunca se publica aunque
+# tenga stock (es materia prima, no producto vendible).
+LINEAS_PROCESO_CODIGOS = {"70", "71"}
+
 
 def generar_nombre_corto(nombre):
     """Elimina prefijos y marcas del nombre para generar versión corta."""
@@ -392,25 +493,40 @@ def motivo_exclusion(
     en_bx,
     tiene_stock=False,
     force_incluir=False,
+    tiene_compromiso=False,
 ):
     """Motivo por el que un SKU del ERP queda FUERA del catálogo (None si entra).
 
     Única fuente de las reglas de inclusión: `decidir_inclusion` la usa y el
     generador la usa para auditar cuántas filas se quedaron afuera y por qué.
+
+    La regla completa (v3.6.0):
+
+        entra  <=>  en guía ∨ stock > 0 ∨ compromiso > 0
+                    ∨ (vigente ∧ precio > 0)
+
+    El precio ya NO decide la presencia: decide la COTIZABILIDAD. Un SKU con
+    stock o compromiso sin precio entra marcado `por_activar` (hay producto
+    físico y hay que activarlo); el flag `cotizable` lo deja fuera de toda
+    cotización hasta que tenga precio.
     """
     if flg_inactivo:
         return "inactivo"
-    # El precio es un filtro ABSOLUTO: sin precio no se publica, ni siquiera
-    # un Crayola (force_incluir solo salta la regla de descontinuado/BX).
-    if precio <= 0:
-        return "sin_precio"
-    if force_incluir:
-        return None
     if linea in LINEAS_EXCLUIR:
         return "linea_proceso"
-    if flg_discont and not en_bx and not tiene_stock:
-        return "descontinuado_sin_bx_ni_stock"
-    return None
+    if force_incluir:
+        return None
+    if en_bx:
+        return None
+    if tiene_stock:
+        return None
+    if tiene_compromiso:
+        return None
+    if not flg_discont and precio > 0:
+        return None
+    if flg_discont:
+        return "descontinuado_sin_guia_ni_stock"
+    return "sin_precio_ni_movimiento"
 
 
 def decidir_inclusion(
@@ -421,15 +537,14 @@ def decidir_inclusion(
     en_bx,
     tiene_stock=False,
     force_incluir=False,
+    tiene_compromiso=False,
 ):
     """Decide si un SKU del ERP entra al catálogo.
 
-    SKU_BX es la guía primaria de lo que se vende. Además, un SKU que tiene
-    STOCK FÍSICO en el almacén entra igual: hay despacho que hacer y sin
-    catálogo no se conoce su peso, EAN ni caja (peso/EAN viven en el catálogo).
-
-    Un descontinuado entra si está curado en SKU_BX **o** si tiene stock
-    (queda marcado con descontinuado=true para que se negocie).
+    Entra si está en la guía (SKU_BX), si tiene stock o compromiso (hay
+    despacho/venta que atender) o si está vigente y tiene precio (se puede
+    cotizar hoy). Un descontinuado entra si está en la guía o tiene
+    movimiento, y queda marcado con descontinuado=true para que se negocie.
 
     Retorna (incluir, descontinuado).
     """
@@ -441,6 +556,7 @@ def decidir_inclusion(
         en_bx,
         tiene_stock,
         force_incluir,
+        tiene_compromiso,
     ):
         return False, False
     return True, bool(flg_discont)
@@ -462,23 +578,27 @@ def _extraer_codigo_linea(linea):
     return ""
 
 
-def leer_erp(ruta, bx_skus=None, stock_skus=None):
-    """Lee PRODUCTOS.xls y retorna (productos, errores, erp_skus, exclusiones).
+def leer_erp(ruta, bx_skus=None, stock_skus=None, compromiso_skus=None):
+    """Lee PRODUCTOS.xls y retorna (productos, errores, erp_skus, exclusiones, erp_todos).
 
-    bx_skus:    SKUs curados en SKU_BX (guía primaria de lo que se vende).
-    stock_skus: SKUs que tienen stock fisico (API de stock). Entran al
-                catalogo aunque no esten en SKU_BX: sin catalogo no se conoce
-                su peso/EAN/caja y hay despacho que hacer.
-    exclusiones: dict {motivo: n} con cuántas filas del ERP quedaron fuera y
-                por qué. Sin esto no se puede auditar por qué el catálogo tiene
-                N SKUs y no otros.
+    bx_skus:          SKUs curados en SKU_BX (guía de lo que se vende).
+    stock_skus:       SKUs con stock físico (reporte S1).
+    compromiso_skus:  SKUs con predespacho/compromiso (reporte S1).
+    exclusiones:      dict {motivo: n} con cuántas filas del ERP quedaron
+                      fuera y por qué. Sin esto no se puede auditar por qué
+                      el catálogo tiene N SKUs y no otros.
+    erp_todos:        TODAS las filas válidas del ERP (aunque queden fuera),
+                      para poder enlazar derivados (método D) y decidir
+                      `por_activar` sin releer el archivo.
     """
     productos = []
     errores = []
     skus_vistos = {}
     erp_skus = set()
+    erp_todos: dict[str, dict] = {}
     bx_skus = bx_skus or set()
     stock_skus = stock_skus or set()
+    compromiso_skus = compromiso_skus or set()
     lineas_desconocidas = set()
     exclusiones: dict[str, int] = {}
     try:
@@ -507,9 +627,19 @@ def leer_erp(ruta, bx_skus=None, stock_skus=None):
                 continue
             skus_vistos[sku] = r
             erp_skus.add(sku)
+            erp_todos[sku] = {
+                "sku": sku,
+                "nombre": nombre,
+                "linea": linea.upper(),
+                "grupo": grupo,
+                "precio": precio,
+                "inactivo": flg_inactivo,
+                "descontinuado": flg_discont,
+            }
 
-            # C* (Crayola) entra sin importar BX/stock (es representada y hay
-            # que llevarla), pero el precio sigue siendo filtro absoluto.
+            # C* (Crayola) entra sin importar guía/stock: es representada y
+            # hay que llevarla. El precio ya no excluye (v3.6.0): sin precio
+            # queda `por_activar` / no cotizable, pero presente.
             force_crayola = sku.upper().startswith("C")
             motivo = motivo_exclusion(
                 flg_inactivo,
@@ -519,6 +649,7 @@ def leer_erp(ruta, bx_skus=None, stock_skus=None):
                 sku in bx_skus,
                 sku in stock_skus,
                 force_incluir=force_crayola,
+                tiene_compromiso=sku in compromiso_skus,
             )
             if motivo:
                 exclusiones[motivo] = exclusiones.get(motivo, 0) + 1
@@ -526,7 +657,7 @@ def leer_erp(ruta, bx_skus=None, stock_skus=None):
             descontinuado = bool(flg_discont)
 
             linea_upper = linea.upper()
-            # C* usan su prefijo como linea propia (CA, CB, CC, CD, CE, CF)
+            # C* usan su prefijo como linea propia (CA, CB, CC, CD, CE, CF, CG)
             # para que cada sub-marca Crayola sea identificable.
             codigo = codigo_linea_crayola(sku) if force_crayola else ""
             if not codigo:
@@ -557,6 +688,8 @@ def leer_erp(ruta, bx_skus=None, stock_skus=None):
                     "precio": round(precio, 2),
                     "descontinuado": descontinuado,
                     "linea_codigo": codigo,
+                    "um": "",
+                    "origen": "erp",
                 }
             )
         wb.release_resources()
@@ -568,7 +701,136 @@ def leer_erp(ruta, bx_skus=None, stock_skus=None):
         print(f"  ERP: {len(productos)} productos válidos")
     except Exception as e:
         errores.append(str(e))
-    return productos, errores, erp_skus, exclusiones
+    return productos, errores, erp_skus, exclusiones, erp_todos
+
+
+def productos_desde_universo(universo, productos_incluidos, erp_todos):
+    """Ficha mínima desde el reporte S1 para SKUs con movimiento que no estaban.
+
+    Un SKU que llega con stock (o compromiso) y no existe en el ERP no se
+    puede cotizar, pero hay que poder verlo, buscarlo y despacharlo: se arma
+    su ficha con lo que el reporte S1 ya trae (nombre, línea con código,
+    grupo, tipo, familia, UM) y queda marcado `por_activar`. Es el caso
+    "SKU no registrado que llega con stock": hoy sale como `sin_catalogo`
+    (precio 0, caja 1); con esto queda con línea y familia.
+    """
+    ya_incluidos = {p["sku"] for p in productos_incluidos}
+    nuevos = []
+    for sku, datos in sorted(universo.items()):
+        if sku in ya_incluidos:
+            continue
+        if sku in erp_todos:
+            # Existe en el ERP pero quedó fuera por regla (línea de proceso
+            # o inactivo). Las líneas de proceso nunca se publican.
+            linea_erp = erp_todos[sku].get("linea", "")
+            if linea_erp in LINEAS_EXCLUIR:
+                continue
+        linea_raw = str(datos.get("linea") or "").strip().upper()
+        if _extraer_codigo_linea(linea_raw) in LINEAS_PROCESO_CODIGOS:
+            continue
+        nombre = str(datos.get("descripcion") or "").strip()
+        if not nombre:
+            continue
+        linea_raw = str(datos.get("linea") or "").strip().upper()
+        # Misma regla que el ERP: un C* toma su sub-marca Crayola como línea
+        # (CA/CB/CC/CD/CE/CF/CG), no la línea genérica donde lo reporta S1.
+        codigo = codigo_linea_crayola(sku) if sku.upper().startswith("C") else ""
+        if not codigo:
+            codigo = _extraer_codigo_linea(linea_raw)
+        if not codigo:
+            codigo = _extraer_codigo_linea(
+                str(erp_todos.get(sku, {}).get("linea", "")) or linea_raw
+            )
+        linea_nombre = normalizar_texto(nombre_sin_codigo(linea_raw)) or linea_raw
+        categoria = categoria_de_producto(sku, codigo) if codigo else CATEGORIA_DEFAULT
+        nuevos.append(
+            {
+                "sku": sku,
+                "nombre": nombre,
+                "ean13": "",
+                "ean14": "",
+                "peso_kg": 0.0,
+                "linea": codigo or linea_nombre,
+                "linea_nombre": linea_nombre,
+                "grupo": nombre_sin_codigo(datos.get("grupo", "")),
+                "tipo": nombre_sin_codigo(datos.get("tipo", "")),
+                "familia": nombre_sin_codigo(datos.get("familia", "")),
+                "categoria": categoria,
+                # Sin precio en ninguna fuente: se publica sin cotizar.
+                "precio": 0.0,
+                "descontinuado": bool(
+                    erp_todos.get(sku, {}).get("descontinuado", False)
+                ),
+                "linea_codigo": codigo,
+                "um": str(datos.get("um") or "").strip().upper(),
+                "origen": "s1",
+            }
+        )
+    return nuevos
+
+
+def aplicar_derivados(productos, nombres_por_sku, erp_todos=None):
+    """Enlaza los SKUs por método D con su base (v3.6.0).
+
+    `03077D` es `03077` sin embalaje: MISMO precio, peso y almacén pero
+    STOCK DISTINTO (traslado/refacción). Se hereda la ficha comercial
+    (precio, peso, caja, EAN, línea, categoría) y se documenta el vínculo
+    en `derivado_de`. NUNCA se fusiona el stock: cada SKU sigue contando
+    con sus unidades.
+
+    La base puede estar fuera del catálogo (descontinuada, sin precio, sin
+    movimiento) y aun así define la línea/categoría del derivado: para eso
+    se consulta `erp_todos`, que trae todas las filas del ERP.
+    """
+    erp_todos = erp_todos or {}
+    por_sku = {p["sku"]: p for p in productos}
+    derivados = 0
+    for p in productos:
+        # La similitud se mide contra el nombre de la BASE, no contra el del
+        # propio SKU: si no, todo SKU con D y linea 98 "coincide" consigo
+        # mismo (ratio 1.0) y el filtro de nombre no filtra nada.
+        sku = str(p.get("sku", "")).strip().upper()
+        nombre_base = nombres_por_sku.get(sku[:-1], "") if sku.endswith("D") else ""
+        base = sku_base_derivado(
+            p["sku"],
+            p.get("nombre", ""),
+            p.get("linea_codigo", ""),
+            nombre_base,
+        )
+        if not base:
+            continue
+        if base in por_sku:
+            padre = por_sku[base]
+            p["derivado_de"] = base
+            # La línea/categoría de la base manda: el "D" es el mismo producto
+            # en otra presentación, no una línea "sin embalaje" que nadie vende.
+            p["linea_codigo"] = padre["linea_codigo"]
+            p["linea"] = padre["linea"]
+            p["linea_nombre"] = padre.get("linea_nombre", "")
+            p["categoria"] = padre["categoria"]
+            p["precio"] = p["precio"] or padre.get("precio", 0.0)
+            p["peso_kg"] = p["peso_kg"] or padre.get("peso_kg", 0.0)
+            p["ean13"] = p["ean13"] or padre.get("ean13", "")
+            p["ean14"] = p["ean14"] or padre.get("ean14", "")
+            derivados += 1
+            continue
+        fila = erp_todos.get(base)
+        if not fila:
+            continue
+        # Base no publicada: se hereda igual la línea/categoría comercial.
+        codigo = codigo_linea_crayola(base) or resolver_codigo_linea_grupo(
+            fila.get("linea", ""), fila.get("grupo", "")
+        )
+        if not codigo:
+            continue
+        p["derivado_de"] = base
+        p["linea_codigo"] = codigo
+        p["linea"] = codigo
+        p["linea_nombre"] = fila.get("linea", "") or codigo
+        p["categoria"] = categoria_de_producto(base, codigo)
+        p["precio"] = p["precio"] or float(fila.get("precio") or 0.0)
+        derivados += 1
+    return derivados
 
 
 def leer_unbx(ruta):
@@ -615,8 +877,15 @@ def generar_output(
     exclusiones=None,
     universo_stock=None,
     taxonomia_extra=None,
+    universo=None,
 ):
-    """Genera el JSON de catálogo completo."""
+    """Genera el JSON de catálogo completo.
+
+    `universo` es el detalle del reporte S1 {sku: {stock, predespacho, ...}}:
+    con él se publican los flags de negocio (compromiso, cotizable,
+    por_activar) y el snapshot de stock que justificó cada inclusión.
+    """
+    universo = universo or {}
     estadisticas = {
         "sin_ean13": 0,
         "con_ean14": 0,
@@ -624,7 +893,14 @@ def generar_output(
         "con_unbx": 0,
         "descontinuados": 0,
         "sin_linea_codigo": 0,
+        "en_guia": 0,
+        "con_compromiso": 0,
+        "por_activar": 0,
+        "cotizables": 0,
+        "derivados": 0,
+        "solo_s1": 0,
         "por_categoria": {},
+        "por_categoria_venta": {},
         "por_linea": {},
         "por_estado_linea": {},
     }
@@ -659,6 +935,39 @@ def generar_output(
                 estadisticas["por_estado_linea"].get(est, 0) + 1
             )
 
+        # ── Flags de negocio (v3.6.0) ─────────────────────────────────
+        mov = universo.get(p["sku"], {})
+        stock_snap = int(mov.get("stock") or 0)
+        predespacho_snap = int(mov.get("predespacho") or 0)
+        precio = float(p.get("precio") or 0.0)
+        origen = p.get("origen", "erp")
+        en_guia = p["sku"] in orden_map
+        compromiso = predespacho_snap > 0
+        vigente = not bool(p.get("descontinuado"))
+        # `por_activar` = está en el catálogo pero todavía NO se puede
+        # cotizar: no tiene precio (ni en el ERP ni heredado de su base).
+        # El origen ('erp'/'s1') ya queda en su propio campo.
+        cotizable = precio > 0
+        por_activar = not cotizable
+        derivado_de = p.get("derivado_de", "")
+        cat_venta = categoria_venta(cat)
+
+        if en_guia:
+            estadisticas["en_guia"] += 1
+        if compromiso:
+            estadisticas["con_compromiso"] += 1
+        if por_activar:
+            estadisticas["por_activar"] += 1
+        if cotizable:
+            estadisticas["cotizables"] += 1
+        if derivado_de:
+            estadisticas["derivados"] += 1
+        if origen == "s1":
+            estadisticas["solo_s1"] += 1
+        estadisticas["por_categoria_venta"][cat_venta] = (
+            estadisticas["por_categoria_venta"].get(cat_venta, 0) + 1
+        )
+
         productos_final.append(
             {
                 "sku": p["sku"],
@@ -667,19 +976,33 @@ def generar_output(
                 "ean13": p["ean13"],
                 "ean14": p["ean14"],
                 "categoria": p["categoria"],
+                "categoria_venta": cat_venta,
                 # linea = CODIGO canonico | linea_nombre = nombre legible
                 "linea": p["linea"],
                 "linea_nombre": p.get("linea_nombre", ""),
                 "grupo": p["grupo"],
                 "tipo": p["tipo"],
                 "familia": p["familia"],
+                "um": p.get("um", ""),
                 "un_bx": un_bx,
                 "orden": orden_map.get(p["sku"], 0),
                 "estado_linea": est,
                 "peso_kg": p["peso_kg"],
-                "precio": p["precio"],
-                "descontinuado": p.get("descontinuado", False),
+                "precio": precio,
+                "descontinuado": bool(p.get("descontinuado", False)),
                 "linea_codigo": p.get("linea_codigo", ""),
+                # Flags de negocio: explican POR QUE el SKU está publicado.
+                "en_guia": en_guia,
+                "compromiso": compromiso,
+                "cotizable": cotizable,
+                "vigente": vigente,
+                "por_activar": por_activar,
+                "derivado_de": derivado_de,
+                "origen": origen,
+                # Snapshot del reporte S1 que justificó la inclusión (el
+                # stock vivo lo sirve /api/v1/stock, esto es solo trazabilidad).
+                "stock_snapshot": stock_snap,
+                "predespacho_snapshot": predespacho_snap,
                 "keywords": generar_keywords(
                     p["nombre"],
                     # El nombre de la linea (no el codigo) es lo que la gente
@@ -696,6 +1019,31 @@ def generar_output(
         key=lambda x: (x.get("orden", 0) == 0, x.get("orden", 0) or 0, x["sku"])
     )
 
+    # ── Invariante de cobertura ──────────────────────────────────────────
+    # TODO SKU con stock o compromiso tiene que estar en el catálogo (salvo
+    # líneas de proceso, que no son vendibles). Se publica la lista y los
+    # faltantes para que el validador y el consumidor puedan auditarlo sin
+    # volver a leer el reporte S1.
+    incluidos = {p["sku"] for p in productos_final}
+    universo_skus = []
+    faltantes = []
+    for sku in sorted(universo):
+        datos = universo.get(sku, {})
+        if (datos.get("stock") or 0) <= 0 and (datos.get("predespacho") or 0) <= 0:
+            continue
+        linea = _extraer_codigo_linea(datos.get("linea", ""))
+        if linea in LINEAS_PROCESO_CODIGOS:
+            continue
+        universo_skus.append(sku)
+        if sku not in incluidos:
+            faltantes.append(sku)
+    if faltantes:
+        print(
+            f"  ALERTA: {len(faltantes)} SKUs con stock/compromiso quedaron "
+            f"FUERA del catalogo: {', '.join(faltantes[:10])}"
+            f"{'...' if len(faltantes) > 10 else ''}"
+        )
+
     # Taxonomia publicada: los consumidores la leen de aca en vez de
     # mantener su propia copia (que terminaba contradiciendose).
     # `taxonomia_extra` son las sub-marcas Crayola nuevas detectadas: se
@@ -709,9 +1057,18 @@ def generar_output(
         "generated_at": datetime.now().isoformat(),
         "source_erp": "PRODUCTOS.xls",
         "source_un_bx": "SKU_BX.xlsx",
+        "source_stock": "reporte S1 (stock + predespacho)",
         "total_productos": len(productos_final),
         "estadisticas": estadisticas,
         "categorias_por_linea": taxonomia_publicada,
+        # Semaforo de venta: las 3 categorias de negocio + revision.
+        "categorias_venta": list(CATEGORIAS_VENTA),
+        "categoria_venta_revision": CATEGORIA_VENTA_REVISION,
+        # Regla de inclusion publicada: el consumidor puede explicar por que
+        # un SKU esta en el catalogo sin leer el codigo del generador.
+        "regla_inclusion": (
+            "en guia ∨ stock > 0 ∨ compromiso > 0 ∨ (vigente ∧ precio > 0)"
+        ),
         "lineas_nombre_a_codigo": dict(LINEA_NOMBRE_A_CODIGO),
         # Desambiguacion por GRUPO: "ACCESORIOS" designa a mas de una linea
         # en el ERP; el grupo desempata. Serializado como "LINEA|GRUPO".
@@ -723,6 +1080,11 @@ def generar_output(
         # explicar por que el catalogo tiene N SKUs.
         "exclusiones": dict(exclusiones or {}),
         "universo_stock": dict(universo_stock or {"incluido": False}),
+        # Invariante publicado: la lista del universo que justificó el
+        # catálogo y lo que quedó afuera (debe ser []). Con esto el
+        # validador detecta una cobertura rota sin releer el reporte S1.
+        "universo_skus": universo_skus,
+        "cobertura_faltante": faltantes,
     }
 
     output = {"metadata": metadata, "productos": productos_final}
@@ -762,23 +1124,47 @@ def generar_output(
     return output
 
 
-def leer_universo_stock(api_url=None, api_key=None, timeout=120, intentos=3):
-    """SKUs con stock fisico segun el API de stock (opcional).
+def leer_universo_stock(
+    api_url=None, api_key=None, timeout=120, intentos=3, cache_local=None
+):
+    """Universo de stock: {sku: detalle} segun el API o el cache local del S1.
 
-    Sirve para que entren al catalogo los SKU que tienen despacho pendiente
-    aunque no esten en la guia SKU_BX: sin catalogo no se conoce su peso,
-    EAN ni caja, y hay carga que hacer.
+    Devuelve (universo, error). `universo` es un dict:
 
-    Config: G360_STOCK_URL / G360_STOCK_API_KEY (o --stock-url / --stock-key).
-    La clave de lectura cae a API_KEY: el API acepta la clave administrativa
-    para leer stock, asi que una sola variable alcanza para todo el flujo.
-    Sin clave no se consulta: se sigue con el criterio de SKU_BX.
+        {sku: {"stock": int, "predespacho": int, "descripcion": str,
+               "um": str, "linea": str, "grupo": str, "tipo": str,
+               "familia": str}}
 
-    Reintenta: el endpoint /stock es pesado y en Render free-tier puede
-    dar 504 por cold start. Un fallo puntual NO debe dejar el catalogo
-    incompleto en silencio (eso costaba 212 SKUs).
+    Sirve para que entren al catalogo los SKU con stock o compromiso aunque
+    no esten en la guia SKU_BX ni en el ERP: sin catalogo no se conoce su
+    peso, EAN ni caja, y ademas hay despacho/venta que atender.
+
+    Orden de lectura:
+      1. `cache_local` (--s1-cache / G360_S1_CACHE): el JSON del reporte S1
+         que el API de stock guarda en data/stock_cache.json. Es la via
+         offline (el ERP y el KARDEX tambien son exports manuales).
+      2. API: endpoint compacto /api/v1/stock/skus (v3.6.0) y, si el API
+         desplegado todavia no lo tiene, /api/v1/stock como respaldo.
+      3. Si el API falla, se intenta el cache local del repo hermano.
+
+    Reintenta: /stock es pesado y en Render free-tier da 504 por cold start.
+    Un fallo puntual NO debe dejar el catalogo incompleto en silencio.
     """
     import time
+
+    def _desde_cache(ruta):
+        with open(ruta, encoding="utf-8") as f:
+            data = json.load(f)
+        return _agregar_universo(data.get("datos", {}), origen=f"cache {ruta}")
+
+    if cache_local:
+        ruta = Path(cache_local)
+        if not ruta.exists():
+            return {}, f"cache S1 no existe: {ruta}"
+        try:
+            return _desde_cache(ruta), ""
+        except (OSError, json.JSONDecodeError) as e:
+            return {}, f"cache S1 ilegible: {e}"
 
     url = api_url or os.environ.get("G360_STOCK_URL", "") or URL_STOCK_DEFAULT
     key = (
@@ -787,33 +1173,65 @@ def leer_universo_stock(api_url=None, api_key=None, timeout=120, intentos=3):
         or os.environ.get("API_KEY", "")
     )
     if not url:
-        return set(), "sin URL configurada"
+        return {}, "sin URL configurada"
     if not key:
-        return set(), "sin G360_STOCK_API_KEY ni API_KEY"
+        return {}, "sin G360_STOCK_API_KEY ni API_KEY"
     try:
         import requests
     except ImportError:
-        return set(), "falta requests (pip install requests)"
+        return {}, "falta requests (pip install requests)"
 
     ultimo_error = ""
     for intento in range(1, intentos + 1):
         try:
             r = requests.get(
-                f"{url.rstrip('/')}/api/v1/stock",
+                f"{url.rstrip('/')}/api/v1/stock/skus",
                 params={"fuente": "todas"},
                 headers={"x-api-key": key, "Accept": "application/json"},
                 timeout=timeout,
             )
+            if r.status_code == 404:
+                # API desplegado sin el endpoint compacto: usar el pesado.
+                r = requests.get(
+                    f"{url.rstrip('/')}/api/v1/stock",
+                    params={"fuente": "todas"},
+                    headers={"x-api-key": key, "Accept": "application/json"},
+                    timeout=timeout,
+                )
             r.raise_for_status()
             items = r.json().get("items", [])
-            return (
-                {
-                    str(i.get("sku", "")).strip()
-                    for i in items
-                    if str(i.get("sku", "")).strip()
-                },
-                "",
-            )
+            universo: dict[str, dict] = {}
+            for i in items:
+                sku = str(i.get("sku", "")).strip()
+                if not sku:
+                    continue
+                d = universo.setdefault(
+                    sku,
+                    {
+                        "stock": 0,
+                        "predespacho": 0,
+                        "descripcion": "",
+                        "um": "",
+                        "linea": "",
+                        "grupo": "",
+                        "tipo": "",
+                        "familia": "",
+                    },
+                )
+                # El endpoint compacto trae los totales; /stock trae el
+                # desglose por almacen.
+                if "almacenes" in i:
+                    d["stock"] += sum(int(a.get("stock") or 0) for a in i["almacenes"])
+                    d["predespacho"] += sum(
+                        int(a.get("predespacho") or 0) for a in i["almacenes"]
+                    )
+                else:
+                    d["stock"] += int(i.get("stock") or 0)
+                    d["predespacho"] += int(i.get("predespacho") or 0)
+                for campo in ("descripcion", "um", "linea", "grupo", "tipo", "familia"):
+                    if not d[campo] and i.get(campo):
+                        d[campo] = str(i[campo]).strip()
+            return universo, ""
         except Exception as e:  # noqa: BLE001
             ultimo_error = str(e)
             if intento < intentos:
@@ -822,7 +1240,62 @@ def leer_universo_stock(api_url=None, api_key=None, timeout=120, intentos=3):
                     f"reintentando en {intento * 5}s"
                 )
                 time.sleep(intento * 5)
-    return set(), ultimo_error
+
+    # Ultimo recurso: el cache local del repo hermano (si existe).
+    hermano = (
+        Path(__file__).resolve().parent.parent.parent
+        / "g360-stock-api"
+        / "data"
+        / "stock_cache.json"
+    )
+    if hermano.exists():
+        try:
+            universo = _desde_cache(hermano)
+            print(
+                f"  WARN: API de stock no respondio ({ultimo_error}). "
+                f"Se uso el cache local {hermano}."
+            )
+            return universo, f"API no disponible ({ultimo_error}); cache local usado"
+        except (OSError, json.JSONDecodeError):
+            pass
+    return {}, ultimo_error
+
+
+def _agregar_universo(datos, origen=""):
+    """Consolida el reporte S1 (dict almacen -> sku -> item) por SKU.
+
+    `datos` es el formato del cache del API de stock:
+    {"121": {"79103": {"stock": ..., "predespacho": ..., "descripcion": ...}}}.
+    El stock y el predespacho se suman entre almacenes; la ficha se toma del
+    primer almacen que la traiga (es la misma en todos).
+    """
+    universo: dict[str, dict] = {}
+    for _almacen, prods in (datos or {}).items():
+        for sku, item in (prods or {}).items():
+            sku = str(sku or "").strip()
+            if not sku:
+                continue
+            d = universo.setdefault(
+                sku,
+                {
+                    "stock": 0,
+                    "predespacho": 0,
+                    "descripcion": "",
+                    "um": "",
+                    "linea": "",
+                    "grupo": "",
+                    "tipo": "",
+                    "familia": "",
+                },
+            )
+            d["stock"] += int(item.get("stock") or 0)
+            d["predespacho"] += int(item.get("predespacho") or 0)
+            for campo in ("descripcion", "um", "linea", "grupo", "tipo", "familia"):
+                if not d[campo] and item.get(campo):
+                    d[campo] = str(item[campo]).strip()
+    if origen:
+        print(f"  Universo de stock: {len(universo)} SKUs ({origen})")
+    return universo
 
 
 def main():
@@ -846,6 +1319,14 @@ def main():
         help="Clave de lectura del API de stock (G360_STOCK_API_KEY)",
     )
     ap.add_argument(
+        "--s1-cache",
+        default=os.environ.get("G360_S1_CACHE", ""),
+        help=(
+            "JSON del reporte S1 (data/stock_cache.json del API de stock). "
+            "Via offline: no consulta el API. Tambien G360_S1_CACHE."
+        ),
+    )
+    ap.add_argument(
         "--sin-universo-stock",
         action="store_true",
         help="No consultar el API: solo se incluye lo que esta en SKU_BX",
@@ -858,22 +1339,26 @@ def main():
     print(f"ERP:      {a.erp}")
     print(f"SKU_BX:   {a.unbx}")
     print(f"Output:   {a.output}")
+    if a.s1_cache:
+        print(f"S1 cache: {a.s1_cache}")
     print()
 
-    # Leer fuentes (BX primero: es la guía primaria de inclusión)
+    # Leer fuentes (BX primero: es la guía de lo que se vende)
     print("Leyendo fuentes...")
     orden_map, unbx_map, estado_map = leer_unbx(a.unbx)
 
-    # Universo con stock fisico: los SKU con despacho pendiente tambien
-    # necesitan catalogo (peso/EAN/caja para despachar).
-    stock_skus = set()
+    # Universo de stock + compromiso: los SKU con despacho o venta pendiente
+    # tambien necesitan catalogo (peso/EAN/caja para despachar).
+    universo: dict[str, dict] = {}
     universo_stock = {"incluido": False, "skus": 0, "error": ""}
     if a.sin_universo_stock:
         print("  Universo de stock: omitido (--sin-universo-stock)")
         universo_stock["error"] = "omitido por --sin-universo-stock"
     else:
-        stock_skus, err = leer_universo_stock(a.stock_url, a.stock_key)
-        if err:
+        universo, err = leer_universo_stock(
+            a.stock_url, a.stock_key, cache_local=a.s1_cache
+        )
+        if err and not universo:
             print(f"  Universo de stock: no disponible ({err}) -> solo SKU_BX")
             print(
                 "  WARN: el catalogo va a quedar INCOMPLETO: los SKUs con stock "
@@ -881,18 +1366,46 @@ def main():
             )
             universo_stock["error"] = err
         else:
-            print(f"  Universo de stock: {len(stock_skus)} SKUs con stock fisico")
+            con_stock = sum(1 for d in universo.values() if d["stock"] > 0)
+            con_compromiso = sum(1 for d in universo.values() if d["predespacho"] > 0)
+            print(
+                f"  Universo de stock: {len(universo)} SKUs "
+                f"({con_stock} con stock, {con_compromiso} con compromiso)"
+            )
             universo_stock = {
                 "incluido": True,
-                "skus": len(stock_skus),
-                "error": "",
+                "skus": len(universo),
+                "con_stock": con_stock,
+                "con_compromiso": con_compromiso,
+                "error": err,
             }
 
-    productos, errs, erp_skus, exclusiones = leer_erp(
-        a.erp, bx_skus=set(orden_map), stock_skus=stock_skus
+    stock_skus = {s for s, d in universo.items() if d["stock"] > 0}
+    compromiso_skus = {s for s, d in universo.items() if d["predespacho"] > 0}
+
+    productos, errs, erp_skus, exclusiones, erp_todos = leer_erp(
+        a.erp,
+        bx_skus=set(orden_map),
+        stock_skus=stock_skus,
+        compromiso_skus=compromiso_skus,
     )
     if errs:
         print(f"Errores: {errs}")
+
+    # Ficha mínima desde el reporte S1 para los SKU con movimiento que no
+    # entraron por el ERP (no existen o están en línea de proceso).
+    desde_s1 = productos_desde_universo(universo, productos, erp_todos)
+    if desde_s1:
+        print(f"  Ficha mínima desde S1: {len(desde_s1)} SKUs con movimiento")
+        productos.extend(desde_s1)
+
+    # Método D: `03077D` es `03077` sin embalaje -> mismo precio/peso, stock
+    # PROPIO. Se enlaza, nunca se fusiona.
+    nombres_por_sku = {sku: d.get("nombre", "") for sku, d in erp_todos.items()}
+    nombres_por_sku.update({p["sku"]: p["nombre"] for p in productos})
+    derivados = aplicar_derivados(productos, nombres_por_sku, erp_todos)
+    if derivados:
+        print(f"  Derivados (método D): {derivados} SKUs enlazados a su base")
 
     huerfanos = sorted(set(orden_map) - erp_skus)
     if huerfanos:
@@ -943,6 +1456,7 @@ def main():
         exclusiones=exclusiones,
         universo_stock=universo_stock,
         taxonomia_extra=crayolas_nuevas,
+        universo=universo,
     )
 
     print(f"\n{'=' * 50}")
@@ -957,6 +1471,12 @@ def main():
     print(f"  Sin un_bx:  {est['sin_unbx']}")
     print(f"  Descontinuados:           {est['descontinuados']}")
     print(f"  Sin linea_codigo:          {est['sin_linea_codigo']}")
+    print(f"  En guia (SKU_BX):          {est['en_guia']}")
+    print(f"  Con compromiso:            {est['con_compromiso']}")
+    print(f"  Cotizables:                {est['cotizables']}")
+    print(f"  Por activar:               {est['por_activar']}")
+    print(f"  Derivados (metodo D):      {est['derivados']}")
+    print(f"  Solo S1 (sin ERP):         {est['solo_s1']}")
     uni = meta.get("universo_stock", {})
     print(
         f"  Universo de stock:         "
@@ -964,6 +1484,9 @@ def main():
     )
     print(f"\nCategorías:")
     for cat, cnt in sorted(est["por_categoria"].items(), key=lambda x: -x[1]):
+        print(f"  {cat}: {cnt}")
+    print(f"\nSemáforo de venta:")
+    for cat, cnt in sorted(est["por_categoria_venta"].items(), key=lambda x: -x[1]):
         print(f"  {cat}: {cnt}")
     print(f"\nListo!")
 

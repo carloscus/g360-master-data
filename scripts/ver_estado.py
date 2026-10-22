@@ -28,14 +28,38 @@ print(f"  Sin un_bx (1):    {e['sin_unbx']}")
 print(f"  Descontinuados:   {e['descontinuados']}")
 print(f"  Sin linea_codigo: {e['sin_linea_codigo']}")
 print()
-print("Universo de stock (SKUs con despacho pendiente):")
+print("Universo de stock (SKUs con stock o compromiso):")
 if uni.get("incluido"):
     print(f"  Incluido: {uni.get('skus', 0)} SKUs")
+    print(
+        f"  Con stock: {uni.get('con_stock', '?')} | Con compromiso: {uni.get('con_compromiso', '?')}"
+    )
+    faltantes = m.get("cobertura_faltante") or []
+    if faltantes:
+        print(
+            f"  ALERTA: {len(faltantes)} SKUs con movimiento fuera del catalogo: {faltantes[:10]}"
+        )
+    else:
+        print("  Cobertura: completa (0 SKUs con movimiento fuera)")
 else:
     print(f"  NO INCLUIDO: {uni.get('error') or 'sin consultar'}")
     print("  -> el catalogo esta incompleto: faltan los SKUs con stock")
     print("     que no estan en SKU_BX. Define API_KEY y vuelve a generar.")
 print()
+if "cotizables" in e:
+    print("Flags de venta:")
+    print(f"  Cotizables:       {e['cotizables']}")
+    print(f"  Por activar:      {e['por_activar']}")
+    print(f"  En guia:          {e['en_guia']}")
+    print(f"  Con compromiso:   {e['con_compromiso']}")
+    print(f"  Derivados (D):    {e['derivados']}")
+    print(f"  Solo S1:          {e['solo_s1']}")
+    print()
+if e.get("por_categoria_venta"):
+    print("Semaforo de venta:")
+    for cat, cnt in sorted(e["por_categoria_venta"].items(), key=lambda x: -x[1]):
+        print(f"  {cat}: {cnt}")
+    print()
 print("Categorias:")
 for cat, cnt in sorted(e["por_categoria"].items(), key=lambda x: -x[1]):
     print(f"  {cat}: {cnt}")

@@ -72,20 +72,22 @@ class TestProcesosNuevos:
         assert codigo_linea_crayola("CG990") == "CG"
 
     def test_sub_marca_crayola_nueva_se_declara_sola(self):
-        """Una sub-marca nueva (CG) se publica como REPRESENTADAS.
+        """Una sub-marca nueva (CH) se publica como REPRESENTADAS.
 
         Si no se declarara, el consumidor que resuelva linea -> categoria la
         dejaria en el default (OTROS) y el SKU quedaria con linea y
         categoria incoherentes.
         """
         productos = [
+            {"sku": "CH990", "linea": "CH"},
             {"sku": "CG990", "linea": "CG"},
             {"sku": "CA001", "linea": "CA"},
             {"sku": "X001", "linea": "78"},
         ]
         nuevos = taxonomias_crayola_nuevas(productos)
-        assert nuevos == {"CG": "REPRESENTADAS"}
-        # Las sub-marcas ya conocidas no se redeclaran.
+        assert nuevos == {"CH": "REPRESENTADAS"}
+        # Las sub-marcas ya conocidas (CA..CG) no se redeclaran.
+        assert "CG" not in nuevos
         assert "CA" not in nuevos
 
     def test_categoria_de_crayola_no_depende_de_la_linea(self):
@@ -99,13 +101,18 @@ class TestProcesosNuevos:
         assert resolver_codigo_linea_grupo("ACCESORIOS", "PINCELES") == "CD"
         assert resolver_codigo_linea_grupo("accesorios", "pinceles") == "CD"
 
-    def test_inclusion_sin_precio_siempre_fuera(self):
-        """Sin precio no se publica, aunque tenga BX y stock (regla absoluta)."""
+    def test_inclusion_sin_precio_entra_si_hay_producto(self):
+        """v3.6.0: sin precio pero con stock/guia se publica (no cotizable)."""
         assert decidir_inclusion(False, False, 0.0, "PINTURA", True, True) == (
-            False,
+            True,
             False,
         )
         assert decidir_inclusion(False, False, 0.0, "CA001", True, True) == (
+            True,
+            False,
+        )
+        # Sin ningun movimiento ni guia, sigue fuera.
+        assert decidir_inclusion(False, False, 0.0, "CA001", False, False) == (
             False,
             False,
         )

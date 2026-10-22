@@ -89,4 +89,7 @@ def test_metadata_registra_las_exclusiones(catalogo_minimo):
     """Las filas del ERP que quedaron fuera quedan auditadas con su motivo."""
     _, meta = catalogo_minimo
     exclusiones = meta["exclusiones"]
-    assert exclusiones.get("descontinuado_sin_bx_ni_stock", 0) >= 1
+    assert exclusiones.get("descontinuado_sin_guia_ni_stock", 0) >= 1
+    # v3.6.0: el motivo "sin_precio" se reemplazo por "sin_precio_ni_movimiento"
+    # (el precio ya no excluye si hay stock/guia/compromiso).
+    assert "sin_precio" not in exclusiones

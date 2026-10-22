@@ -3,7 +3,7 @@
 > Sistema centralizado de datos maestros para proyectos G360.
 > Genera JSON de catálogo completo desde ERP + SKU_BX + universo de stock.
 
-[![Version](https://img.shields.io/badge/version-3.5.0-blue)]()
+[![Version](https://img.shields.io/badge/version-3.6.0-blue)]()
 [![Python](https://img.shields.io/badge/Python-3.11+-blue)]()
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)]()
 
@@ -11,10 +11,15 @@
 flowchart TD
     A[PRODUCTOS.xls] --> B[generar_catalogo_base.py]
     C[SKU_BX.xlsx] --> B
-    D[g360-stock-api /stock] --> B
+    D["g360-stock-api<br/>/stock/skus (compacto)"] --> B
+    S["data/stock_cache.json<br/>(--s1-cache, offline)"] --> B
     B --> E[catalogo_productos.json]
     E --> F[g360-stock-api]
 ```
+
+> **El catálogo es el allowlist del API.** Todo SKU que puede aparecer en
+> `/stock` y cotizarse tiene que estar publicado acá: si no está, el API lo
+> muestra como `sin_catalogo` (sin precio, sin peso, sin caja).
 
 ---
 
@@ -22,19 +27,28 @@ flowchart TD
 
 ```
 g360-master-data/
-├── data/
-│   ├── PRODUCTOS.xls           ← Fuente principal (mensual/bimestral)
+├── data/                       ← MATERIA PRIMA (exports manuales, con fecha de corte)
+│   ├── PRODUCTOS.xls           ← Maestro del ERP (mensual/bimestral)
 │   │   Columnas: CODIGO, NOMBRE, COD_EAN, COD_EAN_14, CAN_KG_UM,
 │   │              LINEA, GRUPO, TIPO, FAMILIA, FLG_INACTIVO,
 │   │              FLG_DESCONTINUADO, PRECIO
-│   └── SKU_BX.xlsx             ← Guía primaria: qué se vende (manual, agregar cuando ingresa nuevo stock)
-│       Columnas: ORDEN, SKU, UN_BX, ESTADO_LINEA
+│   │   Aporta: ficha, EAN, peso, línea, precio y vigencia
+│   ├── SKU_BX.xlsx             ← Guía de venta (manual: se agrega al ingresar stock)
+│   │   Columnas: ORDEN, SKU, UN_BX, ESTADO_LINEA
+│   │   Aporta: qué se vende, unidades por caja y orden comercial
+│   ├── KARDEX_BASE.xlsx        ← Padrón de artículos por almacén (export manual, 179.591 filas)
+│   │   Columnas: colId/colNom de Almacén, Línea, Grupo, Tipo, Familia,
+│   │              Artículo y UM (sin cantidades ni fechas)
+│   │   Aporta: taxonomía observada SKU × almacén (validar/derivar líneas).
+│   │   Hoy NO lo consume el generador (fase 3: demanda/rotación)
+│   └── plantilla_precios.xlsx  ← Plantilla comercial (PRODUCTOS/DESCUENTOS/PRECIOS_FIJOS)
+│       Aporta: descuentos y precios fijos (vía scripts/leer_plantilla_precios.py)
 │
 ├── output/
-│   └── catalogo_productos.json ← Catálogo generado (2.759 SKUs)
+│   └── catalogo_productos.json ← Catálogo generado (3.538 SKUs)
 │
 ├── scripts/
-│   ├── generar_catalogo_base.py ← Genera catálogo desde ERP + SKU_BX + stock (principal, v3.5)
+│   ├── generar_catalogo_base.py ← Genera catálogo desde ERP + SKU_BX + stock (principal, v3.6)
 │   ├── generar_catalogo.py     ← Generador legacy v1 (no usar: no lee el ERP actual)
 │   ├── leer_plantilla_precios.py ← Lee plantilla_precios.xlsx (hojas PRODUCTOS/DESCUENTOS/PRECIOS_FIJOS)
 │   ├── sanitize_key.py         ← Sanea API_KEY (quita whitespace invisible)
@@ -46,6 +60,13 @@ g360-master-data/
 ├── actualizar_catalogo.bat     ← Workflow interactivo + modo automático (--auto)
 └── README.md
 ```
+
+`data/` es **la** carpeta de materia prima: cada archivo aporta una parte del
+catálogo y se reemplaza completo cuando llega el export nuevo (no se edita a
+mano ni se mezcla). Hoy el generador consume **PRODUCTOS.xls + SKU_BX.xlsx +
+el universo de stock**; `KARDEX_BASE.xlsx` y `plantilla_precios.xlsx` están
+para las siguientes fases (rotación/demanda, descuentos, m³, etc.). Cuando se
+sume una fuente nueva, se agrega acá y se escribe su lector en `scripts/`.
 
 ---
 
@@ -71,11 +92,15 @@ g360-master-data/
 ### El universo de stock (no es opcional)
 
 El catálogo no sale solo del ERP + SKU_BX: incluye además los SKUs que **tienen
-stock físico** (hay despacho que hacer y sin catálogo no se conocen peso, EAN ni
-caja). Ese universo se consulta en el mismo API de stock que recibe el catálogo.
+stock físico o compromiso de venta** (hay despacho que hacer y sin catálogo no
+se conocen peso, EAN ni caja). Ese universo se consulta en el mismo API de stock
+que recibe el catálogo, en el endpoint **compacto** `GET /api/v1/stock/skus`
+(consolidado por SKU, sin el desglose por almacén que multiplica el payload).
 
-Si el universo no entra, el catálogo sale **incompleto y en silencio**: en la
-última corrida sin universo se perdieron **212 SKUs** que sí tienen stock.
+Si el universo no entra, el catálogo sale **incompleto y en silencio**: en una
+corrida sin universo se perdieron **212 SKUs** que sí tenían stock. Para que no
+vuelva a pasar, el generador publica la cobertura en el `metadata` y avisa con
+`ALERTA` si algún SKU con movimiento quedó fuera.
 
 | Variable | Default | Para qué |
 |----------|---------|----------|
@@ -83,44 +108,110 @@ Si el universo no entra, el catálogo sale **incompleto y en silencio**: en la
 | `API_URL` | `https://g360-stock-api.onrender.com` | URL del API |
 | `G360_STOCK_URL` | = `API_URL` | URL para leer el universo de stock |
 | `G360_STOCK_API_KEY` | = `API_KEY` | Clave de lectura del universo |
+| `G360_S1_CACHE` | — | JSON del reporte S1 (ej. `g360-stock-api/data/stock_cache.json`). Si está, **no consulta el API** |
 
 El BAT define `G360_STOCK_URL` y `G360_STOCK_API_KEY` a partir de `API_KEY`, y
 **pide la clave antes de generar** (en modo interactivo). En modo `--auto` sin
-`API_KEY` aborta: no deja generar un catálogo a medias.
+`API_KEY` aborta: no deja generar un catálogo a medias. La excepción es
+`G360_S1_CACHE`: con el JSON del S1 no hace falta clave ni red para generar
+(el upload al API sí la sigue necesitando).
 
 Después de generar, el BAT **valida** el catálogo (`validar_taxonomia.py`) y
-**no sube nada** si hay incoherencias: un catálogo con líneas mixtas, precios
-en cero o taxonomía divergente del API no llega a producción.
+**no sube nada** si hay incoherencias: un catálogo con líneas mixtas, taxonomía
+divergente del API o cobertura incompleta no llega a producción.
 
-Para generar sin universo (a propósito): `python scripts/generar_catalogo_base.py --sin-universo-stock`.
+```bash
+# Con el API en vivo (default)
+python scripts/generar_catalogo_base.py
+
+# Offline: usa el JSON del reporte S1 copiado al repo (sin clave ni red)
+python scripts/generar_catalogo_base.py --s1-cache ..\g360-stock-api\data\stock_cache.json
+
+# Sin universo (a propósito: catálogo incompleto, solo para depurar)
+python scripts/generar_catalogo_base.py --sin-universo-stock
+```
 
 ---
 
-## Filtros aplicados
+## Regla de inclusión (v3.6.0)
+
+Un SKU entra al catálogo si cumple **cualquiera** de estas condiciones:
+
+```
+en guía (SKU_BX) ∨ stock > 0 ∨ compromiso > 0 ∨ (vigente ∧ precio > 0)
+```
 
 | Filtro | Resultado |
 |--------|-----------|
-| Inactivos (FLG_INACTIVO) | Excluidos (siempre) |
-| Sin precio (≤0) | Excluidos (siempre, incluso los Crayola) |
-| Descontinuado fuera de BX y sin stock | Excluido |
-| Descontinuado en BX o con stock físico | **Incluido con `descontinuado: true`** |
-| Líneas de proceso | Excluidas (siempre) |
+| Inactivos (FLG_INACTIVO) | Excluidos (siempre: el ERP los borra) |
+| Líneas de proceso (códigos `70`/`71`) | Excluidas (siempre) |
+| `sin_precio_ni_movimiento` | Excluido: ni stock, ni compromiso, ni guía, ni precio |
+| `descontinuado_sin_guia_ni_stock` | Excluido: descontinuado y sin nada que despachar |
+| Descontinuado en guía o con stock | **Incluido** con `descontinuado: true`, `vigente: false` |
+| SKU con stock/compromiso y **sin precio** | **Incluido** con `cotizable: false`, `por_activar: true` |
 | SKUs duplicados en ERP | Solo el primero |
-| SKUs en BX sin ERP | Advertencia y se omiten (ej. `04058`) |
-| **Productos finales** | **2.759 SKUs** |
+| SKUs en guía sin ERP | Advertencia y se omiten (ej. `04058`) |
+| **Productos finales** | **3.538 SKUs** |
 
-Un SKU **vigente** con precio > 0 entra siempre, esté o no en SKU_BX. SKU_BX
-manda sobre los *descontinuados* (y aporta `un_bx`, `orden` y `estado_linea`).
+El precio ya **no decide la presencia**: decide la **cotizabilidad**. Un SKU sin
+precio puede estar publicado (hay producto físico), pero se marca `por_activar`
+para que comercial lo complete. `cotizable` y `por_activar` son complementarios
+exactos (`cotizable = precio > 0`).
+
+### Categorías de venta (el semáforo)
+
+La categoría de negocio sigue saliendo de la línea (con la marca mandando en
+Crayola), pero para venta se publica además `categoria_venta`:
+
+| `categoria_venta` | Significado |
+|-------------------|-------------|
+| `VINIBALL` | Se vende |
+| `VINIFAN` | Se vende |
+| `REPRESENTADAS` | Se vende (incluye todas las líneas Crayola `CA..CG`) |
+| `REVISION_VENTA` | Está en el catálogo (hay producto), pero **no se cotiza** hasta que comercial revise |
+
+`REVISION_VENTA` agrupa MATERIALES, INDUSTRIAL, CIPTECH, PUBLICIDAD,
+DESCARTE Y VARIOS, OTROS, etc. La distribución actual: **REVISION_VENTA 1.152 /
+VINIFAN 972 / REPRESENTADAS 838 / VINIBALL 576**.
+
+### Derivados `D` (método D)
+
+Los SKU que terminan en `D` suelen ser el mismo producto **sin embalaje**
+(línea 98). Se **enlazan** a su base, nunca se fusionan: conservan su propio
+stock y heredan la ficha comercial (línea, categoría, precio, peso, caja).
+
+Condiciones para enlazar (todas):
+
+1. el SKU termina en `D`;
+2. la línea es `98` (sin embalaje);
+3. existe la base sin la `D` (en catálogo o en el ERP);
+4. similitud de nombre ≥ `0,80` (SequenceMatcher sobre texto normalizado).
+
+Si la base no está publicada, el derivado entra igual con la ficha del ERP y el
+validador lo reporta como **aviso** (hay que revisar por qué la base no entra).
 
 ### Trazabilidad
 
-El `metadata` del JSON registra por qué se quedó fuera cada fila del ERP y si
-el universo de stock entró en la generación:
+El `metadata` del JSON registra por qué se quedó fuera cada fila del ERP, si el
+universo de stock entró y si hubo SKUs con movimiento que no se publicaron:
 
 ```json
-"exclusiones": { "sin_precio": 9305, "descontinuado_sin_bx_ni_stock": 170, "linea_proceso": 2 },
-"universo_stock": { "incluido": true, "skus": 2269, "error": "" }
+"regla_inclusion": "en guia ∨ stock > 0 ∨ compromiso > 0 ∨ (vigente ∧ precio > 0)",
+"exclusiones": {
+  "linea_proceso": 6538,
+  "sin_precio_ni_movimiento": 2236,
+  "descontinuado_sin_guia_ni_stock": 446
+},
+"universo_stock": { "incluido": true, "skus": 2214, "con_stock": 2204, "con_compromiso": 666, "error": "" },
+"universo_skus": ["016763", "..."],
+"cobertura_faltante": []
 ```
+
+`cobertura_faltante` es el invariante: **debe ser `[]`**. Si trae un SKU, ese
+producto tiene movimiento y quedó fuera del catálogo (el generador imprime
+`ALERTA` y el validador falla). `universo_skus` son los SKUs vendibles del
+reporte (excluye líneas de proceso) para que el validador lo verifique sin
+releer el S1.
 
 El generador además avisa en consola cuando el catálogo **se achica** respecto
 del anterior (suele ser una fuente faltante, no menos productos).
@@ -131,18 +222,27 @@ del anterior (suele ser una fuente faltante, no menos productos).
 
 | Campo | Fuente | Notas |
 |-------|--------|-------|
-| sku, nombre | PRODUCTOS.xls | |
-| ean13 | PRODUCTOS.xls | ~45% tiene valor |
-| ean14 | PRODUCTOS.xls | ~36% tiene valor |
+| sku, nombre | PRODUCTOS.xls / S1 | | |
+| ean13 | PRODUCTOS.xls | ~36% tiene valor |
+| ean14 | PRODUCTOS.xls | ~29% tiene valor |
 | peso_kg | PRODUCTOS.xls | |
-| linea, grupo, tipo, familia | PRODUCTOS.xls | `linea` es el **código canónico** (2 chars); el nombre va en `linea_nombre` |
-| linea_codigo | Mapa estático + desambiguación por grupo | SKUs Crayola (`C*`) usan su prefijo como línea propia (CA/CB/CC/CD/CE/CF → REPRESENTADAS); líneas ERP genéricas (72/76/77/79) quedan 100% VINIFAN. Grupo desempata cuando el nombre es ambiguo (`ACCESORIOS|PINCELES`→`CD`) |
+| linea, grupo, tipo, familia | PRODUCTOS.xls / S1 | `linea` es el **código canónico** (2 chars); el nombre va en `linea_nombre`. Grupo/tipo/familia salen **sin** el código del S1 (`03 - BORRADOR` → `BORRADOR`) |
+| um | S1 | Unidad de medida del reporte |
+| linea_codigo | Mapa estático + desambiguación por grupo | SKUs Crayola (`C*`) usan su prefijo como línea propia (CA/CB/CC/CD/CE/CF/CG → REPRESENTADAS); líneas ERP genéricas (72/76/77/79) quedan 100% VINIFAN. Grupo desempata cuando el nombre es ambiguo (`ACCESORIOS|PINCELES`→`CD`) |
 | categoria | Marca > línea | La **marca manda**: todo SKU `C*` es `REPRESENTADAS` con línea propia (su prefijo de 2 letras), aunque la línea del ERP sea genérica o la sub-marca aún no exista en la taxonomía. Para el resto, la categoría sale de la línea |
-| un_bx | SKU_BX.xlsx | 37% tiene valor definido (1 por default) |
+| categoria_venta | Derivada de `categoria` | `VINIBALL` / `VINIFAN` / `REPRESENTADAS`, o `REVISION_VENTA` para el resto |
+| un_bx | SKU_BX.xlsx | 29% tiene valor definido (1 por default) |
 | orden | SKU_BX.xlsx (col A) | Índice maestro — orden ascendente |
 | estado_linea | SKU_BX.xlsx (col D) | NACIONAL, IMPORTADO, NUEVO, TRADICIONAL |
 | precio | PRODUCTOS.xls | |
 | descontinuado | PRODUCTOS.xls (FLG_DESCONTINUADO) + SKU_BX + stock | `true` si está descontinuado y entra al catálogo; el API lo propaga como badge |
+| en_guia | SKU_BX.xlsx | `true` si el SKU está curado en la guía |
+| compromiso | S1 (`predespacho`) | `true` si tenía compromiso de venta al generar |
+| cotizable / por_activar | `precio > 0` | Complementarios exactos |
+| vigente | ERP | `false` si el ERP lo marca descontinuado |
+| derivado_de | Método D | SKU base cuando es un derivado de línea 98 |
+| origen | ERP / S1 | `erp` (ficha del maestro) o `s1` (solo existe en el reporte) |
+| stock_snapshot / predespacho_snapshot | S1 | Foto del movimiento al generar (trazabilidad, no stock vivo) |
 | nombre_corto | Generado con regex | Elimina prefijos, marcas |
 | keywords | Generado automáticamente | Palabras clave del nombre + categoría |
 
@@ -159,11 +259,14 @@ del anterior (suele ser una fuente faltante, no menos productos).
 Genera el catálogo completo desde las tres fuentes.
 
 ```bash
-# Uso básico
+# Uso básico (API en vivo, requiere G360_STOCK_API_KEY o API_KEY)
 python scripts/generar_catalogo_base.py
 
 # Con argumentos
 python scripts/generar_catalogo_base.py -i data/PRODUCTOS.xls -u data/SKU_BX.xlsx -o output/catalogo_productos.json
+
+# Offline: universo desde el JSON del reporte S1 copiado al repo
+python scripts/generar_catalogo_base.py --s1-cache ..\g360-stock-api\data\stock_cache.json
 
 # Solo validación (no genera output)
 python scripts/generar_catalogo_base.py --validate-only
@@ -171,6 +274,17 @@ python scripts/generar_catalogo_base.py --validate-only
 # Sin universo de stock (genera un catálogo incompleto, a propósito)
 python scripts/generar_catalogo_base.py --sin-universo-stock
 ```
+
+| Argumento | Env equivalente | Para qué |
+|-----------|-----------------|----------|
+| `--erp` / `-e` | — | `PRODUCTOS.xls` |
+| `--unbx` / `-u` | — | `SKU_BX.xlsx` |
+| `--output` / `-o` | — | JSON de salida |
+| `--stock-url` | `G360_STOCK_URL` | API para leer el universo (`/stock/skus`) |
+| `--stock-key` | `G360_STOCK_API_KEY` | Clave de lectura |
+| `--s1-cache` | `G360_S1_CACHE` | JSON local del S1: no consulta el API |
+| `--sin-universo-stock` | — | Genera solo con ERP + guía (incompleto) |
+| `--validate-only` / `-v` | — | Valida sin escribir |
 
 ### `actualizar_catalogo.bat`
 
@@ -192,9 +306,17 @@ actualizar_catalogo.bat --auto
 :: Automatico local: genera + copia local, sin subir
 actualizar_catalogo.bat --auto-local
 
+:: Offline: universo desde el JSON del S1 (no consulta el API)
+set G360_S1_CACHE=..\g360-stock-api\data\stock_cache.json
+actualizar_catalogo.bat --auto-local
+
 :: Subir JSON existente sin regenerar (requiere API_KEY)
 actualizar_catalogo.bat --upload
 ```
+
+Con `G360_S1_CACHE` definido, el BAT **no pide clave para generar** (el upload
+sigue necesitándola). Es el modo recomendado cuando el reporte S1 se copia al
+repo a mano, sin depender de que el API esté arriba.
 
 El upload reintenta 3 veces (cold start de Render free-tier) y requiere
 `X-API-Key` (variable `API_KEY` en la terminal). En modo interactivo, si
@@ -210,7 +332,9 @@ setx API_KEY tu_clave
 ### `validar_taxonomia.py`
 
 Validación cruzada: taxonomía del catálogo, líneas Crayola, líneas mixtas,
-líneas sin código, precios en cero, universo de stock incluido y **divergencia
+líneas sin código, **coherencia de precio y flags** (`cotizable`/`por_activar`/
+`compromiso`/`categoria_venta`/`derivado_de`), **cobertura del universo**
+(`cobertura_faltante` vacío + cross-check de `universo_skus`) y **divergencia
 con `g360-stock-api`**.
 
 ```bash
@@ -229,25 +353,24 @@ pendiente, no bloquean). El BAT la ejecuta después de generar: si hay errores,
 
 ### Sub-marca Crayola nueva
 
-Si aparece una sub-marca nueva (CG, CH…), el generador:
+Si aparece una sub-marca nueva (CH, CI…), el generador:
 
 1. la **publica ya clasificada** como `REPRESENTADAS` en la taxonomía del
    metadata (así ningún consumidor la deja en el default `OTROS`);
-2. avisa en consola que hay que dejarla fija en el código.
+2. avisa en consola y el validador lo reporta como aviso (no bloquea).
 
 Para dejarla fija hay que tocar **dos** archivos:
 
 ```python
 # scripts/generar_catalogo_base.py
-CATEGORIA_POR_LINEA = { ..., "CG": "REPRESENTADAS" }
+CATEGORIA_POR_LINEA = { ..., "CH": "REPRESENTADAS" }
 
 # g360-stock-api/app/core/constants.py
-CATEGORIAS = { ..., "REPRESENTADAS": ["85", "CE", "CF", "CA", "CB", "CC", "CD", "CG"] }
+CATEGORIAS = { ..., "REPRESENTADAS": ["85", "CE", "CF", "CA", "CB", "CC", "CD", "CG", "CH"] }
 ```
 
-Mientras no se fije, el validador lo reporta como **aviso** (no bloquea) y el
-API de stock sigue clasificando bien los C* por marca (todo C* es
-REPRESENTADAS, incluso sin catálogo).
+Mientras no se fije, el API de stock sigue clasificando bien los C* por marca
+(todo C* es REPRESENTADAS, incluso sin catálogo).
 
 ### `simular_actualizacion.py`
 
@@ -275,62 +398,82 @@ python -m pytest scripts/tests -q
 ```json
 {
   "metadata": {
-    "version": "3.5.0",
-    "generated_at": "2026-10-21T17:27:54.508668",
+    "version": "3.6.0",
+    "generated_at": "2026-10-22T10:30:46.334309",
     "source_erp": "PRODUCTOS.xls",
     "source_un_bx": "SKU_BX.xlsx",
-    "total_productos": 2759,
+    "source_stock": "http://appweb.cipsa.com.pe:8054/...",
+    "total_productos": 3538,
     "estadisticas": {
-      "sin_ean13": 1512,
-      "con_ean14": 1009,
-      "sin_unbx": 1737,
+      "sin_ean13": 2267,
+      "con_ean14": 1037,
+      "sin_unbx": 2516,
       "con_unbx": 1022,
-      "descontinuados": 342,
+      "descontinuados": 348,
       "sin_linea_codigo": 0,
-      "por_categoria": {
-        "VINIFAN": 944,
-        "REPRESENTADAS": 828,
-        "VINIBALL": 584,
-        "PUBLICIDAD": 216,
-        "INDUSTRIAL": 106,
-        "OTROS": 50,
-        "MATERIALES": 31
+      "en_guia": 1022,
+      "con_compromiso": 667,
+      "por_activar": 768,
+      "cotizables": 2770,
+      "derivados": 30,
+      "solo_s1": 522,
+      "por_categoria_venta": {
+        "REVISION_VENTA": 1152,
+        "VINIFAN": 972,
+        "REPRESENTADAS": 838,
+        "VINIBALL": 576
       },
-      "por_linea": { "85": 775, "01": 531, "78": 391, "80": 212, "76": 196 },
-      "por_estado_linea": {
-        "NUEVO": 406,
-        "IMPORTADO": 285,
-        "TRADICIONAL": 191,
-        "NACIONAL": 140
-      }
+      "por_categoria": { "VINIFAN": 972, "REPRESENTADAS": 838, "VINIBALL": 576, "...": "..." },
+      "por_linea": { "85": 776, "01": 523, "78": 421, "80": 303, "...": "..." },
+      "por_estado_linea": { "NUEVO": 406, "IMPORTADO": 285, "TRADICIONAL": 191, "NACIONAL": 140 }
     },
     "categorias_por_linea": { "01": "VINIBALL", "78": "VINIFAN", "CA": "REPRESENTADAS", "...": "..." },
+    "categorias_venta": ["VINIBALL", "VINIFAN", "REPRESENTADAS"],
+    "categoria_venta_revision": "REVISION_VENTA",
+    "regla_inclusion": "en guia ∨ stock > 0 ∨ compromiso > 0 ∨ (vigente ∧ precio > 0)",
     "lineas_nombre_a_codigo": { "PELOTAS": "01", "ARCHIVO": "78", "MANUALIDADES": "CE", "...": "..." },
     "lineas_grupo_a_codigo": { "ACCESORIOS|PINCELES": "CD" },
-    "exclusiones": { "sin_precio": 9305, "descontinuado_sin_bx_ni_stock": 170, "linea_proceso": 2 },
-    "universo_stock": { "incluido": true, "skus": 2269, "error": "" }
+    "exclusiones": {
+      "linea_proceso": 6538,
+      "sin_precio_ni_movimiento": 2236,
+      "descontinuado_sin_guia_ni_stock": 446
+    },
+    "universo_stock": { "incluido": true, "skus": 2214, "con_stock": 2204, "con_compromiso": 666, "error": "" },
+    "universo_skus": ["016763", "..."],
+    "cobertura_faltante": []
   },
   "productos": [
     {
-      "sku": "011019",
-      "nombre": "N SEMIDEPORTIVA FUTBOL CRACKCITO BLANCO C/ROJO",
-      "nombre_corto": "Semideportiva Futbol Crackcito Blanco C/Rojo",
-      "ean13": "7754807110198",
+      "sku": "016763",
+      "nombre": "FUTBOL PU FUTURE #5",
+      "nombre_corto": "Futbol Future #5",
+      "ean13": "",
       "ean14": "",
       "categoria": "VINIBALL",
+      "categoria_venta": "VINIBALL",
       "linea": "01",
       "linea_nombre": "PELOTAS",
-      "grupo": "NACIONAL",
-      "tipo": "SEMI-DEPORTIVA",
+      "grupo": "IMPORTADA VINIBALL",
+      "tipo": "PU",
       "familia": "FUTBOL",
-      "un_bx": 60,
-      "orden": 79,
-      "estado_linea": "NACIONAL",
-      "peso_kg": 0.20,
-      "precio": 9.16,
+      "um": "",
+      "un_bx": 18,
+      "orden": 1,
+      "estado_linea": "IMPORTADO",
+      "peso_kg": 0.4,
+      "precio": 70.0,
       "descontinuado": false,
       "linea_codigo": "01",
-      "keywords": ["01", "BLANCO", "C/ROJO", "CRACKCITO", "FUTBOL", "PELOTAS", "SEMIDEPORTIVA", "VINIBALL"]
+      "en_guia": true,
+      "compromiso": true,
+      "cotizable": true,
+      "vigente": true,
+      "por_activar": false,
+      "derivado_de": "",
+      "origen": "erp",
+      "stock_snapshot": 615,
+      "predespacho_snapshot": 181,
+      "keywords": ["01", "FUTBOL", "FUTURE", "PELOTAS", "VINIBALL"]
     }
   ]
 }
@@ -354,7 +497,25 @@ curl -H "X-API-Key: $API_KEY" \
 curl -X POST "https://g360-stock-api.onrender.com/api/v1/catalog/upload" \
      -H "X-API-Key: $API_KEY" \
      -F "archivo=@output/catalogo_productos.json"
+
+# Universo compacto (lo que consume el generador)
+curl -H "X-API-Key: $API_KEY" \
+     "https://g360-stock-api.onrender.com/api/v1/stock/skus?solo_con_movimiento=true"
 ```
+
+`GET /api/v1/stock/skus` devuelve por SKU: descripción, línea, grupo, tipo,
+familia, UM, categoría, `categoria_venta`, stock/predespacho/disponible
+consolidados y `sin_catalogo`. No repite el SKU por almacén.
+
+### Flags que el API propaga
+
+`/stock` y `/catalog` exponen los mismos flags que publica el catálogo:
+`categoria_venta`, `en_guia`, `compromiso`, `cotizable`, `por_activar`,
+`vigente`, `origen`, `derivado_de`. Además el API calcula un badge único,
+`revision`, con esta prioridad:
+
+`sin_catalogo` → `por_activar` → `revision_venta` → `descontinuado` →
+`compromiso` → `""` (disponible).
 
 > `catalog_raw_url` apunta al raw de GitHub de este repo: un `push` a `main`
 > actualiza producción solo (tras el TTL de 6 h). El `POST` es inmediato.

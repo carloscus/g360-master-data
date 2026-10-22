@@ -33,8 +33,13 @@ def test_catalogo_real_no_tiene_errores():
         catalogo = json.load(f)
     errores, avisos = validar(catalogo, RAIZ)
     assert errores == [], "\n".join(errores)
-    # Avisos: la taxonomia publicada tiene que coincidir con el codigo.
-    assert avisos == [], "\n".join(avisos)
+    # Avisos de mantenimiento: la taxonomia publicada tiene que coincidir con
+    # el codigo. La unica excepcion son los derivados método D cuya base no
+    # se publica (descontinuada, sin precio): se hereda la ficha del ERP y se
+    # avisa, porque hay que revisar por que la base no entra al catalogo.
+    avisos_inesperados = [a for a in avisos if "se deriva de" not in a]
+    assert avisos_inesperados == [], "\n".join(avisos_inesperados)
+    assert len(avisos) <= 30, "\n".join(avisos)
 
 
 def test_detecta_crayola_fuera_de_representadas():
@@ -124,21 +129,21 @@ def test_sub_marca_nueva_es_aviso_no_error():
     """
     catalogo = {
         "metadata": {
-            "categorias_por_linea": {**CATEGORIA_POR_LINEA, "CG": "REPRESENTADAS"}
+            "categorias_por_linea": {**CATEGORIA_POR_LINEA, "CH": "REPRESENTADAS"}
         },
         "productos": [
             {
-                "sku": "CG990",
-                "linea": "CG",
-                "linea_codigo": "CG",
+                "sku": "CH990",
+                "linea": "CH",
+                "linea_codigo": "CH",
                 "categoria": "REPRESENTADAS",
                 "precio": 5.0,
             }
         ],
     }
     errores, avisos = validar(catalogo, RAIZ)
-    assert not any("CG990" in e for e in errores)
-    assert any("CG" in a and "CATEGORIA_POR_LINEA" in a for a in avisos)
+    assert not any("CH990" in e for e in errores)
+    assert any("CH" in a and "CATEGORIA_POR_LINEA" in a for a in avisos)
 
 
 def test_taxonomia_del_maestro_es_la_misma_que_la_del_api():
