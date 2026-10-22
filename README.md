@@ -27,7 +27,7 @@ flowchart TD
 
 ```
 g360-master-data/
-├── data/                       ← MATERIA PRIMA (exports manuales, con fecha de corte)
+├── data/                       ← MATERIA PRIMA LOCAL (exports manuales, NO se versiona)
 │   ├── PRODUCTOS.xls           ← Maestro del ERP (mensual/bimestral)
 │   │   Columnas: CODIGO, NOMBRE, COD_EAN, COD_EAN_14, CAN_KG_UM,
 │   │              LINEA, GRUPO, TIPO, FAMILIA, FLG_INACTIVO,
@@ -63,8 +63,9 @@ g360-master-data/
 
 `data/` es **la** carpeta de materia prima: cada archivo aporta una parte del
 catálogo y se reemplaza completo cuando llega el export nuevo (no se edita a
-mano ni se mezcla). Hoy el generador consume **PRODUCTOS.xls + SKU_BX.xlsx +
-el universo de stock**; `KARDEX_BASE.xlsx` y `plantilla_precios.xlsx` están
+mano ni se mezcla). **No se versiona**: son exports pesados y cambian seguido;
+el repo solo lleva el catálogo generado (`output/`). Hoy el generador consume
+**PRODUCTOS.xls + SKU_BX.xlsx + el universo de stock**; `KARDEX_BASE.xlsx` y `plantilla_precios.xlsx` están
 para las siguientes fases (rotación/demanda, descuentos, m³, etc.). Cuando se
 sume una fuente nueva, se agrega acá y se escribe su lector en `scripts/`.
 

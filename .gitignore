@@ -17,5 +17,7 @@ output/test_estado_linea.json
 # Config local de ripgrep/graft (no aporta al repo).
 .ignore
 
-# Cache local del catalogo: lo regenera el BAT. No se versiona.
-data/catalog_cache.json
+# Materia prima: son exports manuales (PRODUCTOS.xls, SKU_BX.xlsx,
+# KARDEX_BASE.xlsx, plantilla_precios.xlsx) y el cache local del catalogo.
+# No se versionan: el repo solo lleva el catalogo generado (output/).
+/data/
