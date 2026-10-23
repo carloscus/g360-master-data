@@ -293,23 +293,17 @@ def validar(catalogo: dict, raiz: Path = RAIZ) -> tuple[list[str], list[str]]:
                 errores.append(
                     f"ALERTA: {sku} se deriva de si mismo (derivado_de={base})"
                 )
-            elif base in {q.get("sku", "") for q in ps}:
-                padre = next(q for q in ps if q.get("sku") == base)
-                for campo in ("linea", "categoria"):
-                    if p.get(campo) != padre.get(campo):
-                        errores.append(
-                            f"ALERTA: {sku} derivado de {base} tiene "
-                            f"{campo}={p.get(campo)} y su base "
-                            f"{padre.get(campo)} (deben coincidir)"
-                        )
-            else:
+            elif base not in {q.get("sku", "") for q in ps}:
                 # La base puede estar fuera del catalogo (descontinuada, sin
-                # precio): se heredo la ficha comercial igual, pero conviene
-                # saberlo al revisar la ficha.
+                # precio): el D se publica con su propia ficha igual, pero
+                # conviene saberlo al revisar por que la base no entra.
                 avisos.append(
                     f"AVISO: {sku} se deriva de {base}, que no esta publicado "
-                    "(se heredo la ficha comercial del ERP)"
+                    "(el D usa su propia ficha; revisar la base)"
                 )
+            # NOTA: desde v3.8 el D es un producto separado (solo similar a
+            # su base): su linea/categoria/precio son propios y NO tienen
+            # que coincidir con los de la base. No se valida coincidencia.
 
     # 9b. Invariante de cobertura: TODO SKU con stock o compromiso tiene
     #     que estar en el catalogo (salvo lineas de proceso). El generador

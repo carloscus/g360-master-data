@@ -155,6 +155,18 @@ if %ERRORLEVEL% NEQ 0 (
 )
 
 echo.
+echo Validando regresion (tests: el gate que detecta linea vacia y D mal
+echo enlazados antes de publicar)...
+.venv\Scripts\python.exe -m pytest scripts\tests -q
+if %ERRORLEVEL% NEQ 0 (
+    echo.
+    echo ERROR: un test fallo. El catalogo recien generado rompe una regla.
+    echo Revisa el fallo antes de subir: NO se copia ni se sube nada.
+    if "%AUTO_MODE%"=="0" pause
+    exit /b 1
+)
+
+echo.
 echo Copiando a proyectos G360...
 if exist ..\g360-stock-api\data (
     copy /Y output\catalogo_productos.json ..\g360-stock-api\data\catalog_cache.json >nul

@@ -373,7 +373,9 @@ class TestCategoriaVenta:
 
 
 class TestMetodoD:
-    """03077D es 03077 sin embalaje: se enlaza, nunca se fusiona."""
+    """03077D no es 03077: es un producto secundario, solo similar. Se enlaza
+    como referencia (derivado_de) pero cada SKU conserva su propia ficha;
+    nunca se fusiona el stock ni se hereda precio."""
 
     def test_enlaza_si_coincide_el_nombre_y_la_linea(self):
         base = "FOLDER N VINIFAN FANTASIA OFICIO MIX SURTIDO"
@@ -417,7 +419,10 @@ class TestMetodoD:
         assert aplicar_derivados([base, otro], nombres) == 0
         assert otro.get("derivado_de", "") == ""
 
-    def test_hereda_ficha_pero_conserva_su_stock(self, tmp_path):
+    def test_enlaza_sin_heredar_ficha_cada_sku_conserva_la_suya(self, tmp_path):
+        """El D es un producto separado (solo similar): se enlaza pero cada
+        SKU conserva su propia ficha comercial. Sin precio propio el D queda
+        por_activar hasta que se active con su precio real."""
         base = _prod("03077")
         base["nombre"] = "FOLDER N VINIFAN FANTASIA OFICIO MIX SURTIDO"
         base["precio"] = 4.17
@@ -433,9 +438,10 @@ class TestMetodoD:
         nombres = {"03077": base["nombre"], "03077D": derivado["nombre"]}
         assert aplicar_derivados([base, derivado], nombres) == 1
         assert derivado["derivado_de"] == "03077"
-        assert derivado["linea"] == "78"
-        assert derivado["categoria"] == base["categoria"]
-        assert derivado["precio"] == 4.17
+        # Ficha propia intacta: NO hereda linea/categoria/precio de la base.
+        assert derivado["linea"] == "98"
+        assert derivado["categoria"] == "DESCARTE Y VARIOS"
+        assert derivado["precio"] == 0.0
 
         universo = {
             "03077": {"stock": 100, "predespacho": 0, "linea": "0178 - ARCHIVO"},
@@ -446,7 +452,9 @@ class TestMetodoD:
         prod = {p["sku"]: p for p in res["productos"]}
         assert prod["03077"]["stock_snapshot"] == 100
         assert prod["03077D"]["stock_snapshot"] == 7
-        assert prod["03077D"]["cotizable"] is True
+        # Sin precio propio: no cotiza (por_activar) aunque tenga stock.
+        assert prod["03077D"]["cotizable"] is False
+        assert prod["03077D"]["por_activar"] is True
         assert res["metadata"]["estadisticas"]["derivados"] == 1
 
 
@@ -490,6 +498,29 @@ class TestFichaDesdeUniverso:
         incluidos = [{"sku": "YA_ESTA"}]
         nuevos = productos_desde_universo(universo, incluidos, {})
         assert nuevos == []
+
+    def test_sin_taxonomia_en_s1_cae_a_otros_no_a_vacio(self):
+        """Si S1 no trae linea/grupo (p.ej. un D huerfano como 03273D en el
+        universo en vivo), la ficha sale en OTROS, nunca con linea vacia
+        (rompe filtros y el contrato del API)."""
+        universo = {
+            "03273D": {
+                "stock": 5,
+                "predespacho": 0,
+                "descripcion": "FOLDER N VINIFAN FANTASIA",
+                "um": "UND",
+                "linea": "",
+                "grupo": "",
+                "tipo": "",
+                "familia": "",
+            }
+        }
+        nuevos = productos_desde_universo(universo, [], {})
+        assert len(nuevos) == 1
+        p = nuevos[0]
+        assert p["linea"] == "OTROS"
+        assert p["linea_codigo"] == "OTROS"
+        assert p["categoria"] == "OTROS"
 
 
 class TestCobertura:

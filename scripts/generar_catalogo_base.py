@@ -792,7 +792,18 @@ def productos_desde_universo(universo, productos_incluidos, erp_todos):
                 str(erp_todos.get(sku, {}).get("linea", "")) or linea_raw
             )
         linea_nombre = normalizar_texto(nombre_sin_codigo(linea_raw)) or linea_raw
-        categoria = categoria_de_producto(sku, codigo) if codigo else CATEGORIA_DEFAULT
+        if not codigo and not linea_nombre:
+            # S1 no trajo taxonomia y no hay de donde sacarla (p.ej. un D
+            # huerfano como 03273D cuya base no existe en ninguna fuente):
+            # OTROS/REVISION_VENTA en vez de linea vacia, que rompe los
+            # filtros y el contrato del API. Queda visible para revision
+            # comercial (test_linea_y_categoria_no_estan_vacias lo vigila).
+            codigo = linea_nombre = CATEGORIA_DEFAULT
+            categoria = CATEGORIA_DEFAULT
+        else:
+            categoria = (
+                categoria_de_producto(sku, codigo) if codigo else CATEGORIA_DEFAULT
+            )
         nuevos.append(
             {
                 "sku": sku,
@@ -820,17 +831,21 @@ def productos_desde_universo(universo, productos_incluidos, erp_todos):
 
 
 def aplicar_derivados(productos, nombres_por_sku, erp_todos=None):
-    """Enlaza los SKUs por método D con su base (v3.6.0).
+    """Enlaza los SKUs por método D con su base, SIN heredar ficha (v3.8).
 
-    `03077D` es `03077` sin embalaje: MISMO precio, peso y almacén pero
-    STOCK DISTINTO (traslado/refacción). Se hereda la ficha comercial
-    (precio, peso, caja, EAN, línea, categoría) y se documenta el vínculo
-    en `derivado_de`. NUNCA se fusiona el stock: cada SKU sigue contando
-    con sus unidades.
+    `03077D` NO es `03077`: es un producto secundario, solo similar (otra
+    presentacion/contenido). El vinculo `derivado_de` queda como referencia
+    para buscar y auditar, pero la ficha comercial (precio, peso, EAN,
+    linea, categoria) es la propia de cada SKU: heredar el precio de la
+    base pondria en vitrina un precio que no es el del producto.
+
+    Sin precio propio el D queda `por_activar`/`cotizable=false` hasta que
+    se active con su precio real. NUNCA se fusiona el stock: cada SKU sigue
+    contando con sus unidades.
 
     La base puede estar fuera del catálogo (descontinuada, sin precio, sin
-    movimiento) y aun así define la línea/categoría del derivado: para eso
-    se consulta `erp_todos`, que trae todas las filas del ERP.
+    movimiento) y aun asi sirve para enlazar: para eso se consulta
+    `erp_todos`, que trae todas las filas del ERP.
     """
     erp_todos = erp_todos or {}
     por_sku = {p["sku"]: p for p in productos}
@@ -863,36 +878,8 @@ def aplicar_derivados(productos, nombres_por_sku, erp_todos=None):
         )
         if not base:
             continue
-        if base in por_sku:
-            padre = por_sku[base]
-            p["derivado_de"] = base
-            # La línea/categoría de la base manda: el "D" es el mismo producto
-            # en otra presentación, no una línea "sin embalaje" que nadie vende.
-            p["linea_codigo"] = padre["linea_codigo"]
-            p["linea"] = padre["linea"]
-            p["linea_nombre"] = padre.get("linea_nombre", "")
-            p["categoria"] = padre["categoria"]
-            p["precio"] = p["precio"] or padre.get("precio", 0.0)
-            p["peso_kg"] = p["peso_kg"] or padre.get("peso_kg", 0.0)
-            p["ean13"] = p["ean13"] or padre.get("ean13", "")
-            p["ean14"] = p["ean14"] or padre.get("ean14", "")
-            derivados += 1
-            continue
-        fila = erp_todos.get(base)
-        if not fila:
-            continue
-        # Base no publicada: se hereda igual la línea/categoría comercial.
-        codigo = codigo_linea_crayola(base) or resolver_codigo_linea_grupo(
-            fila.get("linea", ""), fila.get("grupo", "")
-        )
-        if not codigo:
-            continue
+        # Solo el vinculo: cada SKU conserva su propia ficha comercial.
         p["derivado_de"] = base
-        p["linea_codigo"] = codigo
-        p["linea"] = codigo
-        p["linea_nombre"] = fila.get("linea", "") or codigo
-        p["categoria"] = categoria_de_producto(base, codigo)
-        p["precio"] = p["precio"] or float(fila.get("precio") or 0.0)
         derivados += 1
     return derivados
 

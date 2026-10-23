@@ -264,18 +264,21 @@ VINIFAN 972 / REPRESENTADAS 838 / VINIBALL 576**.
 
 ### Derivados `D` (método D)
 
-Los SKU que terminan en `D` suelen ser el mismo producto **sin embalaje**
-(línea 98). Se **enlazan** a su base, nunca se fusionan: conservan su propio
-stock y heredan la ficha comercial (línea, categoría, precio, peso, caja).
+Los SKU que terminan en `D` son un producto **secundario, solo similar** a su
+base (otra presentación/contenido, típicamente línea 98). Se **enlazan** como
+referencia (`derivado_de`), pero **cada SKU conserva su propia ficha**: no se
+fusiona el stock ni se hereda precio, peso, EAN, línea o categoría de la base
+(heredar el precio pondría en vitrina un precio que no es el del producto).
+Sin precio propio el `D` queda `por_activar` hasta activarse con su precio real.
 
 Condiciones para enlazar (todas):
 
 1. el SKU termina en `D`;
-2. la línea es `98` (sin embalaje);
+2. la línea es `98` (sin embalaje) o la línea comercial de la base;
 3. existe la base sin la `D` (en catálogo o en el ERP);
 4. similitud de nombre ≥ `0,80` (SequenceMatcher sobre texto normalizado).
 
-Si la base no está publicada, el derivado entra igual con la ficha del ERP y el
+Si la base no está publicada, el derivado entra igual con su propia ficha y el
 validador lo reporta como **aviso** (hay que revisar por qué la base no entra).
 
 ### Trazabilidad
