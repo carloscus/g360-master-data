@@ -1025,6 +1025,7 @@ def generar_output(
         "con_caja": 0,
         "descontinuados": 0,
         "sin_linea_codigo": 0,
+        "con_linea_otros": 0,
         "en_guia": 0,
         "con_compromiso": 0,
         "por_activar": 0,
@@ -1056,6 +1057,11 @@ def generar_output(
             estadisticas["descontinuados"] += 1
         if not p.get("linea_codigo"):
             estadisticas["sin_linea_codigo"] += 1
+        if p.get("linea_codigo") == "OTROS":
+            # S1 no trajo taxonomia para este SKU (ficha minima con fallback).
+            # Si este numero es alto, el reporte S1 o su parseo tienen un
+            # problema: revisar el universo antes de publicar.
+            estadisticas["con_linea_otros"] += 1
 
         cat = p["categoria"]
         lin = p["linea"]
@@ -1694,6 +1700,7 @@ def main():
     print(f"  Con caja (largo/ancho/alto/m3): {est['con_caja']}")
     print(f"  Descontinuados:           {est['descontinuados']}")
     print(f"  Sin linea_codigo:          {est['sin_linea_codigo']}")
+    print(f"  Con linea OTROS (S1 sin taxonomia): {est['con_linea_otros']}")
     print(f"  En guia (SKU_BX):          {est['en_guia']}")
     print(f"  Con compromiso:            {est['con_compromiso']}")
     print(f"  Cotizables:                {est['cotizables']}")
