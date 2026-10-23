@@ -1049,6 +1049,18 @@ def validar_kardex_vs_erp(data: Path) -> Bloque:
         f"ambiguos={stats['ambiguos']} sin_match={stats['sin_match']} "
         f"(KARDEX: {meta_k.get('articulos', 0)} articulos)"
     )
+    # Reglas por columna aplicadas por el loader (contratos.leer_kardex):
+    # jerarquia a 2 chars por la derecha + prefijo '1' sistematico en SKU.
+    # Quedan registradas en meta para que ninguna reescritura sea silenciosa.
+    if meta_k.get("jerarquia_normalizada"):
+        bloque.info.append(
+            f"{meta_k['jerarquia_normalizada']} ID(s) de jerarquia normalizados "
+            f"a 2 chars (ej: {', '.join(meta_k.get('jerarquia_ejemplos', []))})"
+        )
+    if meta_k.get("sku_prefijo_uno"):
+        bloque.info.append(
+            "todos los SKUs traian '1' inicial: prefijo sistematico reducido"
+        )
 
     # Fichas KARDEX que varian segun almacen = defecto del padron.
     con_conflicto = {s: f for s, f in fichas_k.items() if f.get("conflictos")}

@@ -938,7 +938,35 @@ def calcular_m3(largo_cm, ancho_cm, alto_cm) -> float | None:
 # derivan de esa única lectura. Así ningún campo "se deja de leer".
 
 CACHE_KARDEX_NOMBRE = ".cache_kardex.json"
-CACHE_KARDEX_VERSION = 3
+CACHE_KARDEX_VERSION = 4
+
+
+def derecha2(valor) -> str:
+    """IDs de jerarquia a 2 caracteres por la derecha: ('00' + v)[-2:].
+
+    '1' -> '01', '101' -> '01', 'ad' -> 'AD', 40 -> '40', '01' -> '01'.
+    Solo para columnas con contrato de 2 (linea/grupo/tipo/familia):
+    nunca para SKUs, EAN ni nombres. Vacio -> vacio (no inventa '00').
+    """
+    if valor is None or isinstance(valor, bool):
+        return ""
+    if isinstance(valor, float) and valor.is_integer():
+        valor = int(valor)
+    t = limpiar_texto(valor)
+    if not t:
+        return ""
+    return ("00" + t)[-2:].upper()
+
+
+def prefijo_uno_sistematico(valores) -> bool:
+    """True si TODOS los valores no vacios empiezan con '1'.
+
+    Solo para colIdArticulo: un archivo donde todos los SKUs traen el '1'
+    inicial trae un prefijo sistematico (se quita uno solo). Si hay mezcla
+    (1, 3, 2, ...) son codigos reales: se lee sin modificar.
+    """
+    vistos = [v for v in valores if v]
+    return bool(vistos) and all(v.startswith("1") for v in vistos)
 
 
 def canon_sku(codigo) -> str:
@@ -1023,6 +1051,7 @@ def leer_kardex(ruta) -> tuple[dict, dict]:
                 "articulos": len(articulos),
                 "nota": "indice cacheado",
             }
+            meta.update(guardado.get("ajustes", {}))
             return articulos, meta
     except (OSError, ValueError):
         pass
@@ -1051,6 +1080,23 @@ def leer_kardex(ruta) -> tuple[dict, dict]:
             v = columnas.valor(fila, campo) if campo in idx else default
             return limpiar_texto(v)
 
+        def _id(fila, campo, stats):
+            # IDs de jerarquia: siempre ('00'+v)[-2:] en mayusculas.
+            # '1'->'01', '101'->'01', 'ad'->'AD'. Lo que ya viene bien ('01')
+            # pasa igual; lo distinto queda contado en stats (visible en meta).
+            v = columnas.valor(fila, campo) if campo in idx else ""
+            crudo = limpiar_texto(v)
+            norm = derecha2(v)
+            if crudo and crudo != norm:
+                stats["n"] += 1
+                if len(stats["ej"]) < 5 and crudo not in stats["vistos"]:
+                    stats["vistos"].add(crudo)
+                    stats["ej"].append(f"{crudo}->{norm}")
+            return norm
+
+        stats_jer = {"n": 0, "ej": [], "vistos": set()}
+        todos_uno = True
+        hay_skus = False
         for fila in hoja.iter_rows(min_row=2, values_only=True):
             if len(fila) <= max(i_sku, i_um):
                 continue
@@ -1058,6 +1104,11 @@ def leer_kardex(ruta) -> tuple[dict, dict]:
             um = limpiar_texto(fila[i_um]).upper() if len(fila) > i_um else ""
             if not sku:
                 continue
+            # Regla SKU: todos empiezan con '1' => prefijo sistematico
+            # (se quita uno solo al final). Mezcla => codigos reales, intactos.
+            hay_skus = True
+            if not sku.startswith("1"):
+                todos_uno = False
             ficha = articulos.get(sku)
             largo = (
                 limpiar_texto(fila[i_largo])
@@ -1067,13 +1118,13 @@ def leer_kardex(ruta) -> tuple[dict, dict]:
             if ficha is None:
                 articulos[sku] = {
                     "um": um,
-                    "linea_id": _txt(fila, "id_linea"),
+                    "linea_id": _id(fila, "id_linea", stats_jer),
                     "linea": _txt(fila, "nom_linea"),
-                    "grupo_id": _txt(fila, "id_grupo"),
+                    "grupo_id": _id(fila, "id_grupo", stats_jer),
                     "grupo": _txt(fila, "nom_grupo"),
-                    "tipo_id": _txt(fila, "id_tipo"),
+                    "tipo_id": _id(fila, "id_tipo", stats_jer),
                     "tipo": _txt(fila, "nom_tipo"),
-                    "familia_id": _txt(fila, "id_familia"),
+                    "familia_id": _id(fila, "id_familia", stats_jer),
                     "familia": _txt(fila, "nom_familia"),
                     "nombre_corto": _txt(fila, "nom_articulo"),
                     "nombre_largo": largo,
@@ -1095,10 +1146,26 @@ def leer_kardex(ruta) -> tuple[dict, dict]:
         return {}, {"archivo": p.name, "articulos": 0, "nota": "contrato roto"}
     finally:
         libro.close()
+    ajustes: dict = {}
+    if stats_jer["n"]:
+        ajustes["jerarquia_normalizada"] = stats_jer["n"]
+        ajustes["jerarquia_ejemplos"] = stats_jer["ej"]
+    # SKU y almacen son TEXTO: se leen sin modificar. Unica excepcion: si
+    # TODOS los SKUs empiezan con '1' es un prefijo sistematico del archivo
+    # y se quita uno solo. Con mezcla no se toca nada.
+    if hay_skus and todos_uno:
+        articulos = {s[1:]: f for s, f in articulos.items()}
+        ajustes["sku_prefijo_uno"] = True
     try:
         with open(cache, "w", encoding="utf-8") as f:
             json.dump(
-                {"v": CACHE_KARDEX_VERSION, "huella": huella, "articulos": articulos}, f
+                {
+                    "v": CACHE_KARDEX_VERSION,
+                    "huella": huella,
+                    "articulos": articulos,
+                    "ajustes": ajustes,
+                },
+                f,
             )
     except OSError:
         pass
@@ -1107,4 +1174,5 @@ def leer_kardex(ruta) -> tuple[dict, dict]:
         "articulos": len(articulos),
         "nota": "indice reconstruido",
     }
+    meta.update(ajustes)
     return articulos, meta

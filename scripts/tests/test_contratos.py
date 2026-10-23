@@ -22,10 +22,12 @@ from contratos import (  # noqa: E402
     calcular_m3,
     cargar_almacenes,
     cargar_guia_ignorados,
+    derecha2,
     detectar_columnas_s1,
     huella_fuente,
     limpiar_texto,
     normalizar_encabezado,
+    prefijo_uno_sistematico,
     resolver_columnas,
     sku_texto,
 )
@@ -1429,3 +1431,108 @@ class TestConsultarPorTaxonomia:
 
         assert _parse_ids(["01", "02,03"]) == {"01", "02", "03"}
         assert _parse_ids([]) is None
+
+
+class TestDerecha2:
+    """IDs de jerarquia: ('00'+v)[-2:] en mayusculas. Solo linea/grupo/tipo/familia."""
+
+    def test_pad(self):
+        assert derecha2("1") == "01"
+        assert derecha2(1) == "01"
+        assert derecha2(40) == "40"
+
+    def test_recorta_por_derecha(self):
+        assert derecha2("101") == "01"
+        assert derecha2("130") == "30"
+
+    def test_mayusculas(self):
+        assert derecha2("ad") == "AD"
+        assert derecha2("1ad") == "AD"
+
+    def test_identidad(self):
+        assert derecha2("01") == "01"
+        assert derecha2("CA") == "CA"
+
+    def test_vacio_no_inventa(self):
+        assert derecha2("") == ""
+        assert derecha2(None) == ""
+
+    def test_float_entero(self):
+        assert derecha2(40.0) == "40"
+
+
+class TestPrefijoUnoSistematico:
+    """SKU: todos con '1' inicial => prefijo sistematico; mezcla => intactos."""
+
+    def test_todos_con_uno(self):
+        assert prefijo_uno_sistematico(["10119", "11028", "1CA01"]) is True
+
+    def test_mezcla_no_aplica(self):
+        assert prefijo_uno_sistematico(["10119", "30119", "20119"]) is False
+        assert prefijo_uno_sistematico(["011019", "11019"]) is False
+
+    def test_vacio_no_aplica(self):
+        assert prefijo_uno_sistematico([]) is False
+        assert prefijo_uno_sistematico(["", ""]) is False
+
+
+class TestReglasPorColumnaEnLoader:
+    """El loader aplica derecha2 a jerarquia y el prefijo '1' solo si es total."""
+
+    def _fila(self, sku, lin="01", gru="01", tip="02", fam="01", alm="40", um="UND"):
+        return [
+            alm,
+            "ALM",
+            sku,
+            "NOM " + sku,
+            "LARGO " + sku,
+            lin,
+            "L",
+            gru,
+            "G",
+            tip,
+            "T",
+            fam,
+            "F",
+            um,
+        ]
+
+    def test_jerarquia_se_normaliza_y_queda_en_meta(self, tmp_path):
+        from contratos import leer_kardex
+
+        _escribir_kardex(
+            tmp_path / "KARDEX_BASE.xlsx",
+            [
+                self._fila("A00011", lin="101", gru=1, tip="ad", fam="02", alm=40),
+                self._fila("B00022", lin="01", gru="01", tip="02", fam="01", alm="VES"),
+            ],
+        )
+        fichas, meta = leer_kardex(tmp_path / "KARDEX_BASE.xlsx")
+        assert fichas["A00011"]["linea_id"] == "01"
+        assert fichas["A00011"]["grupo_id"] == "01"
+        assert fichas["A00011"]["tipo_id"] == "AD"
+        assert fichas["B00022"]["linea_id"] == "01"
+        assert meta["jerarquia_normalizada"] == 3
+        assert "101->01" in meta["jerarquia_ejemplos"]
+
+    def test_sku_todos_con_uno_se_reduce(self, tmp_path):
+        from contratos import leer_kardex
+
+        _escribir_kardex(
+            tmp_path / "KARDEX_BASE.xlsx",
+            [self._fila("111019"), self._fila("11028")],
+        )
+        fichas, meta = leer_kardex(tmp_path / "KARDEX_BASE.xlsx")
+        assert set(fichas) == {"11019", "1028"}
+        assert meta.get("sku_prefijo_uno") is True
+
+    def test_sku_mezclados_no_se_tocan(self, tmp_path):
+        from contratos import leer_kardex
+
+        _escribir_kardex(
+            tmp_path / "KARDEX_BASE.xlsx",
+            [self._fila("011019"), self._fila("11019")],
+        )
+        fichas, meta = leer_kardex(tmp_path / "KARDEX_BASE.xlsx")
+        assert set(fichas) == {"011019", "11019"}
+        assert "sku_prefijo_uno" not in meta
