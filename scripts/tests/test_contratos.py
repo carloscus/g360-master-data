@@ -1316,3 +1316,112 @@ class TestAuditarKardexErp:
         self._erp(tmp_path / "PRODUCTOS.xls")
         bloque = validar_kardex_vs_erp(tmp_path)
         assert bloque.estado == "skip"
+
+
+class TestConsultarPorTaxonomia:
+    """El KARDEX manda en jerarquia (IDs exactos); el JSON responde
+    precio/peso/caja/stock por SKU exacto (con prefijo como fallback)."""
+
+    def _fichas(self):
+        return {
+            "01019": {
+                "linea_id": "01",
+                "grupo_id": "01",
+                "tipo_id": "02",
+                "familia_id": "01",
+                "um": "UND",
+                "nombre_corto": "FUTBOL X",
+            },
+            "01CA001": {
+                "linea_id": "CA",
+                "grupo_id": "01",
+                "tipo_id": "02",
+                "familia_id": "01",
+                "um": "UND",
+                "nombre_corto": "CRAYON X",
+            },
+            # En KARDEX con prefijo, en catalogo sin el: el calce lo resuelve.
+            "01VOLE1": {
+                "linea_id": "01",
+                "grupo_id": "01",
+                "tipo_id": "02",
+                "familia_id": "02",
+                "um": "UND",
+                "nombre_corto": "VOLEY X",
+            },
+        }
+
+    def _catalogo(self):
+        return {
+            "productos": [
+                {
+                    "sku": "01019",
+                    "precio": 70.0,
+                    "peso_kg": 0.4,
+                    "un_bx": 12,
+                    "stock_snapshot": 5,
+                    "categoria": "VINIBALL",
+                },
+                {
+                    "sku": "VOLE1",
+                    "precio": 0,
+                    "peso_kg": 0.3,
+                    "un_bx": 0,
+                    "stock_snapshot": 3,
+                    "categoria": "VINIBALL",
+                },
+            ]
+        }
+
+    def test_filtra_por_ids_exactos(self):
+        from consultar_por_taxonomia import filtrar_jerarquia
+
+        sel = filtrar_jerarquia(
+            self._fichas(),
+            linea={"01"},
+            grupo={"01"},
+            tipo={"02"},
+            familia={"01", "02"},
+        )
+        assert set(sel) == {"01019", "01VOLE1"}
+
+    def test_sin_filtro_trae_todo(self):
+        from consultar_por_taxonomia import filtrar_jerarquia
+
+        assert len(filtrar_jerarquia(self._fichas())) == 3
+
+    def test_cruce_con_catalogo_y_prefijo(self):
+        from consultar_por_taxonomia import consultar
+
+        rep = consultar(
+            self._fichas(),
+            self._catalogo(),
+            {"linea": {"01"}, "grupo": {"01"}, "tipo": {"02"}, "familia": {"01", "02"}},
+        )
+        assert rep["kardex_seleccion"] == 2
+        assert rep["en_catalogo"] == 2
+        # 01019 cotiza; VOLE1 entra por prefijo pero con precio 0 no cotiza.
+        assert rep["cotizables"] == 1
+        por_sku = {f["sku"]: f for f in rep["filas"]}
+        assert por_sku["01019"]["precio"] == 70.0
+        assert por_sku["01019"]["un_bx"] == 12
+        assert por_sku["01VOLE1"]["via_prefijo"] is True
+        assert por_sku["01VOLE1"]["cotizable"] is False
+
+    def test_fuera_del_catalogo_lleva_motivo(self):
+        from consultar_por_taxonomia import consultar
+
+        rep = consultar(
+            self._fichas(),
+            {"productos": []},
+            {"linea": {"CA"}},
+        )
+        assert rep["kardex_seleccion"] == 1
+        assert rep["en_catalogo"] == 0
+        assert "regla de inclusion" in rep["filas"][0]["motivo"]
+
+    def test_parse_ids_acepta_lista_y_coma(self):
+        from consultar_por_taxonomia import _parse_ids
+
+        assert _parse_ids(["01", "02,03"]) == {"01", "02", "03"}
+        assert _parse_ids([]) is None
