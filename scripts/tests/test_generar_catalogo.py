@@ -432,6 +432,39 @@ class TestSinEnlacesPorParecido:
         assert prod["03077D"]["peso_kg"] == 0.5  # el suyo, no el de la base
 
 
+class TestKardexIds:
+    """El JSON publica los IDs KARDEX (grupo/tipo/familia) para que las apps
+    filtren por jerarquia sin leer el KARDEX. Sin cruce no hay IDs (vacios,
+    nunca inventados)."""
+
+    def test_ids_del_cruce_quedan_en_producto(self, tmp_path):
+        out = tmp_path / "cat.json"
+        res = generar_output(
+            [_prod("011019")],
+            {},
+            {},
+            {},
+            str(out),
+            kardex_ids={
+                "011019": {"grupo_id": "01", "tipo_id": "02", "familia_id": "01"}
+            },
+        )
+        p = res["productos"][0]
+        assert p["grupo_id"] == "01"
+        assert p["tipo_id"] == "02"
+        assert p["familia_id"] == "01"
+        assert res["metadata"]["estadisticas"]["con_ids_jerarquia"] == 1
+
+    def test_sin_cruce_ids_vacios(self, tmp_path):
+        out = tmp_path / "cat.json"
+        res = generar_output([_prod("ZZZ99")], {}, {}, {}, str(out))
+        p = res["productos"][0]
+        assert p["grupo_id"] == ""
+        assert p["tipo_id"] == ""
+        assert p["familia_id"] == ""
+        assert res["metadata"]["estadisticas"]["con_ids_jerarquia"] == 0
+
+
 class TestFichaDesdeUniverso:
     def test_arma_la_ficha_minima_con_lo_que_trae_s1(self):
         universo = {

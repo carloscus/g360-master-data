@@ -918,6 +918,7 @@ def generar_output(
     fuentes=None,
     erp_todos=None,
     um_kardex=None,
+    kardex_ids=None,
 ):
     """Genera el JSON de catálogo completo.
 
@@ -943,6 +944,7 @@ def generar_output(
         "por_activar": 0,
         "cotizables": 0,
         "con_um": 0,
+        "con_ids_jerarquia": 0,
         # Sin enlaces por parecido: siempre 0. Se mantiene la clave para no
         # romper consumidores del metadata.
         "derivados": 0,
@@ -1020,6 +1022,9 @@ def generar_output(
             estadisticas["cotizables"] += 1
         if p.get("um", "") or (um_kardex or {}).get(p["sku"], ""):
             estadisticas["con_um"] += 1
+        kid = (kardex_ids or {}).get(p["sku"], {})
+        if kid.get("grupo_id") and kid.get("tipo_id") and kid.get("familia_id"):
+            estadisticas["con_ids_jerarquia"] += 1
         if origen == "s1":
             estadisticas["solo_s1"] += 1
         estadisticas["por_categoria_venta"][cat_venta] = (
@@ -1039,8 +1044,13 @@ def generar_output(
                 "linea": p["linea"],
                 "linea_nombre": p.get("linea_nombre", ""),
                 "grupo": p["grupo"],
+                "grupo_id": (kardex_ids or {}).get(p["sku"], {}).get("grupo_id", ""),
                 "tipo": p["tipo"],
+                "tipo_id": (kardex_ids or {}).get(p["sku"], {}).get("tipo_id", ""),
                 "familia": p["familia"],
+                "familia_id": (kardex_ids or {})
+                .get(p["sku"], {})
+                .get("familia_id", ""),
                 "um": p.get("um", "") or (um_kardex or {}).get(p["sku"], ""),
                 "un_bx": un_bx,
                 "orden": orden_map.get(p["sku"], 0),
@@ -1653,6 +1663,7 @@ def main():
     # Una sola lectura compartida (contratos.leer_kardex, con cache) y
     # calce exacto primero, sin prefijo despues (contratos.emparejar_skus).
     um_kardex: dict[str, str] = {}
+    kardex_ids: dict[str, dict] | None = None
     kardex_ruta = Path("data") / "KARDEX_BASE.xlsx"
     if kardex_ruta.exists():
         fichas_kardex, meta_kardex = leer_kardex(kardex_ruta)
@@ -1661,6 +1672,15 @@ def main():
             {p["sku"] for p in productos}, um_raw
         )
         um_kardex = {s: um_raw[m] for s, m in match_kardex.items()}
+        # IDs de jerarquia KARDEX por producto (el JSON los publica para que
+        # las apps filtren por jerarquia sin leer el KARDEX).
+        kardex_ids = {
+            s: {
+                k: fichas_kardex[m].get(k, "")
+                for k in ("grupo_id", "tipo_id", "familia_id")
+            }
+            for s, m in match_kardex.items()
+        }
         print(
             f"  KARDEX: {meta_kardex.get('nota', '')} "
             f"({meta_kardex.get('articulos', 0)} articulos); "
@@ -1685,6 +1705,7 @@ def main():
         fuentes=[huella_fuente(a.erp), huella_fuente(a.unbx)],
         erp_todos=erp_todos,
         um_kardex=um_kardex,
+        kardex_ids=kardex_ids,
     )
 
     print(f"\n{'=' * 50}")
