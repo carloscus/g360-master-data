@@ -26,7 +26,7 @@ RAIZ = Path(__file__).resolve().parent.parent
 if __name__ == "__main__" and __package__ is None:
     sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from contratos import canon_sku, leer_kardex  # noqa: E402
+from contratos import emparejar_skus, leer_kardex  # noqa: E402
 
 CAMPOS_JERARQUIA = (
     ("linea", "linea_id"),
@@ -91,24 +91,10 @@ def consultar(fichas: dict, catalogo: dict, filtros: dict) -> dict:
         familia=filtros.get("familia"),
     )
     prods = {p["sku"]: p for p in catalogo.get("productos", [])}
-    # Calce exacto primero, sin prefijo numerico despues: el KARDEX guarda
-    # '01CA001' donde el catalogo (ERP) dice 'CA001'. Direccion inversa a
-    # contratos.emparejar_skus (alla el prefijo lo tiene el candidato):
-    # aca se reduce el BUSCADO y se exige que el reducido exista tal cual
-    # en el JSON. Nunca se inventa: o esta o no esta.
-    match: dict[str, str] = {}
-    stats = {"exactos": 0, "prefijo": 0, "sin_match": 0}
-    for s in seleccion:
-        if s in prods:
-            match[s] = s
-            stats["exactos"] += 1
-            continue
-        base = canon_sku(s)
-        if base and base in prods:
-            match[s] = base
-            stats["prefijo"] += 1
-        else:
-            stats["sin_match"] += 1
+    # Una sola regla de calce en todo el sistema (contratos.emparejar_skus):
+    # exacto primero, prefijo despues en cualquier lado ('01CA001'<->'CA001',
+    # '1014458'<->'014458'), siempre verificado contra la otra fuente.
+    match, stats = emparejar_skus(set(seleccion), set(prods))
 
     filas = []
     for sku in sorted(seleccion):

@@ -984,9 +984,29 @@ def canon_sku(codigo) -> str:
     return texto if re.search(r"[A-Z]", texto) else ""
 
 
+def reducir_uno_numerico(codigo) -> str:
+    """Quita UN '1' inicial solo a SKU puramente numerico de 6-7 digitos.
+
+    '1014458' -> '014458', '111019' -> '11019'. Len 5 ('11028', el codigo
+    real de 5) y alfanumericos: intactos ('' = no aplica). La existencia
+    en el maestro la verifica quien llama (emparejar_skus): sin calce
+    exacto del reducido no se toca nada.
+    """
+    t = str(codigo or "").strip()
+    if t.isdigit() and len(t) in (6, 7) and t.startswith("1"):
+        return t[1:]
+    return ""
+
+
 def emparejar_skus(buscados, candidatos) -> tuple[dict[str, str], dict]:
-    """Calza SKUs entre dos fuentes por codigo EXACTO primero y sin prefijo
-    numerico despues. Devuelve ({buscado: candidato}, stats).
+    """Calza SKUs entre dos fuentes por codigo EXACTO primero, sin prefijo
+    despues (letras o '1' numerico). Devuelve ({buscado: candidato}, stats).
+
+    El prefijo se acepta en CUALQUIER lado: KARDEX '01CA001' vs JSON 'CA001'
+    y KARDEX '1014458' vs ERP '014458' calzan igual que al reves. La forma
+    reducida solo vale si existe TAL CUAL en la otra fuente; si ambas
+    formas existen el exacto ya gano antes (nunca se fusiona). Len 5
+    ('11028') y alfanumericos sin letras de sobra: intactos.
 
     stats: exactos / prefijo / ambiguos (2+ candidatos distintos) /
     sin_match. Lo ambiguo y lo no encontrado NO se adivinan: se reportan.
@@ -994,10 +1014,14 @@ def emparejar_skus(buscados, candidatos) -> tuple[dict[str, str], dict]:
     candidatos = list(dict.fromkeys(candidatos))
     exactos = set(candidatos)
     por_base: dict[str, list[str]] = {}
+    por_num: dict[str, list[str]] = {}
     for c in candidatos:
         b = canon_sku(c)
         if b and b != c.upper():
             por_base.setdefault(b, []).append(c)
+        nb = reducir_uno_numerico(c)
+        if nb:
+            por_num.setdefault(nb, []).append(c)
 
     match: dict[str, str] = {}
     stats = {"exactos": 0, "prefijo": 0, "ambiguos": 0, "sin_match": 0}
@@ -1007,7 +1031,21 @@ def emparejar_skus(buscados, candidatos) -> tuple[dict[str, str], dict]:
             stats["exactos"] += 1
             continue
         b = canon_sku(s)
-        cands = [c for c in por_base.get(b, []) if c.upper() != str(s).upper()]
+        if b and b in exactos:
+            # El buscado trae el prefijo ('01CA001' vs 'CA001').
+            match[s] = b
+            stats["prefijo"] += 1
+            continue
+        nb = reducir_uno_numerico(s)
+        if nb and nb in exactos:
+            # Prefijo '1' sistematico verificado: el reducido existe tal cual.
+            match[s] = nb
+            stats["prefijo"] += 1
+            continue
+        cands = (
+            [c for c in por_base.get(b, []) if c.upper() != str(s).upper()] if b else []
+        )
+        cands += [c for c in por_num.get(str(s), []) if c != s]
         if len(cands) == 1:
             match[s] = cands[0]
             stats["prefijo"] += 1

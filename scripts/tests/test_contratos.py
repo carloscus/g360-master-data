@@ -612,6 +612,48 @@ class TestEmparejarSkus:
         assert match == {}
         assert st["ambiguos"] == 1
 
+    def test_prefijo_en_buscado_tambien_calza(self):
+        # Simetria: KARDEX '01CA001' vs JSON 'CA001' (antes solo al reves).
+        emparejar = self._emparejar()
+        match, st = emparejar({"01CA001"}, {"CA001"})
+        assert match == {"01CA001": "CA001"}
+        assert st["prefijo"] == 1
+
+    def test_uno_numerico_buscado(self):
+        emparejar = self._emparejar()
+        match, st = emparejar({"1014458"}, {"014458"})
+        assert match == {"1014458": "014458"}
+        assert st["prefijo"] == 1
+
+    def test_uno_numerico_candidato(self):
+        emparejar = self._emparejar()
+        match, st = emparejar({"014458"}, {"1014458"})
+        assert match == {"014458": "1014458"}
+        assert st["prefijo"] == 1
+
+    def test_exacta_gana_a_reduccion(self):
+        # Si el largo existe tal cual, no se reduce (nunca fusionar).
+        emparejar = self._emparejar()
+        match, st = emparejar({"014458"}, {"014458", "1014458"})
+        assert match == {"014458": "014458"}
+        assert st["exactos"] == 1 and st["prefijo"] == 0
+
+    def test_len5_no_se_toca(self):
+        # '11028' es el codigo real de 5: reducirlo a '1028' lo destruiria.
+        emparejar = self._emparejar()
+        match, st = emparejar({"11028"}, {"1028"})
+        assert match == {}
+        assert st["sin_match"] == 1
+
+    def test_reducir_uno_numerico(self):
+        from contratos import reducir_uno_numerico
+
+        assert reducir_uno_numerico("1014458") == "014458"
+        assert reducir_uno_numerico("111019") == "11019"
+        assert reducir_uno_numerico("11028") == ""
+        assert reducir_uno_numerico("01CA001") == ""
+        assert reducir_uno_numerico("") == ""
+
 
 class TestUmEnCatalogo:
     def _prod(self, sku, um=""):
@@ -1351,6 +1393,15 @@ class TestConsultarPorTaxonomia:
                 "um": "UND",
                 "nombre_corto": "VOLEY X",
             },
+            # Prefijo '1' numerico: KARDEX '1014458', catalogo '014458'.
+            "1014458": {
+                "linea_id": "01",
+                "grupo_id": "01",
+                "tipo_id": "02",
+                "familia_id": "01",
+                "um": "UND",
+                "nombre_corto": "PELOTA X",
+            },
         }
 
     def _catalogo(self):
@@ -1374,6 +1425,14 @@ class TestConsultarPorTaxonomia:
                     "stock_snapshot": 3,
                     "categoria": "VINIBALL",
                 },
+                {
+                    "sku": "014458",
+                    "precio": 5.0,
+                    "peso_kg": 0.4,
+                    "un_bx": 24,
+                    "stock_snapshot": 9,
+                    "categoria": "VINIBALL",
+                },
             ]
         }
 
@@ -1387,12 +1446,12 @@ class TestConsultarPorTaxonomia:
             tipo={"02"},
             familia={"01", "02"},
         )
-        assert set(sel) == {"01019", "01VOLE1"}
+        assert set(sel) == {"01019", "01VOLE1", "1014458"}
 
     def test_sin_filtro_trae_todo(self):
         from consultar_por_taxonomia import filtrar_jerarquia
 
-        assert len(filtrar_jerarquia(self._fichas())) == 3
+        assert len(filtrar_jerarquia(self._fichas())) == 4
 
     def test_cruce_con_catalogo_y_prefijo(self):
         from consultar_por_taxonomia import consultar
@@ -1402,10 +1461,10 @@ class TestConsultarPorTaxonomia:
             self._catalogo(),
             {"linea": {"01"}, "grupo": {"01"}, "tipo": {"02"}, "familia": {"01", "02"}},
         )
-        assert rep["kardex_seleccion"] == 2
-        assert rep["en_catalogo"] == 2
-        # 01019 cotiza; VOLE1 entra por prefijo pero con precio 0 no cotiza.
-        assert rep["cotizables"] == 1
+        assert rep["kardex_seleccion"] == 3
+        assert rep["en_catalogo"] == 3
+        # 01019 y 014458 cotizan; VOLE1 entra por prefijo pero con precio 0 no cotiza.
+        assert rep["cotizables"] == 2
         por_sku = {f["sku"]: f for f in rep["filas"]}
         assert por_sku["01019"]["precio"] == 70.0
         assert por_sku["01019"]["un_bx"] == 12
@@ -1413,6 +1472,9 @@ class TestConsultarPorTaxonomia:
         assert por_sku["01019"]["ean14"] == "17754807110195"
         assert por_sku["01VOLE1"]["via_prefijo"] is True
         assert por_sku["01VOLE1"]["cotizable"] is False
+        assert por_sku["1014458"]["sku_catalogo"] == "014458"
+        assert por_sku["1014458"]["via_prefijo"] is True
+        assert por_sku["1014458"]["precio"] == 5.0
 
     def test_fuera_del_catalogo_lleva_motivo(self):
         from consultar_por_taxonomia import consultar
