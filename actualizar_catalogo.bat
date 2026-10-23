@@ -50,7 +50,7 @@ if "%~1"=="--upload" (
 :menu
 echo.
 echo ==========================================
-echo G360 MASTER DATA - WORKFLOW v3.7.0
+echo G360 MASTER DATA - WORKFLOW v3.8.0
 echo ==========================================
 echo.
 echo  1) Generar catalogo base (PRODUCTOS.xls + SKU_BX + universo de stock)

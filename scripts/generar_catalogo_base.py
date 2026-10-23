@@ -35,7 +35,7 @@ son las tres categorías de negocio; todo el resto queda en REVISION_VENTA.
 # Versión única del catálogo. El banner, la ayuda del CLI y el metadata del
 # JSON salen de acá: antes cada uno declaraba una versión distinta y el
 # README terminaba describiendo un producto que no existía.
-VERSION = "3.7.0"
+VERSION = "3.8.0"
 
 # Caida del universo vs la corrida anterior que dispara la alerta: el API
 # pudo devolver un reporte parcial con HTTP 200 (corte a medias). La

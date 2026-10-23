@@ -1,7 +1,7 @@
 {
   "metadata": {
-    "version": "3.7.0",
-    "generated_at": "2026-10-23T00:06:55.595911",
+    "version": "3.8.0",
+    "generated_at": "2026-10-23T00:32:29.274082",
     "source_erp": "PRODUCTOS.xls",
     "source_un_bx": "SKU_BX.xlsx",
     "source_stock": "reporte S1 (stock + predespacho)",
@@ -242,8 +242,8 @@
       "con_compromiso": 699,
       "error": "",
       "sin_taxonomia_s1": 0,
-      "previo_skus": 2214,
-      "variacion": 0.019
+      "previo_skus": 2256,
+      "variacion": 0.0
     },
     "universo_skus": [
       "011019",

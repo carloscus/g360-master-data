@@ -3,7 +3,7 @@
 > Sistema centralizado de datos maestros para proyectos G360.
 > Genera JSON de catálogo completo desde ERP + SKU_BX + universo de stock.
 
-[![Version](https://img.shields.io/badge/version-3.7.0-blue)]()
+[![Version](https://img.shields.io/badge/version-3.8.0-blue)]()
 [![Python](https://img.shields.io/badge/Python-3.11+-blue)]()
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)]()
 
@@ -43,7 +43,8 @@ g360-master-data/
 │   │              Artículo y UM (sin cantidades ni fechas)
 │   │   Aporta: taxonomía observada SKU × almacén (validar/derivar líneas).
 │   │   Hoy NO lo consume el generador (fase 3: demanda/rotación)
-│   └── plantilla_precios.xlsx  ← Plantilla comercial (DESCUENTOS/PRECIOS_FIJOS/SKU_CLIENTES)
+│   └── plantilla_precios.xlsx  ← Plantilla comercial (hoja única SKU_PRECIOS:
+│       SKU, DESC1..6, VIGENCIA_DESC, PRECIO_FIJO, VIGENCIA_PRECIO, OBSERVACION)
 │       Aporta: descuentos y precios fijos (vía scripts/leer_plantilla_precios.py)
 │
 ├── plantillas/                 ← MOLDES versionados de los archivos manuales
@@ -59,7 +60,7 @@ g360-master-data/
 │   ├── generar_catalogo_base.py ← Genera catálogo desde ERP + SKU_BX + stock (principal, v3.7)
 │   ├── generar_catalogo.py     ← Generador legacy v1 (no usar: no lee el ERP actual)
 │   ├── crear_plantillas.py     ← Genera/migra las plantillas de plantillas/
-│   ├── leer_plantilla_precios.py ← Lee plantilla_precios.xlsx (hojas DESCUENTOS/PRECIOS_FIJOS/SKU_CLIENTES)
+│   ├── leer_plantilla_precios.py ← Lee plantilla_precios.xlsx (hoja única SKU_PRECIOS; acepta el layout legacy)
 │   ├── sanitize_key.py         ← Sanea API_KEY (quita whitespace invisible)
 │   ├── simular_actualizacion.py ← Simula el ciclo de actualización de código (SKU nuevo)
 │   ├── validar_taxonomia.py     ← Validación cruzada de taxonomía (master-data ↔ stock-api)
@@ -525,9 +526,10 @@ publicados; con `--sku-bx` copia el orden maestro.
 
 Validación cruzada: taxonomía del catálogo, líneas Crayola, líneas mixtas,
 líneas sin código, **coherencia de precio y flags** (`cotizable`/`por_activar`/
-`compromiso`/`categoria_venta`/`derivado_de`), **cobertura del universo**
-(`cobertura_faltante` vacío + cross-check de `universo_skus`) y **divergencia
-con `g360-stock-api`**.
+`compromiso`/`categoria_venta`), **cobertura del universo**
+(`cobertura_faltante` vacío + cross-check de `universo_skus`), **alertas de
+universo** (`alerta_caida`, `alerta_sin_taxonomia`) y **divergencia con
+`g360-stock-api`**.
 
 ```bash
 python scripts/validar_taxonomia.py
@@ -583,7 +585,7 @@ python scripts/simular_actualizacion.py --api-url http://127.0.0.1:8099 --api-ke
 python -m pytest scripts/tests -q
 ```
 
-165 tests: generación (inclusión, taxonomía, SKUs exactos sin enlaces,
+160 tests: generación (inclusión, taxonomía, SKUs exactos sin enlaces,
 cobertura, universo S1), contrato de encabezados (normalización, alias,
 duplicados, columnas corridas, anclas del S1, cajas/m³), revisión de guía
 y robustez de la validación.
@@ -595,8 +597,8 @@ y robustez de la validación.
 ```json
 {
   "metadata": {
-    "version": "3.7.0",
-    "generated_at": "2026-10-22T10:30:46.334309",
+    "version": "3.8.0",
+    "generated_at": "2026-10-23T00:12:00.000000",
     "source_erp": "PRODUCTOS.xls",
     "source_un_bx": "SKU_BX.xlsx",
     "source_stock": "http://appweb.cipsa.com.pe:8054/...",
@@ -617,7 +619,7 @@ y robustez de la validación.
       "con_compromiso": 667,
       "por_activar": 768,
       "cotizables": 2770,
-      "derivados": 30,
+      "derivados": 0,
       "solo_s1": 522,
       "por_categoria_venta": {
         "REVISION_VENTA": 1152,
@@ -640,9 +642,10 @@ y robustez de la validación.
       "sin_precio_ni_movimiento": 2236,
       "descontinuado_sin_guia_ni_stock": 446
     },
-    "universo_stock": { "incluido": true, "skus": 2214, "con_stock": 2204, "con_compromiso": 666, "error": "" },
+    "universo_stock": { "incluido": true, "skus": 2256, "con_stock": 2256, "con_compromiso": 699, "error": "", "previo_skus": 2256, "variacion": 0.0 },
     "universo_skus": ["016763", "..."],
-    "cobertura_faltante": []
+    "cobertura_faltante": [],
+    "almacenes": { "principal": "VES", "almacenes": { "40": "venta", "VES": "venta", "...": "..." }, "fuente": "config" },
   },
   "productos": [
     {
