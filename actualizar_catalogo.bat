@@ -21,7 +21,7 @@ REM API, endpoint compacto /api/v1/stock/skus: sin el, el catalogo sale
 REM incompleto y no se nota. Por eso la clave se pide ANTES de generar.
 REM
 REM v3.6.0: el catalogo publica los flags de negocio (categoria_venta, en_guia,
-REM compromiso, cotizable, por_activar, vigente, derivado_de) y la regla de
+REM compromiso, cotizable, por_activar, vigente) y la regla de
 REM inclusion es: guia OR stock OR compromiso OR (vigente AND precio > 0).
 REM
 REM v3.7.0: paso 0 de contrato de encabezados (scripts/validar_encabezados.py):

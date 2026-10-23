@@ -48,7 +48,6 @@ UMBRAL_CAIDA_UNIVERSO = 0.15
 URL_STOCK_DEFAULT = "https://g360-stock-api.onrender.com"
 
 import argparse
-import difflib
 import json
 import os
 import re
@@ -279,52 +278,11 @@ def nombre_sin_codigo(valor) -> str:
     return sin_codigo or txt
 
 
-# Similitud mínima entre el nombre del SKU "D" y el de su base para
-# considerarlo derivado. Los pares reales dan >= 0.84 (FANTASÍA A-4 vs
-# FANTASIA A4); un umbral más bajo mezclaría productos distintos.
-SIMILITUD_MINIMA_DERIVADO = 0.80
-
-# Línea del KARDEX/S1 donde viven los SKUs "sin embalaje" (método D:
-# traslado/refacción). El SKU con sufijo D es SIEMPRE stock distinto de su
-# base aunque comparta precio, peso y almacén: nunca se fusiona.
-LINEA_SIN_EMBALAJE = "98"
-
-
-def sku_base_derivado(
-    sku: str, nombre: str, linea_codigo: str, nombre_base, linea_base=""
-) -> str:
-    """SKU base de un derivado por método D, o "" si no aplica.
-
-    Condiciones (todas):
-      1. El SKU termina en D y el base existe (nombre_base no vacío).
-      2. Vive en la línea "sin embalaje" (98) o en la MISMA línea comercial
-         de su base: el reporte S1 ya resuelve la línea del producto físico
-         (p. ej. 78 - ARCHIVO), así que exigir 98 dejaba sin ficha a los
-         derivados que solo existen en S1.
-      3. El nombre es el mismo producto (similitud >= 0.80): evita enlazar
-         por accidente dos SKUs que solo comparten el código.
-
-    El vínculo NO fusiona: solo documenta de dónde sale la ficha comercial.
-    El stock se mantiene propio (eso es justamente el método D).
-    """
-    sku = str(sku or "").strip().upper()
-    if not sku.endswith("D") or len(sku) < 3:
-        return ""
-    linea = str(linea_codigo or "").strip().upper()
-    lineas_validas = {"", LINEA_SIN_EMBALAJE}
-    if linea_base:
-        lineas_validas.add(str(linea_base).strip().upper())
-    if linea not in lineas_validas:
-        return ""
-    if not nombre_base:
-        return ""
-    a = normalizar_texto(nombre)
-    b = normalizar_texto(nombre_base)
-    if not a or not b:
-        return ""
-    if difflib.SequenceMatcher(None, a, b).ratio() < SIMILITUD_MINIMA_DERIVADO:
-        return ""
-    return sku[:-1]
+# NOTA DE DISEÑO (SKU exactos, sin parecidos):
+# Antes existia un "metodo D" que enlazaba 03077D con 03077 por similitud
+# de nombre. Se elimino: cada SKU es exacto y standalone, y la linea 98
+# (sin embalaje) esta fuera del semaforo vendible. Un SKU que termina en
+# D es un producto mas, sin vinculo con nada que "se le parezca".
 
 
 def codigo_linea_crayola(sku: str) -> str:
@@ -641,8 +599,7 @@ def leer_erp(ruta, bx_skus=None, stock_skus=None, compromiso_skus=None):
                       fuera y por qué. Sin esto no se puede auditar por qué
                       el catálogo tiene N SKUs y no otros.
     erp_todos:        TODAS las filas válidas del ERP (aunque queden fuera),
-                      para poder enlazar derivados (método D) y decidir
-                      `por_activar` sin releer el archivo.
+                      para decidir `por_activar` sin releer el archivo.
     """
     productos = []
     errores = []
@@ -841,60 +798,6 @@ def productos_desde_universo(universo, productos_incluidos, erp_todos):
     return nuevos
 
 
-def aplicar_derivados(productos, nombres_por_sku, erp_todos=None):
-    """Enlaza los SKUs por método D con su base, SIN heredar ficha (v3.8).
-
-    `03077D` NO es `03077`: es un producto secundario, solo similar (otra
-    presentacion/contenido). El vinculo `derivado_de` queda como referencia
-    para buscar y auditar, pero la ficha comercial (precio, peso, EAN,
-    linea, categoria) es la propia de cada SKU: heredar el precio de la
-    base pondria en vitrina un precio que no es el del producto.
-
-    Sin precio propio el D queda `por_activar`/`cotizable=false` hasta que
-    se active con su precio real. NUNCA se fusiona el stock: cada SKU sigue
-    contando con sus unidades.
-
-    La base puede estar fuera del catálogo (descontinuada, sin precio, sin
-    movimiento) y aun asi sirve para enlazar: para eso se consulta
-    `erp_todos`, que trae todas las filas del ERP.
-    """
-    erp_todos = erp_todos or {}
-    por_sku = {p["sku"]: p for p in productos}
-    derivados = 0
-    for p in productos:
-        # La similitud se mide contra el nombre de la BASE, no contra el del
-        # propio SKU: si no, todo SKU con D y linea 98 "coincide" consigo
-        # mismo (ratio 1.0) y el filtro de nombre no filtra nada.
-        sku = str(p.get("sku", "")).strip().upper()
-        base_candidata = sku[:-1] if sku.endswith("D") else ""
-        nombre_base = nombres_por_sku.get(base_candidata, "") if base_candidata else ""
-        # Linea comercial de la base: si el SKU "D" viene reportado por S1 en
-        # esa misma linea (y no en 98), igual es derivado.
-        linea_base = ""
-        if base_candidata:
-            padre = por_sku.get(base_candidata)
-            if padre:
-                linea_base = padre.get("linea_codigo", "")
-            elif base_candidata in erp_todos:
-                fila = erp_todos[base_candidata]
-                linea_base = resolver_codigo_linea_grupo(
-                    fila.get("linea", ""), fila.get("grupo", "")
-                )
-        base = sku_base_derivado(
-            p["sku"],
-            p.get("nombre", ""),
-            p.get("linea_codigo", ""),
-            nombre_base,
-            linea_base,
-        )
-        if not base:
-            continue
-        # Solo el vinculo: cada SKU conserva su propia ficha comercial.
-        p["derivado_de"] = base
-        derivados += 1
-    return derivados
-
-
 @dataclass
 class DatosSKUBX:
     """Lo que aporta la guia comercial (SKU_BX.xlsx).
@@ -1036,6 +939,8 @@ def generar_output(
         "con_compromiso": 0,
         "por_activar": 0,
         "cotizables": 0,
+        # Sin enlaces por parecido: siempre 0. Se mantiene la clave para no
+        # romper consumidores del metadata.
         "derivados": 0,
         "solo_s1": 0,
         "por_categoria": {},
@@ -1092,11 +997,13 @@ def generar_output(
         compromiso = predespacho_snap > 0
         vigente = not bool(p.get("descontinuado"))
         # `por_activar` = está en el catálogo pero todavía NO se puede
-        # cotizar: no tiene precio (ni en el ERP ni heredado de su base).
-        # El origen ('erp'/'s1') ya queda en su propio campo.
+        # cotizar: no tiene precio. El origen ('erp'/'s1') ya queda en
+        # su propio campo.
         cotizable = precio > 0
         por_activar = not cotizable
-        derivado_de = p.get("derivado_de", "")
+        # Sin enlaces: derivado_de siempre vacio (cada SKU es exacto y
+        # standalone; se mantiene la clave por compatibilidad con el API).
+        derivado_de = ""
         cat_venta = categoria_venta(cat)
 
         if en_guia:
@@ -1107,8 +1014,6 @@ def generar_output(
             estadisticas["por_activar"] += 1
         if cotizable:
             estadisticas["cotizables"] += 1
-        if derivado_de:
-            estadisticas["derivados"] += 1
         if origen == "s1":
             estadisticas["solo_s1"] += 1
         estadisticas["por_categoria_venta"][cat_venta] = (
@@ -1677,14 +1582,8 @@ def main():
         print(f"  Ficha mínima desde S1: {len(desde_s1)} SKUs con movimiento")
         productos.extend(desde_s1)
 
-    # Método D: `03077D` es `03077` sin embalaje -> mismo precio/peso, stock
-    # PROPIO. Se enlaza, nunca se fusiona.
-    nombres_por_sku = {sku: d.get("nombre", "") for sku, d in erp_todos.items()}
-    nombres_por_sku.update({p["sku"]: p["nombre"] for p in productos})
-    derivados = aplicar_derivados(productos, nombres_por_sku, erp_todos)
-    if derivados:
-        print(f"  Derivados (método D): {derivados} SKUs enlazados a su base")
-
+    # Sin enlaces por parecido: cada SKU es exacto y standalone (linea 98
+    # incluida). Nada se deriva de nada por similitud de nombre o codigo.
     huerfanos = sorted(set(orden_map) - erp_skus)
     if huerfanos:
         # Los ya revisados a mano (config/guia_ignorados.json) no se vuelven
@@ -1769,7 +1668,9 @@ def main():
     print(f"  Con compromiso:            {est['con_compromiso']}")
     print(f"  Cotizables:                {est['cotizables']}")
     print(f"  Por activar:               {est['por_activar']}")
-    print(f"  Derivados (metodo D):      {est['derivados']}")
+    print(
+        f"  Derivados (enlaces por parecido): {est['derivados']} (siempre 0: SKU exactos)"
+    )
     print(f"  Solo S1 (sin ERP):         {est['solo_s1']}")
     uni = meta.get("universo_stock", {})
     print(

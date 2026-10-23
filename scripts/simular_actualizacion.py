@@ -38,7 +38,6 @@ RAIZ = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(RAIZ / "scripts"))
 
 from generar_catalogo_base import (  # noqa: E402
-    aplicar_derivados,
     generar_output,
     leer_erp,
     leer_unbx,
@@ -55,7 +54,7 @@ SKU_ESCENARIO_2 = "990002"  # nuevo descontinuado, sin BX, sin stock
 SKU_ESCENARIO_3 = "990003"  # nuevo descontinuado, sin BX, con stock fisico
 SKU_ESCENARIO_4 = "CG990"  # nuevo Crayola (sub-marca CG)
 SKU_ESCENARIO_5 = "S199001"  # con stock y compromiso, NUNCA registrado en el ERP
-SKU_ESCENARIO_6 = "03077D"  # derivado metodo D (existe la base 03077)
+SKU_ESCENARIO_6 = "03077D"  # SKU exacto con D: otro producto, sin vinculos
 
 FILAS_NUEVAS = [
     # sku, nombre, ean13, ean14, peso, linea, grupo, tipo, familia,
@@ -238,9 +237,6 @@ def _generar(erp: Path, bx: Path, salida: Path, stock_skus, universo=None) -> di
     if errs:
         raise RuntimeError(f"Error leyendo ERP simulado: {errs}")
     productos.extend(productos_desde_universo(universo, productos, erp_todos))
-    nombres = {sku: d.get("nombre", "") for sku, d in erp_todos.items()}
-    nombres.update({p["sku"]: p["nombre"] for p in productos})
-    aplicar_derivados(productos, nombres)
     return generar_output(
         productos,
         unbx_map,
@@ -348,7 +344,8 @@ def ejecutar(api_url: str = "", api_key: str = "") -> int:
             "tipo": "02 - ANILLADO",
             "familia": "03 - A4",
         },
-        # Derivado método D: mismo nombre que su base 03077 (FOLDER ...).
+        # SKU con D: nombre parecido a otro codigo, pero es otro producto
+        # exacto: no se enlaza ni hereda nada.
         SKU_ESCENARIO_6: {
             "stock": 7,
             "predespacho": 0,
@@ -374,11 +371,11 @@ def ejecutar(api_url: str = "", api_key: str = "") -> int:
         )
     else:
         print(f"   {SKU_ESCENARIO_5}: FUERA del catalogo")
-    print("\n-- Escenario 6: metodo D (mismo producto sin embalaje, stock propio)")
+    print("\n-- Escenario 6: SKU con D (producto exacto, sin vinculos)")
     p6 = skus5.get(SKU_ESCENARIO_6)
     if p6:
         print(
-            f"   {SKU_ESCENARIO_6}: derivado_de={p6['derivado_de']} "
+            f"   {SKU_ESCENARIO_6}: derivado_de={p6['derivado_de']!r} "
             f"linea={p6['linea']} categoria={p6['categoria']} "
             f"precio={p6['precio']} stock_snapshot={p6['stock_snapshot']}"
         )
@@ -407,7 +404,7 @@ def ejecutar(api_url: str = "", api_key: str = "") -> int:
         SKU_ESCENARIO_3: (True, "universo de stock: entra aunque no este en BX"),
         SKU_ESCENARIO_4: (True, "Crayola: entra con linea propia"),
         SKU_ESCENARIO_5: (True, "no registrado con movimiento: ficha minima S1"),
-        SKU_ESCENARIO_6: (True, "metodo D: entra enlazado a su base"),
+        SKU_ESCENARIO_6: (True, "D exacto: entra sin enlaces ni herencia"),
     }
     print("\n" + "=" * 70)
     print("RESULTADO")

@@ -287,24 +287,6 @@ def validar(catalogo: dict, raiz: Path = RAIZ) -> tuple[list[str], list[str]]:
                 f"ALERTA: {sku} tiene predespacho_snapshot={predespacho} y "
                 f"compromiso={p.get('compromiso')} (incoherentes)"
             )
-        if p.get("derivado_de"):
-            base = str(p["derivado_de"])
-            if base == sku:
-                errores.append(
-                    f"ALERTA: {sku} se deriva de si mismo (derivado_de={base})"
-                )
-            elif base not in {q.get("sku", "") for q in ps}:
-                # La base puede estar fuera del catalogo (descontinuada, sin
-                # precio): el D se publica con su propia ficha igual, pero
-                # conviene saberlo al revisar por que la base no entra.
-                avisos.append(
-                    f"AVISO: {sku} se deriva de {base}, que no esta publicado "
-                    "(el D usa su propia ficha; revisar la base)"
-                )
-            # NOTA: desde v3.8 el D es un producto separado (solo similar a
-            # su base): su linea/categoria/precio son propios y NO tienen
-            # que coincidir con los de la base. No se valida coincidencia.
-
     # 9b. Invariante de cobertura: TODO SKU con stock o compromiso tiene
     #     que estar en el catalogo (salvo lineas de proceso). El generador
     #     publica la lista y sus faltantes; los faltantes deben ser cero.

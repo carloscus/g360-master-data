@@ -21,8 +21,6 @@ from generar_catalogo_base import (
     asignar_categoria,
     categoria_venta,
     nombre_sin_codigo,
-    sku_base_derivado,
-    aplicar_derivados,
     productos_desde_universo,
     leer_universo_stock,
     _agregar_universo,
@@ -372,76 +370,27 @@ class TestCategoriaVenta:
             assert categoria_venta(cat) == "REVISION_VENTA"
 
 
-class TestMetodoD:
-    """03077D no es 03077: es un producto secundario, solo similar. Se enlaza
-    como referencia (derivado_de) pero cada SKU conserva su propia ficha;
-    nunca se fusiona el stock ni se hereda precio."""
+class TestSinEnlacesPorParecido:
+    """Los SKU son exactos: nada se enlaza por similitud de codigo o nombre.
 
-    def test_enlaza_si_coincide_el_nombre_y_la_linea(self):
-        base = "FOLDER N VINIFAN FANTASIA OFICIO MIX SURTIDO"
-        derivado = "FOLDER N VINIFAN TAPA FANTASIA OFICIO MIX SURTIDO"
-        assert sku_base_derivado("03077D", derivado, "98", base) == "03077"
+    03077D NO es 03077 aunque se parezca: es otro producto, con su propia
+    ficha. La linea 98 esta fuera del semaforo vendible, pero sus SKUs
+    existen igual en el catalogo (visibles, por_activar, no cotizables).
+    """
 
-    def test_normaliza_acentos_y_guiones(self):
-        base = "FOLDER N VINIFAN FANTASIA A4 SPIDERMAN"
-        derivado = "FOLDER N VINIFAN FANTAS\u00cdA A-4 SPIDERMAN"
-        assert sku_base_derivado("78095D", derivado, "98", base) == "78095"
-
-    def test_no_enlaza_si_el_nombre_es_otro_producto(self):
-        assert (
-            sku_base_derivado("03077D", "FOLDER DRAGON BALL", "98", "CUADERNO A4") == ""
-        )
-
-    def test_no_enlaza_fuera_de_la_linea_sin_embalaje(self):
-        nombre = "FOLDER N VINIFAN FANTASIA OFICIO MIX SURTIDO"
-        assert sku_base_derivado("03077D", nombre, "78", nombre) == ""
-
-    def test_no_enlaza_si_no_termina_en_d(self):
-        nombre = "FOLDER N VINIFAN FANTASIA OFICIO MIX SURTIDO"
-        assert sku_base_derivado("03077", nombre, "98", nombre) == ""
-
-    def test_aplicar_derivados_no_enlaza_por_el_codigo_solo(self):
-        """Un D en linea 98 con nombre distinto NO es derivado (regresion).
-
-        Antes se comparaba el nombre del SKU contra si mismo (ratio 1.0), asi
-        que cualquier D con base existente se enlazaba aunque fuera otro
-        producto. La similitud tiene que medirse contra el nombre de la base.
-        """
+    def test_d_con_nombre_identico_no_genera_enlace(self, tmp_path):
         base = _prod("03077", linea="ARCHIVO")
-        base["nombre"] = "CUADERNO A4 RAYADO 100 HOJAS"
-        base["linea"] = "78"
-        base["linea_codigo"] = "78"
-        otro = _prod("03077D", linea="ARCHIVO")
-        otro["nombre"] = "FOLDER PLASTICO OFICIO TAPA TRANSPARENTE"
-        otro["linea"] = "98"
-        otro["linea_codigo"] = "98"
-        nombres = {"03077": base["nombre"], "03077D": otro["nombre"]}
-        assert aplicar_derivados([base, otro], nombres) == 0
-        assert otro.get("derivado_de", "") == ""
-
-    def test_enlaza_sin_heredar_ficha_cada_sku_conserva_la_suya(self, tmp_path):
-        """El D es un producto separado (solo similar): se enlaza pero cada
-        SKU conserva su propia ficha comercial. Sin precio propio el D queda
-        por_activar hasta que se active con su precio real."""
-        base = _prod("03077")
         base["nombre"] = "FOLDER N VINIFAN FANTASIA OFICIO MIX SURTIDO"
         base["precio"] = 4.17
         base["linea"] = "78"
         base["linea_codigo"] = "78"
-        derivado = _prod("03077D")
+        derivado = _prod("03077D", linea="ARCHIVO")
         derivado["nombre"] = "FOLDER N VINIFAN TAPA FANTASIA OFICIO MIX SURTIDO"
         derivado["precio"] = 0.0
         derivado["linea"] = "98"
         derivado["linea_codigo"] = "98"
         derivado["categoria"] = "DESCARTE Y VARIOS"
         derivado["origen"] = "s1"
-        nombres = {"03077": base["nombre"], "03077D": derivado["nombre"]}
-        assert aplicar_derivados([base, derivado], nombres) == 1
-        assert derivado["derivado_de"] == "03077"
-        # Ficha propia intacta: NO hereda linea/categoria/precio de la base.
-        assert derivado["linea"] == "98"
-        assert derivado["categoria"] == "DESCARTE Y VARIOS"
-        assert derivado["precio"] == 0.0
 
         universo = {
             "03077": {"stock": 100, "predespacho": 0, "linea": "0178 - ARCHIVO"},
@@ -450,12 +399,37 @@ class TestMetodoD:
         out = tmp_path / "cat.json"
         res = generar_output([base, derivado], {}, {}, {}, str(out), universo=universo)
         prod = {p["sku"]: p for p in res["productos"]}
+        # Sin enlace: cada uno conserva su ficha intacta.
+        assert prod["03077D"].get("derivado_de", "") == ""
+        assert prod["03077D"]["linea"] == "98"
+        assert prod["03077D"]["linea_codigo"] == "98"
+        assert prod["03077D"]["categoria"] == "DESCARTE Y VARIOS"
+        assert prod["03077D"]["precio"] == 0.0
+        # Stock propio, sin fusionar.
         assert prod["03077"]["stock_snapshot"] == 100
         assert prod["03077D"]["stock_snapshot"] == 7
         # Sin precio propio: no cotiza (por_activar) aunque tenga stock.
         assert prod["03077D"]["cotizable"] is False
         assert prod["03077D"]["por_activar"] is True
-        assert res["metadata"]["estadisticas"]["derivados"] == 1
+        # Ningun enlace contado.
+        assert res["metadata"]["estadisticas"]["derivados"] == 0
+
+    def test_d_en_guia_no_hereda_nada(self, tmp_path):
+        """Aunque el supuesto 'parecido' este en guia, no se copia nada."""
+        base = _prod("03077", linea="ARCHIVO")
+        base["nombre"] = "FOLDER N VINIFAN FANTASIA OFICIO MIX SURTIDO"
+        base["peso_kg"] = 0.1
+        otro = _prod("03077D", linea="ARCHIVO")
+        otro["nombre"] = "FOLDER PLASTICO OFICIO TAPA TRANSPARENTE"
+        otro["linea"] = "98"
+        otro["linea_codigo"] = "98"
+        otro["peso_kg"] = 0.5
+        out = tmp_path / "cat.json"
+        res = generar_output([base, otro], {}, {}, {}, str(out))
+        prod = {p["sku"]: p for p in res["productos"]}
+        assert prod["03077D"].get("derivado_de", "") == ""
+        assert prod["03077D"]["ean13"] == ""
+        assert prod["03077D"]["peso_kg"] == 0.5  # el suyo, no el de la base
 
 
 class TestFichaDesdeUniverso:

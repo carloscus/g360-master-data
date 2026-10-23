@@ -34,12 +34,9 @@ def test_catalogo_real_no_tiene_errores():
     errores, avisos = validar(catalogo, RAIZ)
     assert errores == [], "\n".join(errores)
     # Avisos de mantenimiento: la taxonomia publicada tiene que coincidir con
-    # el codigo. La unica excepcion son los derivados método D cuya base no
-    # se publica (descontinuada, sin precio): se hereda la ficha del ERP y se
-    # avisa, porque hay que revisar por que la base no entra al catalogo.
-    avisos_inesperados = [a for a in avisos if "se deriva de" not in a]
-    assert avisos_inesperados == [], "\n".join(avisos_inesperados)
-    assert len(avisos) <= 30, "\n".join(avisos)
+    # el codigo. Sin excepciones: no hay enlaces por parecido que justifiquen
+    # avisos especiales.
+    assert avisos == [], "\n".join(avisos)
 
 
 def test_detecta_crayola_fuera_de_representadas():
