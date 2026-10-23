@@ -158,18 +158,21 @@ def _imprimir(reporte: dict, limite: int) -> None:
     if calce.get("prefijo"):
         print(f"(calce con prefijo numerico: {calce['prefijo']})")
     print(
-        f"{'SKU':<12}{'EAN13':<14}{'EAN14':<15}{'NOMBRE':<24}{'UM':<5}{'PRECIO':>9}{'UN_BX':>7}{'STOCK':>8}  CATEGORIA"
+        f"{'SKU_KARDEX -> SKU_JSON':<28}{'EAN13':<14}{'EAN14':<15}{'NOMBRE':<24}{'UM':<5}{'PRECIO':>9}{'UN_BX':>7}{'STOCK':>8}  CATEGORIA"
     )
     for fila in reporte["filas"][:limite]:
         if fila["en_catalogo"]:
             marca = " *" if fila["via_prefijo"] else ""
+            sku = fila["sku"]
+            if fila["via_prefijo"]:
+                sku = f"{fila['sku']} -> {fila['sku_catalogo']}"
             print(
-                f"{fila['sku']:<12}{fila.get('ean13', ''):<14}{fila.get('ean14', ''):<15}{fila['nombre'][:23]:<24}{fila['um']:<5}"
+                f"{sku:<28}{fila.get('ean13', ''):<14}{fila.get('ean14', ''):<15}{fila['nombre'][:23]:<24}{fila['um']:<5}"
                 f"{fila['precio']:>9.2f}{fila['un_bx'] or '-':>7}{fila['stock'] or 0:>8}  {fila['categoria']}{marca}"
             )
         else:
             print(
-                f"{fila['sku']:<12}{'':<14}{'':<15}{fila['nombre'][:23]:<24}{fila['um']:<5}{'--':>9}  FUERA"
+                f"{fila['sku']:<28}{'':<14}{'':<15}{fila['nombre'][:23]:<24}{fila['um']:<5}{'--':>9}  FUERA"
             )
     resto = len(reporte["filas"]) - min(limite, len(reporte["filas"]))
     if resto:
