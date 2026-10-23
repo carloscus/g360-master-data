@@ -570,49 +570,45 @@ class TestLeerUnbxCaja:
             leer_unbx(ruta)
 
 
-class TestResolverUmKardex:
-    """El UM sale de KARDEX: exacto primero, sin prefijo numerico despues."""
+class TestEmparejarSkus:
+    """Calce exacto primero, sin prefijo numerico despues, sin adivinar."""
 
-    def _resolver(self):
-        from generar_catalogo_base import resolver_um_kardex
+    def _emparejar(self):
+        from contratos import emparejar_skus
 
-        return resolver_um_kardex
+        return emparejar_skus
 
     def test_exacta(self):
-        resolver = self._resolver()
-        res, st = resolver({"CA001"}, {"CA001": "UND", "X": "KGR"})
-        assert res == {"CA001": "UND"}
-        assert st["exactos"] == 1
+        emparejar = self._emparejar()
+        match, st = emparejar({"CA001"}, {"CA001": "UND", "X": "KGR"})
+        assert match == {"CA001": "CA001"}
+        assert st == {"exactos": 1, "prefijo": 0, "ambiguos": 0, "sin_match": 0}
 
     def test_prefijo_numerico(self):
         # KARDEX guarda '01CA001' cuando el ERP dice 'CA001'.
-        resolver = self._resolver()
-        res, st = resolver({"CA001"}, {"01CA001": "UND"})
-        assert res == {"CA001": "UND"}
+        emparejar = self._emparejar()
+        match, st = emparejar({"CA001"}, {"01CA001": "UND"})
+        assert match == {"CA001": "01CA001"}
         assert st["prefijo"] == 1
 
     def test_ceros_no_se_pierden(self):
         # '016763' NO es '16763': sin letras no hay reduccion.
-        resolver = self._resolver()
-        res, st = resolver({"16763"}, {"016763": "UND"})
-        assert res == {}
+        emparejar = self._emparejar()
+        match, st = emparejar({"16763"}, {"016763": "UND"})
+        assert match == {}
         assert st["sin_match"] == 1
 
     def test_exacta_gana_a_prefijo(self):
-        resolver = self._resolver()
-        res, _ = resolver({"CA001"}, {"CA001": "UND", "01CA001": "KGR"})
-        assert res == {"CA001": "UND"}
+        emparejar = self._emparejar()
+        match, st = emparejar({"CA001"}, {"CA001": "UND", "01CA001": "KGR"})
+        assert match == {"CA001": "CA001"}
+        assert st["exactos"] == 1 and st["prefijo"] == 0
 
     def test_ambiguo_no_se_adivina(self):
-        resolver = self._resolver()
-        res, st = resolver({"CA001"}, {"01CA001": "UND", "02CA001": "KGR"})
-        assert res == {}
+        emparejar = self._emparejar()
+        match, st = emparejar({"CA001"}, {"01CA001": "UND", "02CA001": "KGR"})
+        assert match == {}
         assert st["ambiguos"] == 1
-
-    def test_um_vacia_no_entra(self):
-        resolver = self._resolver()
-        res, _ = resolver({"A"}, {"A": ""})
-        assert res == {"A": ""} or res == {}
 
 
 class TestUmEnCatalogo:
@@ -740,17 +736,18 @@ class TestDimensionesEnCatalogo:
 
 class TestClasificarGuia:
     """El motivo por el que un SKU manual no entra. Los SKU son EXACTOS:
-    no hay 'similares' ni sugerencias: o el codigo esta en el maestro o no."""
+    no hay 'similares' ni sugerencias: o el codigo esta en el maestro (o en
+    KARDEX, con o sin prefijo) o no esta."""
 
     def test_en_erp_activo_entra(self):
         motivo, _ = clasificar_guia(
-            "A00011", {"inactivo": False, "linea": "PELOTAS"}, set()
+            "A00011", {"inactivo": False, "linea": "PELOTAS"}, False
         )
         assert motivo == "ok"
 
     def test_inactivo_en_erp_no_entra(self):
         motivo, detalle = clasificar_guia(
-            "B0002", {"inactivo": True, "linea": "PELOTAS"}, set()
+            "B0002", {"inactivo": True, "linea": "PELOTAS"}, False
         )
         assert motivo == "inactivo"
         assert "inactivo" in detalle.lower()
@@ -759,27 +756,27 @@ class TestClasificarGuia:
         motivo, detalle = clasificar_guia(
             "C0003",
             {"inactivo": False, "linea": "PRODUCTOS EN PROCESO"},
-            set(),
+            False,
         )
         assert motivo == "proceso"
         assert "proceso" in detalle.lower()
 
     def test_sin_similares_solo_exactos(self):
         # A00012 no existe: aunque A00011 se parezca, no se sugiere nada.
-        motivo, detalle = clasificar_guia("A00012", None, set())
+        motivo, detalle = clasificar_guia("A00012", None, False)
         assert motivo == "inexistente"
         assert "A00011" not in detalle
         assert "similar" not in detalle.lower()
         assert "tipeo" not in detalle.lower()
 
     def test_en_kardex_pero_no_en_erp(self):
-        motivo, detalle = clasificar_guia("K0009", None, {"K0009"})
+        motivo, detalle = clasificar_guia("K0009", None, True)
         assert motivo == "kardex"
         assert "KARDEX" in detalle
         assert "similar" not in detalle.lower()
 
     def test_inexistente(self):
-        motivo, detalle = clasificar_guia("ZZZ99", None, set())
+        motivo, detalle = clasificar_guia("ZZZ99", None, False)
         assert motivo == "inexistente"
         assert "ERP" in detalle and "KARDEX" in detalle
 
@@ -1070,3 +1067,252 @@ class TestCaidaUniverso:
         }
         errores, _ = validar(catalogo, Path(__file__).resolve().parent.parent.parent)
         assert any("cayo -20%" in e for e in errores)
+
+
+CABECERA_KARDEX = [
+    "colIdAlmacen",
+    "colNomAlmacen",
+    "colIdArticulo",
+    "colNomArticulo",
+    "colNomArticulo",
+    "colIdLinea",
+    "colNomLinea",
+    "colIdGrupo",
+    "colNomGrupo",
+    "colIdTipo",
+    "colNomTipo",
+    "colIdFamilia",
+    "colNomFamilia",
+    "colIdUM",
+]
+
+
+def _escribir_kardex(ruta, filas):
+    import openpyxl
+
+    libro = openpyxl.Workbook()
+    hoja = libro.active
+    hoja.title = "KARDEX"
+    hoja.append(CABECERA_KARDEX)
+    for fila in filas:
+        hoja.append(fila)
+    libro.save(ruta)
+    return ruta
+
+
+def _fila_k(
+    almacen,
+    sku,
+    um="UND",
+    lin=("CA", "LINEA"),
+    gru=("G1", "GRUPO"),
+    tip=("T1", "TIPO"),
+    fam=("F1", "FAM"),
+):
+    return [
+        almacen,
+        "ALM",
+        sku,
+        "NOM " + sku,
+        "NOM LARGO " + sku,
+        lin[0],
+        lin[1],
+        gru[0],
+        gru[1],
+        tip[0],
+        tip[1],
+        fam[0],
+        fam[1],
+        um,
+    ]
+
+
+class TestLeerKardex:
+    """Una sola lectura compartida: ficha completa + cache por archivo."""
+
+    def test_ficha_completa(self, tmp_path):
+        from contratos import leer_kardex
+
+        _escribir_kardex(
+            tmp_path / "KARDEX_BASE.xlsx",
+            [
+                _fila_k("A", "01CA001"),
+                _fila_k("B", "03077", um="KGR"),
+            ],
+        )
+        fichas, meta = leer_kardex(tmp_path / "KARDEX_BASE.xlsx")
+        assert meta["articulos"] == 2
+        assert fichas["01CA001"]["um"] == "UND"
+        assert fichas["01CA001"]["linea"] == "LINEA"
+        assert fichas["01CA001"]["nombre_largo"] == "NOM LARGO 01CA001"
+        assert fichas["03077"]["um"] == "KGR"
+
+    def test_segunda_lectura_usa_cache(self, tmp_path):
+        from contratos import leer_kardex
+
+        _escribir_kardex(tmp_path / "KARDEX_BASE.xlsx", [_fila_k("A", "K1")])
+        leer_kardex(tmp_path / "KARDEX_BASE.xlsx")
+        _, meta = leer_kardex(tmp_path / "KARDEX_BASE.xlsx")
+        assert meta["nota"] == "indice cacheado"
+
+    def test_conflicto_por_almacen_queda_registrado(self, tmp_path):
+        from contratos import leer_kardex
+
+        _escribir_kardex(
+            tmp_path / "KARDEX_BASE.xlsx",
+            [
+                _fila_k("A", "K1", gru=("G1", "GRUPO UNO")),
+                _fila_k("B", "K1", gru=("G1", "GRUPO DOS")),
+            ],
+        )
+        fichas, _ = leer_kardex(tmp_path / "KARDEX_BASE.xlsx")
+        assert fichas["K1"]["n_almacenes"] == 2
+        assert fichas["K1"]["conflictos"].get("grupo") == ["GRUPO DOS", "GRUPO UNO"]
+
+    def test_sin_archivo_devuelve_vacio(self, tmp_path):
+        from contratos import leer_kardex
+
+        fichas, meta = leer_kardex(tmp_path / "KARDEX_BASE.xlsx")
+        assert fichas == {}
+        assert meta["nota"] == "sin KARDEX"
+
+
+class TestAuditarKardexErp:
+    """El cruce ERP<->KARDEX muestra defectos de registro en vez de asumir."""
+
+    def _erp(self, ruta):
+        import xlwt
+
+        libro = xlwt.Workbook(encoding="utf-8")
+        hoja = libro.add_sheet("codigos productos")
+        columnas = [
+            "CODIGO",
+            "NOMBRE",
+            "LINEA",
+            "GRUPO",
+            "TIPO",
+            "FAMILIA",
+            "PRECIO",
+            "FLG_INACTIVO",
+            "FLG_DESCONTINUADO",
+        ]
+        for i, nombre in enumerate(columnas):
+            hoja.write(0, i, nombre)
+        filas = [
+            [
+                "IGUAL1",
+                "N",
+                "PELOTAS",
+                "G1",
+                "T1",
+                "F1",
+                "10",
+                "Unchecked",
+                "Unchecked",
+            ],
+            [
+                "DIFER01",
+                "N",
+                "PELOTAS",
+                "G1",
+                "T1",
+                "F1",
+                "10",
+                "Unchecked",
+                "Unchecked",
+            ],
+            [
+                "PREF01",
+                "N",
+                "PELOTAS",
+                "G1",
+                "T1",
+                "F1",
+                "10",
+                "Unchecked",
+                "Unchecked",
+            ],
+            [
+                "SOLOERP",
+                "N",
+                "PELOTAS",
+                "G1",
+                "T1",
+                "F1",
+                "10",
+                "Unchecked",
+                "Unchecked",
+            ],
+        ]
+        for r, fila in enumerate(filas, start=1):
+            for c, valor in enumerate(fila):
+                hoja.write(r, c, valor)
+        libro.save(str(ruta))
+
+    def test_detecta_diferencia_y_prefijo(self, tmp_path):
+        from validar_encabezados import validar_kardex_vs_erp
+
+        self._erp(tmp_path / "PRODUCTOS.xls")
+        _escribir_kardex(
+            tmp_path / "KARDEX_BASE.xlsx",
+            [
+                # igual en todo (ERP guarda el nombre: 'G1' == 'G1')
+                _fila_k(
+                    "A",
+                    "IGUAL1",
+                    lin=("01", "PELOTAS"),
+                    gru=("G1", "G1"),
+                    tip=("T1", "T1"),
+                    fam=("F1", "F1"),
+                ),
+                # grupo distinto: ERP G1 vs KARDEX G9
+                _fila_k(
+                    "A",
+                    "DIFER01",
+                    lin=("01", "PELOTAS"),
+                    gru=("G9", "G9"),
+                    tip=("T1", "T1"),
+                    fam=("F1", "F1"),
+                ),
+                # con prefijo numerico: ERP PREF01, KARDEX 01PREF01
+                _fila_k(
+                    "A",
+                    "01PREF01",
+                    lin=("01", "PELOTAS"),
+                    gru=("G1", "G1"),
+                    tip=("T1", "T1"),
+                    fam=("F1", "F1"),
+                ),
+                # conflicto entre almacenes
+                _fila_k(
+                    "A",
+                    "CONF01",
+                    lin=("01", "PELOTAS"),
+                    gru=("G1", "G1"),
+                    tip=("T1", "T1"),
+                    fam=("F1", "F1"),
+                ),
+                _fila_k(
+                    "B",
+                    "CONF01",
+                    lin=("01", "PELOTAS"),
+                    gru=("G2", "G2"),
+                    tip=("T1", "T1"),
+                    fam=("F1", "F1"),
+                ),
+            ],
+        )
+        bloque = validar_kardex_vs_erp(tmp_path)
+        assert bloque.estado == "aviso"
+        texto = "\n".join(bloque.avisos)
+        assert "DIFER01" in texto
+        assert "G1" in texto and "G9" in texto
+        assert not any(a.startswith("  IGUAL1:") for a in bloque.avisos)
+        assert any("CONF01" in a for a in bloque.avisos)
+
+    def test_no_bloquea_y_sin_kardex_se_omite(self, tmp_path):
+        from validar_encabezados import validar_kardex_vs_erp
+
+        self._erp(tmp_path / "PRODUCTOS.xls")
+        bloque = validar_kardex_vs_erp(tmp_path)
+        assert bloque.estado == "skip"

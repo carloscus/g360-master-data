@@ -926,3 +926,185 @@ def calcular_m3(largo_cm, ancho_cm, alto_cm) -> float | None:
             return None
         lados.append(numero)
     return round(lados[0] * lados[1] * lados[2] / 1_000_000, 6)
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# KARDEX completo: una sola lectura compartida
+# ─────────────────────────────────────────────────────────────────────────────
+#
+# El KARDEX es padrón artículo × almacén (179k filas): leerlo entero tarda.
+# Se lee UNA vez por archivo y se cachea en data/.cache_kardex.json; todos
+# los consumidores (UM del catálogo, revisión de guía, auditoría vs ERP)
+# derivan de esa única lectura. Así ningún campo "se deja de leer".
+
+CACHE_KARDEX_NOMBRE = ".cache_kardex.json"
+CACHE_KARDEX_VERSION = 3
+
+
+def canon_sku(codigo) -> str:
+    """Clave canonica para calzar SKUs entre fuentes: mayusculas sin prefijo
+    numerico ('01CA001' -> 'CA001').
+
+    El prefijo solo se quita si lo que queda tiene alguna letra: un SKU
+    puramente numerico ('016763') NUNCA se reduce ('16763' seria otro
+    articulo: los ceros a la izquierda son parte del codigo).
+    """
+    texto = str(codigo or "").strip().upper()
+    base = re.sub(r"^[0-9]+", "", texto)
+    if base and re.search(r"[A-Z]", base):
+        return base
+    return texto if re.search(r"[A-Z]", texto) else ""
+
+
+def emparejar_skus(buscados, candidatos) -> tuple[dict[str, str], dict]:
+    """Calza SKUs entre dos fuentes por codigo EXACTO primero y sin prefijo
+    numerico despues. Devuelve ({buscado: candidato}, stats).
+
+    stats: exactos / prefijo / ambiguos (2+ candidatos distintos) /
+    sin_match. Lo ambiguo y lo no encontrado NO se adivinan: se reportan.
+    """
+    candidatos = list(dict.fromkeys(candidatos))
+    exactos = set(candidatos)
+    por_base: dict[str, list[str]] = {}
+    for c in candidatos:
+        b = canon_sku(c)
+        if b and b != c.upper():
+            por_base.setdefault(b, []).append(c)
+
+    match: dict[str, str] = {}
+    stats = {"exactos": 0, "prefijo": 0, "ambiguos": 0, "sin_match": 0}
+    for s in dict.fromkeys(buscados):
+        if s in exactos:
+            match[s] = s
+            stats["exactos"] += 1
+            continue
+        b = canon_sku(s)
+        cands = [c for c in por_base.get(b, []) if c.upper() != str(s).upper()]
+        if len(cands) == 1:
+            match[s] = cands[0]
+            stats["prefijo"] += 1
+        elif len(cands) > 1:
+            stats["ambiguos"] += 1
+        else:
+            stats["sin_match"] += 1
+    return match, stats
+
+
+def leer_kardex(ruta) -> tuple[dict, dict]:
+    """Lee KARDEX_BASE.xlsx completo, una sola vez por archivo (cache en
+    disco). Devuelve (articulos, meta) donde articulos es
+    {colIdArticulo: ficha} con ficha = {um, linea_id, linea, grupo_id,
+    grupo, tipo_id, tipo, familia_id, familia, nombre_corto, nombre_largo,
+    n_almacenes, conflictos}.
+
+    `conflictos` junta los valores distintos vistos para el mismo SKU en
+    distintas filas/almacenes (UM, linea, grupo...): el KARDEX tambien
+    trae defectos y aca quedan a la vista en vez de perderse en silencio.
+    """
+    import openpyxl
+
+    p = Path(ruta)
+    meta = {"archivo": p.name, "articulos": 0, "nota": "sin KARDEX"}
+    try:
+        st = p.stat()
+    except OSError:
+        return {}, meta
+    huella = {"archivo": p.name, "bytes": st.st_size, "modificado": st.st_mtime}
+    cache = p.with_name(CACHE_KARDEX_NOMBRE)
+    try:
+        with open(cache, encoding="utf-8") as f:
+            guardado = json.load(f)
+        if guardado.get("v") == CACHE_KARDEX_VERSION and all(
+            guardado.get("huella", {}).get(k) == v for k, v in huella.items()
+        ):
+            articulos = guardado.get("articulos", {})
+            meta = {
+                "archivo": p.name,
+                "articulos": len(articulos),
+                "nota": "indice cacheado",
+            }
+            return articulos, meta
+    except (OSError, ValueError):
+        pass
+
+    print("  (leyendo KARDEX completo: una sola vez por archivo...)")
+    articulos: dict[str, dict] = {}
+    libro = openpyxl.load_workbook(ruta, read_only=True, data_only=True)
+    try:
+        columnas, hoja = resolver_xlsx(libro, CONTRATO_KARDEX)
+        idx = {c: columnas.idx(c) for c in columnas.indices}
+        i_sku, i_um = idx["id_articulo"], idx["id_um"]
+        # La 2da ocurrencia de colNomArticulo es la descripcion larga
+        # (la 1ra es el nombre corto y es la que mapea el contrato).
+        # Se acepta solo si el encabezado vecino es el mismo nombre:
+        # nunca por posicion a ciegas.
+        nombres_norm = [normalizar_encabezado(h) for h in columnas.encabezados]
+        i_nom = idx["nom_articulo"]
+        i_largo = None
+        if (
+            i_nom + 1 < len(nombres_norm)
+            and nombres_norm[i_nom + 1] == nombres_norm[i_nom]
+        ):
+            i_largo = i_nom + 1
+
+        def _txt(fila, campo, default=""):
+            v = columnas.valor(fila, campo) if campo in idx else default
+            return limpiar_texto(v)
+
+        for fila in hoja.iter_rows(min_row=2, values_only=True):
+            if len(fila) <= max(i_sku, i_um):
+                continue
+            sku = sku_texto(fila[i_sku])
+            um = limpiar_texto(fila[i_um]).upper() if len(fila) > i_um else ""
+            if not sku:
+                continue
+            ficha = articulos.get(sku)
+            largo = (
+                limpiar_texto(fila[i_largo])
+                if i_largo is not None and len(fila) > i_largo
+                else ""
+            )
+            if ficha is None:
+                articulos[sku] = {
+                    "um": um,
+                    "linea_id": _txt(fila, "id_linea"),
+                    "linea": _txt(fila, "nom_linea"),
+                    "grupo_id": _txt(fila, "id_grupo"),
+                    "grupo": _txt(fila, "nom_grupo"),
+                    "tipo_id": _txt(fila, "id_tipo"),
+                    "tipo": _txt(fila, "nom_tipo"),
+                    "familia_id": _txt(fila, "id_familia"),
+                    "familia": _txt(fila, "nom_familia"),
+                    "nombre_corto": _txt(fila, "nom_articulo"),
+                    "nombre_largo": largo,
+                    "n_almacenes": 1,
+                    "conflictos": {},
+                }
+                continue
+            ficha["n_almacenes"] += 1
+            for campo, valor in (
+                ("um", um),
+                ("linea", _txt(fila, "nom_linea")),
+                ("grupo", _txt(fila, "nom_grupo")),
+                ("tipo", _txt(fila, "nom_tipo")),
+                ("familia", _txt(fila, "nom_familia")),
+            ):
+                if valor and valor != ficha[campo]:
+                    ficha["conflictos"].setdefault(campo, sorted({ficha[campo], valor}))
+    except ErrorContrato:
+        return {}, {"archivo": p.name, "articulos": 0, "nota": "contrato roto"}
+    finally:
+        libro.close()
+    try:
+        with open(cache, "w", encoding="utf-8") as f:
+            json.dump(
+                {"v": CACHE_KARDEX_VERSION, "huella": huella, "articulos": articulos}, f
+            )
+    except OSError:
+        pass
+    meta = {
+        "archivo": p.name,
+        "articulos": len(articulos),
+        "nota": "indice reconstruido",
+    }
+    return articulos, meta

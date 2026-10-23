@@ -49,6 +49,8 @@ from contratos import (
     calcular_m3,
     cargar_guia_ignorados,
     detectar_columnas_s1,
+    emparejar_skus,
+    leer_kardex,
     limpiar_texto,
     normalizar_encabezado,
     resolver_xls,
@@ -795,15 +797,16 @@ def _imprimir(bloques: list[Bloque]) -> None:
 # ─────────────────────────────────────────────────────────────────────────────
 
 
-def clasificar_guia(sku, ficha_erp, kardex) -> tuple[str, str]:
+def clasificar_guia(sku, ficha_erp, en_kardex: bool) -> tuple[str, str]:
     """Por que un SKU de la guia (SKU_BX/precios) no entra al catalogo.
 
-    Los SKU son EXACTOS: no hay "similares". O el codigo esta en el
-    maestro o no esta; no se sugiere ni se adivina (un "parecido" en un
-    aviso termina cargandose como dato).
+    Los SKU son EXACTOS: no hay "similares". El calce contra KARDEX acepta
+    el prefijo numerico ('01CA001' -> 'CA001', nunca '016763' -> '16763'):
+    ver contratos.emparejar_skus. O el codigo esta o no esta; no se sugiere
+    ni se adivina (un "parecido" en un aviso termina cargandose como dato).
 
     `ficha_erp` es None si el SKU no esta en el ERP, o
-    {inactivo: bool, linea: str}. `kardex` es el set de colIdArticulo.
+    {inactivo: bool, linea: str}. `en_kardex` dice si existe en KARDEX.
     Devuelve (motivo, detalle); motivo 'ok' = entra por guia.
     """
     from generar_catalogo_base import LINEAS_EXCLUIR
@@ -822,7 +825,7 @@ def clasificar_guia(sku, ficha_erp, kardex) -> tuple[str, str]:
                 "aunque este en guia",
             )
         return ("ok", "")
-    if sku in kardex:
+    if en_kardex:
         return (
             "kardex",
             "existe en KARDEX pero no en ERP: revisar maestro "
@@ -836,7 +839,7 @@ def clasificar_guia(sku, ficha_erp, kardex) -> tuple[str, str]:
 
 
 def _fichas_erp(ruta: Path) -> dict[str, dict] | None:
-    """{sku: {inactivo, linea}} con TODAS las filas del ERP. None si el
+    """Ficha completa por SKU con TODAS las filas del ERP. None si el
     contrato esta roto (el bloque ERP ya lo reporta: no duplicar el error)."""
     import xlrd
 
@@ -850,6 +853,12 @@ def _fichas_erp(ruta: Path) -> dict[str, dict] | None:
         return None
     finally:
         libro.release_resources()
+
+    def _campo(fila, campo):
+        if not columnas.tiene(campo):
+            return ""
+        return limpiar_texto(columnas.valor(fila, campo))
+
     fichas: dict[str, dict] = {}
     for r in range(1, hoja.nrows):
         fila = hoja.row_values(r)
@@ -857,56 +866,42 @@ def _fichas_erp(ruta: Path) -> dict[str, dict] | None:
         if not sku or sku in fichas:
             continue
         fichas[sku] = {
-            "inactivo": limpiar_texto(columnas.valor(fila, "inactivo")).lower()
-            == "checked",
-            "linea": limpiar_texto(columnas.valor(fila, "linea")),
+            "nombre": _campo(fila, "nombre"),
+            "inactivo": _campo(fila, "inactivo").lower() == "checked",
+            "linea": _campo(fila, "linea"),
+            "grupo": _campo(fila, "grupo"),
+            "tipo": _campo(fila, "tipo"),
+            "familia": _campo(fila, "familia"),
         }
     return fichas
 
 
-def _skus_kardex(ruta: Path) -> tuple[set[str], str]:
-    """Set de colIdArticulo del KARDEX + nota de origen.
+def _fichas_kardex(ruta: Path) -> tuple[dict, dict]:
+    """Fichas completas por colIdArticulo + meta (una sola lectura, cacheada).
 
-    El archivo pesa 11 MB / 179k filas: se cachea el set en
-    data/.cache_kardex_skus.json y solo se reconstruye si el archivo cambio
-    (mismo nombre, tamano y fecha). Sin KARDEX devuelve set vacio.
+    Delega en contratos.leer_kardex: la misma lectura que alimenta el UM
+    del catalogo y la revision de guia. Sin KARDEX devuelve ({}, ...).
     """
-    import openpyxl
-
     try:
-        st = ruta.stat()
-    except OSError:
-        return set(), "sin KARDEX"
-    huella = {"archivo": ruta.name, "bytes": st.st_size, "modificado": st.st_mtime}
-    cache = ruta.with_name(".cache_kardex_skus.json")
-    try:
-        with open(cache, encoding="utf-8") as f:
-            guardado = json.load(f)
-        if all(guardado.get(k) == v for k, v in huella.items()):
-            return set(guardado.get("skus", [])), "indice cacheado"
-    except (OSError, ValueError):
-        pass
-
-    print("  (construyendo indice KARDEX: una sola vez por archivo...)")
-    libro = openpyxl.load_workbook(ruta, read_only=True, data_only=True)
-    try:
-        columnas, hoja = resolver_xlsx(libro, CONTRATO_KARDEX)
-        i_art = columnas.idx("id_articulo")
-        skus = {
-            sku_texto(f[i_art])
-            for f in hoja.iter_rows(min_row=2, values_only=True)
-            if len(f) > i_art and sku_texto(f[i_art])
-        }
+        fichas, meta = leer_kardex(ruta)
     except ErrorContrato:
-        return set(), "contrato roto (ver bloque KARDEX)"
-    finally:
-        libro.close()
-    try:
-        with open(cache, "w", encoding="utf-8") as f:
-            json.dump({**huella, "skus": sorted(skus)}, f)
-    except OSError:
-        pass
-    return skus, f"indice reconstruido ({len(skus)} articulos)"
+        return {}, {
+            "archivo": Path(ruta).name,
+            "articulos": 0,
+            "nota": "contrato roto (ver bloque KARDEX)",
+        }
+    if not fichas and meta.get("nota") == "sin KARDEX":
+        return fichas, {
+            "archivo": Path(ruta).name,
+            "articulos": 0,
+            "nota": "sin KARDEX",
+        }
+    meta = dict(meta)
+    meta["nota"] = {
+        "indice cacheado": "indice cacheado",
+        f"indice reconstruido ({meta.get('articulos', 0)} articulos)": f"indice reconstruido ({meta.get('articulos', 0)} articulos)",
+    }.get(meta.get("nota", ""), meta.get("nota", ""))
+    return fichas, meta
 
 
 def _skus_guia(data: Path) -> dict[str, str]:
@@ -985,8 +980,19 @@ def validar_guia_vs_maestros(data: Path) -> Bloque:
         bloque.info.append("guia vacia o ilegible: nada que revisar")
         return bloque
 
-    kardex, nota_kardex = _skus_kardex(data / "KARDEX_BASE.xlsx")
-    bloque.info.append(f"KARDEX: {len(kardex)} articulos ({nota_kardex})")
+    kardex, meta_kardex = _fichas_kardex(data / "KARDEX_BASE.xlsx")
+    bloque.info.append(
+        f"KARDEX: {meta_kardex.get('articulos', 0)} articulos "
+        f"({meta_kardex.get('nota', '')})"
+    )
+    # Calce exacto primero, sin prefijo despues: un SKU de la guia que solo
+    # existe con prefijo en KARDEX ('01CA001') SI esta en KARDEX.
+    match_kardex, stats_kardex = emparejar_skus(set(guia), set(kardex))
+    en_kardex = set(match_kardex)
+    if stats_kardex["prefijo"]:
+        bloque.info.append(
+            f"{stats_kardex['prefijo']} SKU(s) de guia calzan con prefijo KARDEX"
+        )
 
     ignorados = cargar_guia_ignorados()
     omitidos_ack = 0
@@ -994,7 +1000,7 @@ def validar_guia_vs_maestros(data: Path) -> Bloque:
         if sku in ignorados:
             omitidos_ack += 1
             continue
-        motivo, detalle = clasificar_guia(sku, fichas.get(sku), kardex)
+        motivo, detalle = clasificar_guia(sku, fichas.get(sku), sku in en_kardex)
         if motivo == "ok":
             continue
         bloque.avisos.append(f"{sku} ({guia[sku]}): {detalle}")
@@ -1005,6 +1011,93 @@ def validar_guia_vs_maestros(data: Path) -> Bloque:
         )
     if not bloque.avisos:
         bloque.info.append(f"{len(guia)} SKUs de guia existen en ERP: nada que revisar")
+    return bloque
+
+
+def _norm(valor: str) -> str:
+    return normalizar_encabezado(valor)
+
+
+def validar_kardex_vs_erp(data: Path) -> Bloque:
+    """Auditoria cruzada ERP <-> KARDEX por taxonomia completa.
+
+    Para cada SKU que existe en AMBOS maestros compara linea, grupo, tipo,
+    familia y UM. Las diferencias no bloquean (el catalogo no consume la
+    taxonomia KARDEX salvo por el UM), pero quedan a la vista: si una
+    fuente dice "PELOTAS" y la otra "OTROS", alguien tiene que revisar
+    cual esta mal registrada.
+
+    Tambien lista SKUs cuya ficha KARDEX varia segun el almacen (el
+    padron deberia decir lo mismo en todas partes) y SKUs del ERP sin
+    UM en KARDEX.
+    """
+    bloque = Bloque(
+        "KARDEX vs ERP (auditoria de taxonomia)", str(data), bloqueante=False
+    )
+    fichas_erp = _fichas_erp(data / "PRODUCTOS.xls")
+    if fichas_erp is None:
+        bloque.omitido = "sin ERP legible: no se puede auditar"
+        return bloque
+    fichas_k, meta_k = _fichas_kardex(data / "KARDEX_BASE.xlsx")
+    if not fichas_k:
+        bloque.omitido = f"KARDEX no disponible ({meta_k.get('nota', '')})"
+        return bloque
+
+    match, stats = emparejar_skus(set(fichas_erp), set(fichas_k))
+    bloque.info.append(
+        f"cruce exacto={stats['exactos']} prefijo={stats['prefijo']} "
+        f"ambiguos={stats['ambiguos']} sin_match={stats['sin_match']} "
+        f"(KARDEX: {meta_k.get('articulos', 0)} articulos)"
+    )
+
+    # Fichas KARDEX que varian segun almacen = defecto del padron.
+    con_conflicto = {s: f for s, f in fichas_k.items() if f.get("conflictos")}
+    if con_conflicto:
+        bloque.avisos.append(
+            f"{len(con_conflicto)} SKU(s) con ficha distinta segun almacen "
+            "(padron inconsistente)"
+        )
+    for sku in sorted(con_conflicto)[:5]:
+        bloque.avisos.append(f"  {sku}: {con_conflicto[sku]['conflictos']}")
+
+    # Comparar taxonomia donde ambas fuentes conocen el SKU.
+    campos = (
+        ("linea", "linea"),
+        ("grupo", "grupo"),
+        ("tipo", "tipo"),
+        ("familia", "familia"),
+    )
+    malas = 0
+    for sku in sorted(match):
+        fe, fk = fichas_erp[sku], fichas_k[match[sku]]
+        difs = []
+        for campo_erp, campo_k in campos:
+            ve = normalizar_encabezado(fe.get(campo_erp, ""))
+            vk = normalizar_encabezado(fk.get(campo_k, ""))
+            if ve and vk and ve != vk:
+                difs.append(
+                    f"{campo_erp}: ERP={fe.get(campo_erp, '')!r} vs KARDEX={fk.get(campo_k, '')!r}"
+                )
+        if difs:
+            malas += 1
+            if len([a for a in bloque.avisos if a.startswith("  ")]) < 12:
+                bloque.avisos.append(f"  {sku}: " + "; ".join(difs))
+    if malas:
+        bloque.avisos.insert(
+            0,
+            f"{malas} SKU(s) con taxonomia distinta entre ERP y KARDEX "
+            "(mostrando hasta 12)",
+        )
+    else:
+        bloque.info.append(f"{len(match)} SKUs comparados: taxonomia coincidente")
+
+    # ERP sin UM en KARDEX (el UM del catalogo quedara vacio o de S1).
+    sin_um = sorted(s for s, m in match.items() if not fichas_k[m].get("um"))
+    if sin_um:
+        bloque.avisos.append(
+            f"{len(sin_um)} SKU(s) del ERP sin UM en KARDEX "
+            f"(ej: {', '.join(sin_um[:5])})"
+        )
     return bloque
 
 
@@ -1044,6 +1137,7 @@ def main() -> int:
         bloques.append(validar_s1(s1))
     if not args.sin_kardex:
         bloques.append(validar_kardex(data / "KARDEX_BASE.xlsx"))
+        bloques.append(validar_kardex_vs_erp(data))
     bloques.append(validar_guia_vs_maestros(data))
 
     if args.json:

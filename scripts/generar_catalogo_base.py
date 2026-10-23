@@ -59,13 +59,14 @@ from pathlib import Path
 
 from contratos import (
     CONTRATO_ERP,
-    CONTRATO_KARDEX,
     CONTRATO_SKU_BX,
     ErrorContrato,
     calcular_m3,
     cargar_almacenes,
     cargar_guia_ignorados,
+    emparejar_skus,
     huella_fuente,
+    leer_kardex,
     limpiar_texto,
     resolver_xls,
     resolver_xlsx,
@@ -892,100 +893,6 @@ def leer_unbx(ruta):
     return datos
 
 
-def leer_um_kardex(ruta: Path) -> tuple[dict[str, str], str]:
-    """Lee UM por SKU desde KARDEX_BASE.xlsx, con cache en disco.
-
-    KARDEX tiene ~180k filas y 68k SKUs; leerlo completo en cada corrida
-    es lento (~2-3s). Se cachea el mapping {sku: um} en
-    data/.cache_kardex_um.json y solo se reconstruye si el archivo cambio
-    (mismo nombre, tamano y fecha). Sin KARDEX devuelve dict vacio.
-    """
-    try:
-        st = ruta.stat()
-    except OSError:
-        return {}, "sin KARDEX"
-    huella = {"archivo": ruta.name, "bytes": st.st_size, "modificado": st.st_mtime}
-    cache = ruta.with_name(".cache_kardex_um.json")
-    try:
-        with open(cache, encoding="utf-8") as f:
-            guardado = json.load(f)
-        if all(guardado.get(k) == v for k, v in huella.items()):
-            return guardado.get("um", {}), "indice cacheado"
-    except (OSError, ValueError):
-        pass
-
-    print("  (leyendo UM desde KARDEX: una sola vez por archivo...)")
-    libro = openpyxl.load_workbook(ruta, read_only=True, data_only=True)
-    try:
-        columnas, hoja = resolver_xlsx(libro, CONTRATO_KARDEX)
-        i_sku = columnas.idx("id_articulo")
-        i_um = columnas.idx("id_um")
-        um_map: dict[str, str] = {}
-        for fila in hoja.iter_rows(min_row=2, values_only=True):
-            if len(fila) <= max(i_sku, i_um):
-                continue
-            sku = sku_texto(fila[i_sku])
-            um = limpiar_texto(fila[i_um])
-            if sku and um:
-                um_map.setdefault(sku, um)
-    except ErrorContrato:
-        return {}, "contrato roto (ver bloque KARDEX)"
-    finally:
-        libro.close()
-    try:
-        with open(cache, "w", encoding="utf-8") as f:
-            json.dump({**huella, "um": um_map}, f)
-    except OSError:
-        pass
-    return um_map, f"{len(um_map)} SKUs con UM"
-
-
-def _sin_prefijo_numerico(codigo) -> str:
-    """'01CA001' -> 'CA001'. Quita digitos iniciales SOLO si lo que queda
-    tiene alguna letra: un '016763' jamas se reduce a '16763' (son
-    articulos distintos, los ceros a la izquierda son parte del SKU)."""
-    base = re.sub(r"^[0-9]+", "", str(codigo or "").strip().upper())
-    if base and re.search(r"[A-Z]", base):
-        return base
-    return ""
-
-
-def resolver_um_kardex(skus, um_por_id: dict[str, str]):
-    """Une UM de KARDEX con SKUs del catalogo/ERP.
-
-    1) Coincidencia exacta (tal cual).
-    2) Sin prefijo numerico: KARDEX guarda algunos como '01CA001' cuando
-       el ERP dice 'CA001'. Solo si lo que queda tiene alguna letra (ver
-       _sin_prefijo_numerico) y sin ambiguedad (un solo candidato; el
-       exacto siempre gana).
-    """
-    resueltos: dict[str, str] = {}
-    stats = {"exactos": 0, "prefijo": 0, "ambiguos": 0, "sin_match": 0}
-    for s in dict.fromkeys(skus):
-        if s in um_por_id:
-            resueltos[s] = um_por_id[s]
-            stats["exactos"] += 1
-    por_base: dict[str, list] = {}
-    for kid, um in um_por_id.items():
-        b = _sin_prefijo_numerico(kid)
-        if b:
-            por_base.setdefault(b, []).append((kid, um))
-    for s in dict.fromkeys(skus):
-        if s in resueltos:
-            continue
-        b = _sin_prefijo_numerico(s)
-        cands = por_base.get(b, []) if b else []
-        cands = [(k, u) for k, u in cands if k.upper() != str(s).upper()]
-        if len(cands) == 1:
-            resueltos[s] = cands[0][1]
-            stats["prefijo"] += 1
-        elif len(cands) > 1:
-            stats["ambiguos"] += 1
-        else:
-            stats["sin_match"] += 1
-    return resueltos, stats
-
-
 def _entero(valor) -> int:
     """Entero tolerante ('18', 18.0, '18.0'); 0 si no se puede."""
     texto = limpiar_texto(valor)
@@ -1743,20 +1650,27 @@ def main():
     # Generar output
     print("\nGenerando catálogo...")
     # UM desde KARDEX (fuente primaria: el ERP no exporta UM, KARDEX sí).
-    # Se resuelve por SKU exacto y, si no hay, sin prefijo numerico
-    # ('01CA001' -> 'CA001'). Sin KARDEX, um queda como esta (S1 o vacio).
+    # Una sola lectura compartida (contratos.leer_kardex, con cache) y
+    # calce exacto primero, sin prefijo despues (contratos.emparejar_skus).
     um_kardex: dict[str, str] = {}
     kardex_ruta = Path("data") / "KARDEX_BASE.xlsx"
     if kardex_ruta.exists():
-        um_crudo, um_nota = leer_um_kardex(kardex_ruta)
-        um_kardex, um_stats = resolver_um_kardex(
-            {p["sku"] for p in productos}, um_crudo
+        fichas_kardex, meta_kardex = leer_kardex(kardex_ruta)
+        um_raw = {sku: f["um"] for sku, f in fichas_kardex.items() if f.get("um")}
+        match_kardex, stats_kardex = emparejar_skus(
+            {p["sku"] for p in productos}, um_raw
         )
+        um_kardex = {s: um_raw[m] for s, m in match_kardex.items()}
         print(
-            f"  KARDEX UM: {um_nota}; calce exacto={um_stats['exactos']} "
-            f"prefijo={um_stats['prefijo']} ambiguos={um_stats['ambiguos']} "
-            f"sin_match={um_stats['sin_match']}"
+            f"  KARDEX: {meta_kardex.get('nota', '')} "
+            f"({meta_kardex.get('articulos', 0)} articulos); "
+            f"UM exacto={stats_kardex['exactos']} "
+            f"prefijo={stats_kardex['prefijo']} "
+            f"ambiguos={stats_kardex['ambiguos']} "
+            f"sin_match={stats_kardex['sin_match']}"
         )
+    else:
+        print("  KARDEX: sin archivo (UM queda como esta: S1 o vacio)")
     output = generar_output(
         productos,
         unbx_map,
