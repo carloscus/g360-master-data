@@ -166,14 +166,13 @@ merecen atención especial porque anticipan sorpresas:
 - **ERP viejo**: el paso 0 informa hace cuántos días se exportó y avisa si
   pasa de 60 (el catálogo saldría "válido" pero rancio: altas que no entran,
   precios desactualizados).
-- **Universo S1 parcial o sin taxonomía**: si el API devuelve un reporte
-  cortado con HTTP 200, la cobertura da OK (se calcula contra ese mismo
-  universo) y nadie lo nota. Por eso el generador compara contra la corrida
-  anterior y publica `metadata.universo_stock.previo_skus/variacion`: una
-  caída ≥ 15% sale como ALERTA en consola, queda registrada en el metadata
-  y el validador la convierte en error (bloquea el upload). Si la caída es
-  real (baja masiva), se revisa y se publica con
-  `actualizar_catalogo.bat --upload`.
+- **Universo S1 parcial**: si el API devuelve un reporte cortado con HTTP
+  200, la cobertura da OK (se calcula contra ese mismo universo) y nadie lo
+  nota. Por eso el generador compara contra la corrida anterior y publica
+  `metadata.universo_stock.previo_skus/variacion`: una caída ≥ 15% sale como
+  ALERTA en consola, queda registrada en el metadata y el validador la
+  convierte en error (bloquea el upload). Si la caída es real (baja masiva),
+  se revisa y se publica con `actualizar_catalogo.bat --upload`.
 - **Universo sin taxonomía S1**: el generador cuenta cuántos SKUs vienen sin
   línea (`sin_taxonomia_s1`) y muestra la `fecha_descarga`/`cache_expirado`
   que reporta el API. Si ≥ 15% viene sin línea (parseo viejo o cache
