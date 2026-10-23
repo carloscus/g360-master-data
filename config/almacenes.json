@@ -1,0 +1,19 @@
+{
+  "version": 1,
+  "descripcion": "Almacenes del reporte S1 que se publican en el catalogo. EDITAR AQUI: el generador y el validador leen este archivo; el catalogo lo publica en metadata.almacenes para que los consumidores (stock-api, apps) no tengan la lista hardcodeada.",
+  "almacen_principal": "VES",
+  "almacenes": {
+    "40": "venta",
+    "92": "venta",
+    "106": "venta",
+    "118": "mktd",
+    "121": "venta",
+    "122": "venta",
+    "129": "venta",
+    "VES": "venta"
+  },
+  "reglas": {
+    "prefijos_mktd": ["S"],
+    "nota": "Los almacenes S* (sucursales) se detectan por prefijo, no hace falta listarlos."
+  }
+}

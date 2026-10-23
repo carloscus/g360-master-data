@@ -28,7 +28,6 @@ from generar_catalogo_base import (
     _agregar_universo,
     LINEA_A_CATEGORIA,
     LINEA_NOMBRE_A_CODIGO,
-    CATEGORIA_POR_LINEA,
 )
 
 

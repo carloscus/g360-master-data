@@ -341,6 +341,42 @@ def validar(catalogo: dict, raiz: Path = RAIZ) -> tuple[list[str], list[str]]:
                 f"{'...' if len(fuera) > 10 else ''}"
             )
 
+    # 9d. Coherencia de la caja: si el SKU publica dimensiones, el volumen
+    #     tiene que dar (es un calculo, no un dato libre: una celda pegada a
+    #     mano lo rompe). Sin dimensiones se publica null y no se juzga.
+    for p in ps:
+        caja = p.get("dimensiones_caja")
+        if not caja:
+            continue
+        sku = p.get("sku", "")
+        lados = [caja.get("largo_cm"), caja.get("ancho_cm"), caja.get("alto_cm")]
+        try:
+            lados_num = [float(v) for v in lados]
+        except (TypeError, ValueError):
+            errores.append(
+                f"ALERTA: {sku} tiene dimensiones_caja no numericas: {lados}"
+            )
+            continue
+        if any(v <= 0 for v in lados_num):
+            errores.append(
+                f"ALERTA: {sku} tiene dimensiones_caja con un lado <= 0: {lados}"
+            )
+            continue
+        m3 = round(lados_num[0] * lados_num[1] * lados_num[2] / 1_000_000, 6)
+        if abs(float(caja.get("m3_caja") or 0) - m3) > 1e-6:
+            errores.append(
+                f"ALERTA: {sku} m3_caja={caja.get('m3_caja')} no coincide con "
+                f"largo*ancho*alto ({m3})"
+            )
+        un_bx = p.get("un_bx") or 0
+        if un_bx:
+            m3_unidad = round(m3 / un_bx, 6)
+            if abs(float(caja.get("m3_unidad") or 0) - m3_unidad) > 1e-6:
+                errores.append(
+                    f"ALERTA: {sku} m3_unidad={caja.get('m3_unidad')} no "
+                    f"coincide con m3_caja/un_bx ({m3_unidad})"
+                )
+
     return errores, avisos
 
 

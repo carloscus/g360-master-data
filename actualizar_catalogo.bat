@@ -1,7 +1,7 @@
 @echo off
 setlocal enabledelayedexpansion
 REM G360 Master Data - Workflow de generacion
-REM Autor: CCUSI | v3.6.0
+REM Autor: CCUSI | v3.7.0
 REM
 REM Uso:
 REM   actualizar_catalogo.bat              Modo interactivo (menu)
@@ -23,6 +23,10 @@ REM
 REM v3.6.0: el catalogo publica los flags de negocio (categoria_venta, en_guia,
 REM compromiso, cotizable, por_activar, vigente, derivado_de) y la regla de
 REM inclusion es: guia OR stock OR compromiso OR (vigente AND precio > 0).
+REM
+REM v3.7.0: paso 0 de contrato de encabezados (scripts/validar_encabezados.py):
+REM las fuentes se leen por NOMBRE de columna y una fuente rota frena todo.
+REM El catalogo agrega las dimensiones de caja y el m3 (plantillas/).
 
 set "AUTO_MODE=0"
 set "UPLOAD_MODE=0"
@@ -46,7 +50,7 @@ if "%~1"=="--upload" (
 :menu
 echo.
 echo ==========================================
-echo G360 MASTER DATA - WORKFLOW v3.6.0
+echo G360 MASTER DATA - WORKFLOW v3.7.0
 echo ==========================================
 echo.
 echo  1) Generar catalogo base (PRODUCTOS.xls + SKU_BX + universo de stock)
@@ -110,6 +114,20 @@ if "%AUTO_MODE%"=="0" (
     if not defined API_KEY if not defined G360_S1_CACHE call :pedir_clave
 )
 call :preparar_entorno
+
+REM Paso 0: contrato de encabezados. Si una fuente cambio de formato (columna
+REM nueva, renombrada o corrida), se corta ACA. Generar con columnas corridas
+REM produce un catalogo corrupto sin un solo error.
+echo.
+echo Validando encabezados de las fuentes...
+.venv\Scripts\python.exe scripts\validar_encabezados.py
+if %ERRORLEVEL% NEQ 0 (
+    echo.
+    echo ERROR: una fuente no cumple el contrato de encabezados.
+    echo Corregi el archivo o el contrato en scripts/contratos.py y reintenta.
+    if "%AUTO_MODE%"=="0" pause
+    exit /b 1
+)
 
 echo Generando catalogo...
 set "GEN_CMD=.venv\Scripts\python.exe scripts/generar_catalogo_base.py"

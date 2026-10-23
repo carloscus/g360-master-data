@@ -4,11 +4,12 @@ G360 Catalog Generator
 Genera el catálogo maestro (el ALLOWLIST real del API) desde las fuentes
 disponibles. El API de stock no tiene allowlist propia: lo que no está en
 este catálogo se ve como `sin_catalogo` (precio 0, caja 1, sin peso/EAN).
-Autor: CCUSI | v3.6.0
+Autor: CCUSI | v3.7.0
 
-Fuentes:
+Fuentes (se leen por NOMBRE de columna, ver scripts/contratos.py):
   - data/PRODUCTOS.xls       → SKU, nombre, ean13, ean14, peso, linea, grupo, tipo, familia, precio
   - data/SKU_BX.xlsx         → SKU, un_bx (cantidad por caja) + orden de la guía
+                               + dimensiones de caja (largo/ancho/alto → m³)
   - API de stock / cache S1  → stock y predespacho por SKU + ficha mínima
                                (descripción, línea, grupo, tipo, familia, UM)
 
@@ -34,7 +35,7 @@ son las tres categorías de negocio; todo el resto queda en REVISION_VENTA.
 # Versión única del catálogo. El banner, la ayuda del CLI y el metadata del
 # JSON salen de acá: antes cada uno declaraba una versión distinta y el
 # README terminaba describiendo un producto que no existía.
-VERSION = "3.6.0"
+VERSION = "3.7.0"
 
 # API de stock por defecto. El universo de stock (SKUs con despacho pendiente)
 # es parte del catalogo: sin el, el catalogo sale incompleto y nadie lo nota.
@@ -47,8 +48,22 @@ import os
 import re
 import sys
 import unicodedata
+from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
+
+from contratos import (
+    CONTRATO_ERP,
+    CONTRATO_SKU_BX,
+    ErrorContrato,
+    calcular_m3,
+    cargar_almacenes,
+    huella_fuente,
+    limpiar_texto,
+    resolver_xls,
+    resolver_xlsx,
+    sku_texto,
+)
 
 try:
     import openpyxl
@@ -264,12 +279,17 @@ SIMILITUD_MINIMA_DERIVADO = 0.80
 LINEA_SIN_EMBALAJE = "98"
 
 
-def sku_base_derivado(sku: str, nombre: str, linea_codigo: str, nombre_base) -> str:
+def sku_base_derivado(
+    sku: str, nombre: str, linea_codigo: str, nombre_base, linea_base=""
+) -> str:
     """SKU base de un derivado por método D, o "" si no aplica.
 
     Condiciones (todas):
       1. El SKU termina en D y el base existe (nombre_base no vacío).
-      2. Vive en la línea "sin embalaje" (98).
+      2. Vive en la línea "sin embalaje" (98) o en la MISMA línea comercial
+         de su base: el reporte S1 ya resuelve la línea del producto físico
+         (p. ej. 78 - ARCHIVO), así que exigir 98 dejaba sin ficha a los
+         derivados que solo existen en S1.
       3. El nombre es el mismo producto (similitud >= 0.80): evita enlazar
          por accidente dos SKUs que solo comparten el código.
 
@@ -279,7 +299,11 @@ def sku_base_derivado(sku: str, nombre: str, linea_codigo: str, nombre_base) -> 
     sku = str(sku or "").strip().upper()
     if not sku.endswith("D") or len(sku) < 3:
         return ""
-    if str(linea_codigo or "").strip().upper() not in ("", LINEA_SIN_EMBALAJE):
+    linea = str(linea_codigo or "").strip().upper()
+    lineas_validas = {"", LINEA_SIN_EMBALAJE}
+    if linea_base:
+        lineas_validas.add(str(linea_base).strip().upper())
+    if linea not in lineas_validas:
         return ""
     if not nombre_base:
         return ""
@@ -578,6 +602,24 @@ def _extraer_codigo_linea(linea):
     return ""
 
 
+def _es_checked(valor) -> bool:
+    """Flag del ERP: la celda dice 'Checked' / 'Unchecked'."""
+    return limpiar_texto(valor).lower() == "checked"
+
+
+def _avisar_columnas(columnas, etiqueta):
+    """Deja en el log que columnas se mapearon y que se ignoro.
+
+    Es la evidencia de que se leyo lo que se cree: sin esta linea, un contrato
+    resuelto a otra columna se ve igual que uno correcto.
+    """
+    for aviso in columnas.avisos:
+        print(f"  AVISO {etiqueta}: {aviso}")
+    for campo in columnas.faltantes_opcionales:
+        print(f"  AVISO {etiqueta}: columna ausente, no se leyo '{campo}'")
+    print(f"  {etiqueta}: columnas OK ({columnas.resumen()})")
+
+
 def leer_erp(ruta, bx_skus=None, stock_skus=None, compromiso_skus=None):
     """Lee PRODUCTOS.xls y retorna (productos, errores, erp_skus, exclusiones, erp_todos).
 
@@ -603,24 +645,28 @@ def leer_erp(ruta, bx_skus=None, stock_skus=None, compromiso_skus=None):
     exclusiones: dict[str, int] = {}
     try:
         wb = xlrd.open_workbook(ruta)
-        ws = wb.sheet_by_index(0)
-        for r in range(1, ws.nrows):
-            sku = str(ws.cell_value(r, 0)).strip()
+        # Por NOMBRE de columna, no por posicion: un export con una columna
+        # nueva ya no puede producir un catalogo corrupto en silencio.
+        columnas, ws = resolver_xls(wb, CONTRATO_ERP)
+        _avisar_columnas(columnas, "ERP")
+        for r in range(CONTRATO_ERP.fila_header, ws.nrows):
+            fila = ws.row_values(r)
+            sku = sku_texto(columnas.valor(fila, "sku"))
             if not sku:
                 continue
-            nombre = str(ws.cell_value(r, 1)).strip()
+            nombre = limpiar_texto(columnas.valor(fila, "nombre"))
             if not nombre:
                 continue
-            ean13 = _clean_ean(ws.cell_value(r, 2))
-            ean14 = _clean_ean(ws.cell_value(r, 3))
-            peso_kg = _safe_float(ws.cell_value(r, 4))
-            linea = str(ws.cell_value(r, 5)).strip()
-            grupo = str(ws.cell_value(r, 6)).strip()
-            tipo = str(ws.cell_value(r, 7)).strip()
-            familia = str(ws.cell_value(r, 8)).strip()
-            flg_inactivo = str(ws.cell_value(r, 9)).strip().lower() == "checked"
-            flg_discont = str(ws.cell_value(r, 10)).strip().lower() == "checked"
-            precio = _safe_float(ws.cell_value(r, 11))
+            ean13 = _clean_ean(columnas.valor(fila, "ean13"))
+            ean14 = _clean_ean(columnas.valor(fila, "ean14"))
+            peso_kg = _safe_float(columnas.valor(fila, "peso_kg"))
+            linea = limpiar_texto(columnas.valor(fila, "linea"))
+            grupo = limpiar_texto(columnas.valor(fila, "grupo"))
+            tipo = limpiar_texto(columnas.valor(fila, "tipo"))
+            familia = limpiar_texto(columnas.valor(fila, "familia"))
+            flg_inactivo = _es_checked(columnas.valor(fila, "inactivo"))
+            flg_discont = _es_checked(columnas.valor(fila, "descontinuado"))
+            precio = _safe_float(columnas.valor(fila, "precio"))
 
             if sku in skus_vistos:
                 exclusiones["duplicado_erp"] = exclusiones.get("duplicado_erp", 0) + 1
@@ -699,8 +745,12 @@ def leer_erp(ruta, bx_skus=None, stock_skus=None, compromiso_skus=None):
                 f"{sorted(lineas_desconocidas)[:8]}"
             )
         print(f"  ERP: {len(productos)} productos válidos")
-    except Exception as e:
+    except ErrorContrato as e:
+        # Fatal y explicito: una fuente que no cumple el contrato no puede
+        # producir un catalogo "parecido".
         errores.append(str(e))
+    except Exception as e:
+        errores.append(f"{type(e).__name__}: {e}")
     return productos, errores, erp_skus, exclusiones, erp_todos
 
 
@@ -790,12 +840,26 @@ def aplicar_derivados(productos, nombres_por_sku, erp_todos=None):
         # propio SKU: si no, todo SKU con D y linea 98 "coincide" consigo
         # mismo (ratio 1.0) y el filtro de nombre no filtra nada.
         sku = str(p.get("sku", "")).strip().upper()
-        nombre_base = nombres_por_sku.get(sku[:-1], "") if sku.endswith("D") else ""
+        base_candidata = sku[:-1] if sku.endswith("D") else ""
+        nombre_base = nombres_por_sku.get(base_candidata, "") if base_candidata else ""
+        # Linea comercial de la base: si el SKU "D" viene reportado por S1 en
+        # esa misma linea (y no en 98), igual es derivado.
+        linea_base = ""
+        if base_candidata:
+            padre = por_sku.get(base_candidata)
+            if padre:
+                linea_base = padre.get("linea_codigo", "")
+            elif base_candidata in erp_todos:
+                fila = erp_todos[base_candidata]
+                linea_base = resolver_codigo_linea_grupo(
+                    fila.get("linea", ""), fila.get("grupo", "")
+                )
         base = sku_base_derivado(
             p["sku"],
             p.get("nombre", ""),
             p.get("linea_codigo", ""),
             nombre_base,
+            linea_base,
         )
         if not base:
             continue
@@ -833,39 +897,108 @@ def aplicar_derivados(productos, nombres_por_sku, erp_todos=None):
     return derivados
 
 
+@dataclass
+class DatosSKUBX:
+    """Lo que aporta la guia comercial (SKU_BX.xlsx).
+
+    `orden` es el indice maestro (y la prueba de `en_guia`), `un_bx` las
+    unidades por caja y `caja` las dimensiones/volumen ya calculados.
+    """
+
+    orden: dict[str, int] = field(default_factory=dict)
+    un_bx: dict[str, int] = field(default_factory=dict)
+    estado: dict[str, str] = field(default_factory=dict)
+    caja: dict[str, dict] = field(default_factory=dict)
+    avisos: list[str] = field(default_factory=list)
+
+    @property
+    def skus(self) -> set[str]:
+        return set(self.orden)
+
+
 def leer_unbx(ruta):
-    """Lee SKU_BX.xlsx y retorna dict {sku: orden}, {sku: un_bx} y {sku: estado_linea}.
-    ORDEN = clave-valor de orden indice maestro (col 0 de SKU_BX.xlsx)."""
-    orden_map = {}
-    unbx_map = {}
-    estado_map = {}
+    """Lee SKU_BX.xlsx por nombre de columna y arma DatosSKUBX.
+
+    Acepta la plantilla vieja (ORDEN, SKU, UN_BX, ESTADO_LINEA) y la nueva,
+    que agrega LARGO_CM/ANCHO_CM/ALTO_CM/PESO_CAJA_KG. Si las dimensiones
+    estan, el volumen se calcula aca (no se confia en la formula de Excel:
+    una celda pegada como valor no se recalcula nunca).
+    """
+    datos = DatosSKUBX()
+    libro = openpyxl.load_workbook(ruta, read_only=True, data_only=True)
     try:
-        wb = openpyxl.load_workbook(ruta, read_only=True, data_only=True)
-        ws = wb.active
-        for row in ws.iter_rows(min_row=2, values_only=True):
-            sku = str(row[1] or "").strip()
-            un_bx_raw = row[2]
-            estado = str(row[3] or "").strip() if len(row) > 3 else ""
-            orden = row[0] if len(row) > 0 else None
-            if sku:
-                try:
-                    orden_map[sku] = int(orden) if orden is not None else 0
-                except (ValueError, TypeError):
-                    orden_map[sku] = 0
-            if sku and un_bx_raw is not None and str(un_bx_raw).strip():
-                try:
-                    unbx_map[sku] = int(un_bx_raw)
-                except (ValueError, TypeError):
-                    pass
-            if sku and estado:
-                estado_map[sku] = estado
-        wb.close()
-        print(f"  SKU_BX: {len(orden_map)} SKUs con orden (indice maestro)")
-        print(f"  SKU_BX: {len(unbx_map)} SKUs con un_bx definido")
-        print(f"  SKU_BX: {len(estado_map)} SKUs con estado_linea definido")
-    except Exception as e:
-        print(f"  WARN: No se pudo leer SKU_BX: {e}")
-    return orden_map, unbx_map, estado_map
+        columnas, hoja = resolver_xlsx(libro, CONTRATO_SKU_BX)
+        _avisar_columnas(columnas, "SKU_BX")
+        primera = CONTRATO_SKU_BX.fila_header + 1
+        for n, fila in enumerate(
+            hoja.iter_rows(min_row=primera, values_only=True), start=primera
+        ):
+            crudo_sku = columnas.valor(fila, "sku")
+            sku = sku_texto(crudo_sku)
+            if not sku:
+                continue
+            if isinstance(crudo_sku, (int, float)):
+                datos.avisos.append(
+                    f"fila {n}: SKU numerico ({crudo_sku}); si tenia ceros a la "
+                    "izquierda ya se perdieron en el archivo"
+                )
+            orden = columnas.valor(fila, "orden")
+            try:
+                datos.orden[sku] = int(orden) if orden not in (None, "") else 0
+            except (ValueError, TypeError):
+                datos.orden[sku] = 0
+                datos.avisos.append(f"fila {n}: ORDEN no numerico ({orden!r})")
+            un_bx = _entero(columnas.valor(fila, "un_bx"))
+            if un_bx:
+                datos.un_bx[sku] = un_bx
+            estado = limpiar_texto(columnas.valor(fila, "estado_linea"))
+            if estado:
+                datos.estado[sku] = estado
+            largo = _safe_float(columnas.valor(fila, "largo_cm"))
+            ancho = _safe_float(columnas.valor(fila, "ancho_cm"))
+            alto = _safe_float(columnas.valor(fila, "alto_cm"))
+            m3 = calcular_m3(largo, ancho, alto)
+            if m3 is None:
+                if largo or ancho or alto:
+                    datos.avisos.append(
+                        f"fila {n} ({sku}): caja incompleta "
+                        f"(largo={largo}, ancho={ancho}, alto={alto}); no se "
+                        "publica volumen"
+                    )
+                continue
+            peso_caja = _safe_float(columnas.valor(fila, "peso_caja_kg"))
+            datos.caja[sku] = {
+                "largo_cm": round(largo, 2),
+                "ancho_cm": round(ancho, 2),
+                "alto_cm": round(alto, 2),
+                "m3_caja": m3,
+                "m3_unidad": round(m3 / un_bx, 6) if un_bx else None,
+                "peso_caja_kg": round(peso_caja, 3) if peso_caja > 0 else None,
+            }
+    finally:
+        libro.close()
+
+    for aviso in datos.avisos[:10]:
+        print(f"  AVISO SKU_BX: {aviso}")
+    if len(datos.avisos) > 10:
+        print(f"  AVISO SKU_BX: ... y {len(datos.avisos) - 10} mas")
+    print(f"  SKU_BX: {len(datos.orden)} SKUs con orden (indice maestro)")
+    print(f"  SKU_BX: {len(datos.un_bx)} SKUs con un_bx definido")
+    print(f"  SKU_BX: {len(datos.estado)} SKUs con estado_linea definido")
+    if datos.caja:
+        print(f"  SKU_BX: {len(datos.caja)} SKUs con caja (largo/ancho/alto/m3)")
+    return datos
+
+
+def _entero(valor) -> int:
+    """Entero tolerante ('18', 18.0, '18.0'); 0 si no se puede."""
+    texto = limpiar_texto(valor)
+    if not texto:
+        return 0
+    try:
+        return int(float(texto))
+    except (ValueError, TypeError):
+        return 0
 
 
 def generar_output(
@@ -878,19 +1011,26 @@ def generar_output(
     universo_stock=None,
     taxonomia_extra=None,
     universo=None,
+    caja_map=None,
+    fuentes=None,
+    erp_todos=None,
 ):
     """Genera el JSON de catálogo completo.
 
     `universo` es el detalle del reporte S1 {sku: {stock, predespacho, ...}}:
     con él se publican los flags de negocio (compromiso, cotizable,
     por_activar) y el snapshot de stock que justificó cada inclusión.
+    `caja_map` son las dimensiones/volumen por SKU (SKU_BX) y `fuentes` la
+    huella (sha256, filas, fecha) de cada archivo que se leyó.
     """
     universo = universo or {}
+    caja_map = caja_map or {}
     estadisticas = {
         "sin_ean13": 0,
         "con_ean14": 0,
         "sin_unbx": 0,
         "con_unbx": 0,
+        "con_caja": 0,
         "descontinuados": 0,
         "sin_linea_codigo": 0,
         "en_guia": 0,
@@ -909,6 +1049,9 @@ def generar_output(
     for p in productos:
         tiene_unbx = p["sku"] in unbx_map
         un_bx = unbx_map.get(p["sku"], 1)
+        caja = caja_map.get(p["sku"])
+        if caja:
+            estadisticas["con_caja"] += 1
         if tiene_unbx:
             estadisticas["con_unbx"] += 1
         else:
@@ -988,6 +1131,10 @@ def generar_output(
                 "orden": orden_map.get(p["sku"], 0),
                 "estado_linea": est,
                 "peso_kg": p["peso_kg"],
+                # Caja y volumen (SKU_BX). `un_bx` es unidades por caja; esto
+                # es el tamano fisico. Va como objeto para no confundirlo con
+                # el `caja` (unidades) que usa el API.
+                "dimensiones_caja": caja,
                 "precio": precio,
                 "descontinuado": bool(p.get("descontinuado", False)),
                 "linea_codigo": p.get("linea_codigo", ""),
@@ -1031,6 +1178,12 @@ def generar_output(
         datos = universo.get(sku, {})
         if (datos.get("stock") or 0) <= 0 and (datos.get("predespacho") or 0) <= 0:
             continue
+        # Misma regla que productos_desde_universo: si el ERP lo marca como
+        # línea de proceso, no cuenta para la cobertura.
+        erp = erp_todos or {}
+        if sku in erp:
+            if erp[sku].get("linea", "") in LINEAS_EXCLUIR:
+                continue
         linea = _extraer_codigo_linea(datos.get("linea", ""))
         if linea in LINEAS_PROCESO_CODIGOS:
             continue
@@ -1052,18 +1205,35 @@ def generar_output(
     taxonomia_publicada = dict(CATEGORIA_POR_LINEA)
     taxonomia_publicada.update(taxonomia_extra or {})
 
+    # Almacenes como VARIABLE: la lista vive en config/almacenes.json y se
+    # publica en el metadata para que stock-api y las apps la lean del
+    # catalogo en vez de llevarla hardcodeada en su codigo.
+    config_almacenes = cargar_almacenes()
+    for aviso in config_almacenes.get("avisos", []):
+        print(f"  AVISO almacenes: {aviso}")
+
     metadata = {
         "version": VERSION,
         "generated_at": datetime.now().isoformat(),
         "source_erp": "PRODUCTOS.xls",
         "source_un_bx": "SKU_BX.xlsx",
         "source_stock": "reporte S1 (stock + predespacho)",
+        # Que archivo exacto se leyo (sha256 + fecha): el catalogo queda
+        # trazable aunque el archivo se reemplace despues.
+        "fuentes": list(fuentes or []),
         "total_productos": len(productos_final),
         "estadisticas": estadisticas,
         "categorias_por_linea": taxonomia_publicada,
         # Semaforo de venta: las 3 categorias de negocio + revision.
         "categorias_venta": list(CATEGORIAS_VENTA),
         "categoria_venta_revision": CATEGORIA_VENTA_REVISION,
+        # Almacenes publicados (VARIABLE de config/almacenes.json): quien
+        # consuma stock/almacenes toma la lista de aca.
+        "almacenes": {
+            "principal": config_almacenes["almacen_principal"],
+            "almacenes": config_almacenes["almacenes"],
+            "fuente": config_almacenes["fuente"],
+        },
         # Regla de inclusion publicada: el consumidor puede explicar por que
         # un SKU esta en el catalogo sin leer el codigo del generador.
         "regla_inclusion": (
@@ -1119,7 +1289,7 @@ def generar_output(
             )
         elif despues > antes:
             print(
-                f"  OK: el catalogoCREcio de {antes} a {despues} SKUs (+{despues - antes})."
+                f"  OK: el catalogo crecio de {antes} a {despues} SKUs (+{despues - antes})."
             )
     return output
 
@@ -1343,9 +1513,53 @@ def main():
         print(f"S1 cache: {a.s1_cache}")
     print()
 
-    # Leer fuentes (BX primero: es la guía de lo que se vende)
+    # Leer fuentes (BX primero: es la guía de lo que se vende).
+    # v3.8: si existe `data/SKU_PRECIOS.xlsx` (archivo consolidado con 2 hojas:
+    # SKU_LOGISTICA + SKU_PRECIOS) se usa el lector unificado. Si no, se cae
+    # al lector viejo (SKU_BX.xlsx) para mantener compatibilidad con data/.
     print("Leyendo fuentes...")
-    orden_map, unbx_map, estado_map = leer_unbx(a.unbx)
+    ruta_unificada = Path(a.unbx).with_name("SKU_PRECIOS.xlsx")
+    guia_caja: dict[str, dict] = {}
+    if ruta_unificada.exists():
+        try:
+            from leer_sku_precios import leer_sku_precios as leer_unificado
+
+            datos_unificados = leer_unificado(str(ruta_unificada))
+            orden_map = datos_unificados.orden
+            unbx_map = datos_unificados.un_bx
+            estado_map = datos_unificados.estado
+            guia_caja = datos_unificados.caja
+            print(f"  Fuente unificada: {ruta_unificada.name}")
+        except ErrorContrato as e:
+            print()
+            print(str(e))
+            sys.exit(1)
+    else:
+        if not Path(a.unbx).exists():
+            print()
+            print(f"ERROR: no existe la guia comercial: {a.unbx}")
+            print("  Sin guia no hay orden comercial ni un_bx para el catálogo.")
+            print("  Creala: python scripts\\crear_plantillas.py --instalar")
+            print(
+                "  O migra los archivos viejos: "
+                "python scripts\\crear_plantillas.py --migrar"
+            )
+            sys.exit(1)
+        try:
+            guia = leer_unbx(a.unbx)
+        except ErrorContrato as e:
+            print()
+            print(str(e))
+            sys.exit(1)
+        orden_map = guia.orden
+        unbx_map = guia.un_bx
+        estado_map = guia.estado
+        guia_caja = guia.caja
+    if not orden_map:
+        print(
+            "  WARN: la guia comercial esta VACIA (0 SKUs): el catalogo saldra "
+            "sin en_guia y con un_bx=1 en todo"
+        )
 
     # Universo de stock + compromiso: los SKU con despacho o venta pendiente
     # tambien necesitan catalogo (peso/EAN/caja para despachar).
@@ -1390,7 +1604,9 @@ def main():
         compromiso_skus=compromiso_skus,
     )
     if errs:
-        print(f"Errores: {errs}")
+        print("\nERRORES al leer el ERP:")
+        for e in errs:
+            print(str(e) if "\n" in str(e) else f"  {e}")
 
     # Ficha mínima desde el reporte S1 para los SKU con movimiento que no
     # entraron por el ERP (no existen o están en línea de proceso).
@@ -1457,6 +1673,9 @@ def main():
         universo_stock=universo_stock,
         taxonomia_extra=crayolas_nuevas,
         universo=universo,
+        caja_map=guia_caja,
+        fuentes=[huella_fuente(a.erp), huella_fuente(a.unbx)],
+        erp_todos=erp_todos,
     )
 
     print(f"\n{'=' * 50}")
@@ -1469,6 +1688,7 @@ def main():
     print(f"  Sin ean13:  {est['sin_ean13']}")
     print(f"  Con un_bx:  {est['con_unbx']}")
     print(f"  Sin un_bx:  {est['sin_unbx']}")
+    print(f"  Con caja (largo/ancho/alto/m3): {est['con_caja']}")
     print(f"  Descontinuados:           {est['descontinuados']}")
     print(f"  Sin linea_codigo:          {est['sin_linea_codigo']}")
     print(f"  En guia (SKU_BX):          {est['en_guia']}")
@@ -1482,13 +1702,13 @@ def main():
         f"  Universo de stock:         "
         f"{'incluido (' + str(uni.get('skus', 0)) + ' SKUs)' if uni.get('incluido') else 'NO INCLUIDO'}"
     )
-    print(f"\nCategorías:")
+    print("\nCategorías:")
     for cat, cnt in sorted(est["por_categoria"].items(), key=lambda x: -x[1]):
         print(f"  {cat}: {cnt}")
-    print(f"\nSemáforo de venta:")
+    print("\nSemáforo de venta:")
     for cat, cnt in sorted(est["por_categoria_venta"].items(), key=lambda x: -x[1]):
         print(f"  {cat}: {cnt}")
-    print(f"\nListo!")
+    print("\nListo!")
 
 
 if __name__ == "__main__":

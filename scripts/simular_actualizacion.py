@@ -22,7 +22,6 @@ Uso:
 
 import argparse
 import json
-import os
 import shutil
 import sys
 import tempfile
@@ -228,7 +227,8 @@ def _generar(erp: Path, bx: Path, salida: Path, stock_skus, universo=None) -> di
     universo = universo or {
         s: {"stock": 1, "predespacho": 0} for s in (stock_skus or set())
     }
-    orden_map, unbx_map, estado_map = leer_unbx(str(bx))
+    guia = leer_unbx(str(bx))
+    orden_map, unbx_map, estado_map = guia.orden, guia.un_bx, guia.estado
     productos, errs, erp_skus, exclusiones, erp_todos = leer_erp(
         str(erp),
         bx_skus=set(orden_map),
@@ -250,6 +250,8 @@ def _generar(erp: Path, bx: Path, salida: Path, stock_skus, universo=None) -> di
         exclusiones=exclusiones,
         universo_stock={"incluido": True, "skus": len(universo), "error": ""},
         universo=universo,
+        caja_map=guia.caja,
+        erp_todos=erp_todos,
     )
 
 

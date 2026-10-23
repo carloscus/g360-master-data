@@ -19,11 +19,8 @@ import pytest
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from generar_catalogo_base import (  # noqa: E402
-    CATEGORIA_DEFAULT,
     LINEA_GRUPO_A_CODIGO,
-    LINEA_NOMBRE_A_CODIGO,
     PREFIJO_MARCA_A_CATEGORIA,
-    asignar_categoria,
     categoria_de_producto,
     codigo_linea_crayola,
     decidir_inclusion,

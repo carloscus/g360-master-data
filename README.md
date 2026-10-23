@@ -3,7 +3,7 @@
 > Sistema centralizado de datos maestros para proyectos G360.
 > Genera JSON de catálogo completo desde ERP + SKU_BX + universo de stock.
 
-[![Version](https://img.shields.io/badge/version-3.6.0-blue)]()
+[![Version](https://img.shields.io/badge/version-3.7.0-blue)]()
 [![Python](https://img.shields.io/badge/Python-3.11+-blue)]()
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)]()
 
@@ -35,22 +35,31 @@ g360-master-data/
 │   │   Aporta: ficha, EAN, peso, línea, precio y vigencia
 │   ├── SKU_BX.xlsx             ← Guía de venta (manual: se agrega al ingresar stock)
 │   │   Columnas: ORDEN, SKU, UN_BX, ESTADO_LINEA
-│   │   Aporta: qué se vende, unidades por caja y orden comercial
+│   │             + LARGO_CM, ANCHO_CM, ALTO_CM, PESO_CAJA_KG
+│   │             + M3_CAJA, M3_UNIDAD (calculadas, opcionales)
+│   │   Aporta: qué se vende, unidades por caja, orden comercial y m³
 │   ├── KARDEX_BASE.xlsx        ← Padrón de artículos por almacén (export manual, 179.591 filas)
 │   │   Columnas: colId/colNom de Almacén, Línea, Grupo, Tipo, Familia,
 │   │              Artículo y UM (sin cantidades ni fechas)
 │   │   Aporta: taxonomía observada SKU × almacén (validar/derivar líneas).
 │   │   Hoy NO lo consume el generador (fase 3: demanda/rotación)
-│   └── plantilla_precios.xlsx  ← Plantilla comercial (PRODUCTOS/DESCUENTOS/PRECIOS_FIJOS)
+│   └── plantilla_precios.xlsx  ← Plantilla comercial (DESCUENTOS/PRECIOS_FIJOS/SKU_CLIENTES)
 │       Aporta: descuentos y precios fijos (vía scripts/leer_plantilla_precios.py)
+│
+├── plantillas/                 ← MOLDES versionados de los archivos manuales
+│   ├── SKU_BX.xlsx             ← molde vacío (columnas de caja + fórmulas m³)
+│   └── plantilla_precios.xlsx  ← molde vacío (DESC1..6 como fracción)
 │
 ├── output/
 │   └── catalogo_productos.json ← Catálogo generado (3.538 SKUs)
 │
 ├── scripts/
-│   ├── generar_catalogo_base.py ← Genera catálogo desde ERP + SKU_BX + stock (principal, v3.6)
+│   ├── contratos.py            ← Contrato de encabezados: campos canónicos + alias
+│   ├── validar_encabezados.py  ← Paso 0: valida las fuentes antes de generar
+│   ├── generar_catalogo_base.py ← Genera catálogo desde ERP + SKU_BX + stock (principal, v3.7)
 │   ├── generar_catalogo.py     ← Generador legacy v1 (no usar: no lee el ERP actual)
-│   ├── leer_plantilla_precios.py ← Lee plantilla_precios.xlsx (hojas PRODUCTOS/DESCUENTOS/PRECIOS_FIJOS)
+│   ├── crear_plantillas.py     ← Genera/migra las plantillas de plantillas/
+│   ├── leer_plantilla_precios.py ← Lee plantilla_precios.xlsx (hojas DESCUENTOS/PRECIOS_FIJOS/SKU_CLIENTES)
 │   ├── sanitize_key.py         ← Sanea API_KEY (quita whitespace invisible)
 │   ├── simular_actualizacion.py ← Simula el ciclo de actualización de código (SKU nuevo)
 │   ├── validar_taxonomia.py     ← Validación cruzada de taxonomía (master-data ↔ stock-api)
@@ -64,10 +73,29 @@ g360-master-data/
 `data/` es **la** carpeta de materia prima: cada archivo aporta una parte del
 catálogo y se reemplaza completo cuando llega el export nuevo (no se edita a
 mano ni se mezcla). **No se versiona**: son exports pesados y cambian seguido;
-el repo solo lleva el catálogo generado (`output/`). Hoy el generador consume
-**PRODUCTOS.xls + SKU_BX.xlsx + el universo de stock**; `KARDEX_BASE.xlsx` y `plantilla_precios.xlsx` están
-para las siguientes fases (rotación/demanda, descuentos, m³, etc.). Cuando se
-sume una fuente nueva, se agrega acá y se escribe su lector en `scripts/`.
+el repo solo lleva el catálogo generado (`output/`).
+
+`plantillas/` es lo único que **sí** se versiona de los archivos manuales: son
+moldes vacíos (con encabezados, fórmulas y listas desplegables) que se copian a
+`data/` la primera vez y después viven ahí. El generador **nunca** lee de
+`plantillas/`: lee de `data/`, igual que con los exports del ERP.
+
+```bat
+:: Crear/refrescar los moldes (no toca data/)
+python scripts\crear_plantillas.py
+
+:: Copiar a data/ solo lo que no exista todavia (no pisa nada)
+python scripts\crear_plantillas.py --instalar
+
+:: Agregar las columnas de caja a un data/SKU_BX.xlsx que ya tiene datos
+python scripts\crear_plantillas.py --migrar
+```
+
+Hoy el generador consume **PRODUCTOS.xls + SKU_BX.xlsx + el universo de stock**;
+`KARDEX_BASE.xlsx` y `plantilla_precios.xlsx` están para las siguientes fases
+(rotación/demanda, descuentos, etc.). Cuando se sume una fuente nueva, se
+agrega acá, se declara su contrato en `scripts/contratos.py` y se escribe su
+lector en `scripts/`.
 
 ---
 
@@ -89,6 +117,65 @@ sume una fuente nueva, se agrega acá y se escribe su lector en `scripts/`.
 > o vía auto-carga desde GitHub (`catalogo_raw_url`, TTL 6h).
 > Definir la clave en la misma terminal antes de ejecutar:
 > `set API_KEY=tu_clave` (cmd) o `$env:API_KEY="tu_clave"` (PowerShell).
+
+### Contrato de encabezados (paso 0)
+
+**Regla:** las fuentes se leen por **NOMBRE** de columna, nunca por posición.
+
+Antes cada lector usaba índices fijos (`cell_value(r, 11)`, `row[2]`): si el
+export agregaba una columna, el catálogo se generaba igual pero con el precio
+en la familia y la línea en el peso. Sin error, sin aviso. Como el catálogo es
+el allowlist del API, ese bug se propaga a todo lo que muestra.
+
+El contrato vive en **`scripts/contratos.py`**: cada fuente declara campos
+canónicos con sus alias, y los encabezados se comparan normalizados (sin
+acentos, sin NBSP/BOM, sin espacios de más, en mayúsculas). Ejemplo:
+
+| Fuente | Campo | Alias aceptados |
+|--------|-------|-----------------|
+| ERP | `sku` | `CODIGO`, `SKU` |
+| ERP | `peso_kg` | `CAN_KG_UM` (sí: el ERP llama "peso" a esa columna), `PESO`, `PESO_KG` |
+| ERP | `precio` | `PRECIO`, `PRECIO_LISTA` |
+| SKU_BX | `orden` | `ORDEN`, `N`, `N°`, `NRO` |
+| SKU_BX | `un_bx` | `UN_BX`, `U_BX`, `U/BOX`, `UNIDADES_POR_CAJA` |
+| DESCUENTOS | `desc1` | `DESC1`, `DESC_ADIC01`, `DESC_ADIC1` |
+| PRECIOS_FIJOS | `precio_fijo` | `PRECIO_FIJO`, `PRECIO_FINAL`, `PRECIO` |
+
+**Severidad**
+
+| Situación | Efecto |
+|-----------|--------|
+| Falta una columna **obligatoria** | `ErrorContrato` **fatal**: no se genera catálogo, el mensaje dice qué falta y qué se encontró |
+| Columna de más, encabezado duplicado o alias ambiguo | **Aviso** (se usa la primera/prioritaria) |
+| El contenido no coincide con el campo (ej. `PRECIO` sin números en el 90% de la muestra) | **Error** en el paso 0: detecta el corrimiento de columnas que el encabezado solo no ve |
+
+El **paso 0 del BAT** es `scripts/validar_encabezados.py`, que valida las cinco
+fuentes antes de generar:
+
+```bat
+python scripts\validar_encabezados.py
+python scripts\validar_encabezados.py --s1-xls ruta\REPT_STOCK_xx_xx_xxxx.xls
+python scripts\validar_encabezados.py --json
+```
+
+Un error en las fuentes que alimentan el catálogo (ERP, SKU_BX, S1) **frena
+todo**. Un problema en las informativas (plantilla de precios, KARDEX) se
+reporta pero no bloquea la publicación.
+
+> **SKU siempre es TEXTO.** `016763` y `16763` son artículos distintos: si la
+> celda se guarda como número, los ceros a la izquierda se pierden y el SKU
+> deja de coincidir con el ERP. El validador lo reporta como error.
+
+**Reporte S1 (sin encabezado real).** El `.xls` del S1 trae 9–12 filas de
+preámbulo y una fila de encabezados con celdas combinadas: `ARTICULO` queda en
+la columna de la descripción y el **SKU en la columna anterior**. Por eso no se
+busca por nombre: se ubica la fila por **anclas**
+(`ARTICULO`/`ALMACEN`/`UM`/`STOCK`/`PREDESPACHO`) y se verifica el SKU contra
+los datos, con fallback por contenido. Lo implementan los dos lados:
+
+- `scripts/contratos.py` → `detectar_columnas_s1` (validador, falla con mensaje);
+- `g360-stock-api/app/core/parsers.py` → `detectar_columnas` (servicio: si no
+  encuentra las anclas, cae al layout histórico y deja un `warning`).
 
 ### El universo de stock (no es opcional)
 
@@ -255,6 +342,32 @@ del anterior (suele ser una fuente faltante, no menos productos).
 
 ## Scripts
 
+### `contratos.py`
+
+Núcleo de la convención (ver *Contrato de encabezados*): normalización de
+encabezados y valores, `ErrorContrato`, `resolver_columnas` (campo canónico →
+índice), los contratos por fuente (`CONTRATO_ERP`, `CONTRATO_SKU_BX`,
+`CONTRATO_KARDEX`, `CONTRATO_PLANTILLA_*`), las anclas del S1
+(`detectar_columnas_s1`), la lista de almacenes publicados, `calcular_m3` y
+`huella_fuente` (sha256 + fecha para la trazabilidad). No lee archivos por sí
+mismo: lo usan todos los lectores.
+
+### `validar_encabezados.py`
+
+Paso 0 del workflow. Valida ERP, SKU_BX, plantilla de precios, S1 (si hay un
+`.xls` en `data/`) y KARDEX: columnas obligatorias por nombre, **sanidad del
+contenido** (un SKU parece SKU, un precio es número, UN_BX entero, descuentos
+en rango), duplicados, columnas de más, SKUs guardados como número y cajas
+incompletas.
+
+```bash
+python scripts/validar_encabezados.py
+python scripts/validar_encabezados.py --s1-xls ..\g360-erp-stock-consolidator\samples\REPT_STOCK_22_05_2026.xls
+python scripts/validar_encabezados.py --json
+```
+
+Sale con código 1 solo si falla una fuente que alimenta el catálogo.
+
 ### `generar_catalogo_base.py`
 
 Genera el catálogo completo desde las tres fuentes.
@@ -292,10 +405,15 @@ python scripts/generar_catalogo_base.py --sin-universo-stock
 Workflow interactivo + modo automático:
 
 ```
+0) Validar encabezados de las fuentes (contrato)
 1) Generar catalogo base (PRODUCTOS.xls + SKU_BX + universo de stock)
 2) Ver estado del catalogo
 0) Salir
 ```
+
+> El paso 0 corre **siempre**, antes de generar. Si una fuente cambió de
+> formato, el BAT corta ahí con el mensaje del contrato: no hay forma de
+> generar un catálogo con las columnas corridas.
 
 ```bat
 :: Interactivo (menu)
@@ -329,6 +447,49 @@ Para persistirla (una sola vez, `cmd` — ojo: `setx` va SIN `=`):
 set API_KEY=tu_clave
 setx API_KEY tu_clave
 ```
+
+### Plantillas manuales (`crear_plantillas.py`)
+
+Los archivos que se llenan a mano (`SKU_BX.xlsx`, `plantilla_precios.xlsx`)
+tienen un molde versionado en `plantillas/`. El molde trae lo que un Excel a
+mano no garantiza:
+
+- **SKU como TEXTO** (no se comen los ceros a la izquierda);
+- `ESTADO_LINEA` con lista desplegable;
+- **m³ calculado** con fórmulas (`M3_CAJA = largo*ancho*alto/1.000.000`,
+  `M3_UNIDAD = M3_CAJA/UN_BX`);
+- descuentos como **fracción** validada (0 ≤ x < 1: `10% = 0.10`);
+- una hoja `LEEME` con las reglas de cada columna.
+
+```bash
+# Crear/refrescar los moldes (plantillas/)
+python scripts/crear_plantillas.py
+
+# Instalar en data/ solo si el archivo no existe (nunca pisa datos)
+python scripts/crear_plantillas.py --instalar
+
+# Migrar un data/SKU_BX.xlsx que ya tiene datos: agrega las columnas de caja
+# al final y las fórmulas en las filas existentes (hace backup .bak.xlsx)
+python scripts/crear_plantillas.py --migrar
+```
+
+Flujo: se copia el molde a `data/`, se llena ahí y se sigue editando ahí. El
+generador lee **siempre** de `data/`.
+
+### `leer_plantilla_precios.py`
+
+Lee `plantilla_precios.xlsx` y genera `precios_productos.json`.
+
+```bash
+python scripts/leer_plantilla_precios.py -i data/plantilla_precios.xlsx
+python scripts/leer_plantilla_precios.py -i ... --sku-bx data/SKU_BX.xlsx
+python scripts/leer_plantilla_precios.py -i ... --catalogo output/catalogo_productos.json
+```
+
+v2.0: lee por nombre de columna (acepta `DESC1..6` y `DESC_ADIC01..06`), la
+hoja `PRODUCTOS` dejó de ser obligatoria (el orden vive en `SKU_BX`), y los
+descuentos se publican como fracción. Con `--catalogo` filtra a los SKUs
+publicados; con `--sku-bx` copia el orden maestro.
 
 ### `validar_taxonomia.py`
 
@@ -392,6 +553,10 @@ python scripts/simular_actualizacion.py --api-url http://127.0.0.1:8099 --api-ke
 python -m pytest scripts/tests -q
 ```
 
+145 tests: generación (inclusión, taxonomía, método D, cobertura, universo
+S1), contrato de encabezados (normalización, alias, duplicados, columnas
+corridas, anclas del S1, cajas/m³) y robustez de la validación.
+
 ---
 
 ## Output JSON
@@ -399,17 +564,22 @@ python -m pytest scripts/tests -q
 ```json
 {
   "metadata": {
-    "version": "3.6.0",
+    "version": "3.7.0",
     "generated_at": "2026-10-22T10:30:46.334309",
     "source_erp": "PRODUCTOS.xls",
     "source_un_bx": "SKU_BX.xlsx",
     "source_stock": "http://appweb.cipsa.com.pe:8054/...",
+    "fuentes": [
+      { "archivo": "PRODUCTOS.xls", "bytes": 4844312, "sha256": "2dbbbf8b9669cc52", "modificado": "2026-10-20T16:16:53" },
+      { "archivo": "SKU_BX.xlsx", "bytes": 37266, "sha256": "e910d11c282f85b0", "modificado": "2026-09-21T23:37:32" }
+    ],
     "total_productos": 3538,
     "estadisticas": {
       "sin_ean13": 2267,
       "con_ean14": 1037,
       "sin_unbx": 2516,
       "con_unbx": 1022,
+      "con_caja": 0,
       "descontinuados": 348,
       "sin_linea_codigo": 0,
       "en_guia": 1022,
@@ -462,6 +632,14 @@ python -m pytest scripts/tests -q
       "orden": 1,
       "estado_linea": "IMPORTADO",
       "peso_kg": 0.4,
+      "dimensiones_caja": {
+        "largo_cm": 40,
+        "ancho_cm": 30,
+        "alto_cm": 25,
+        "m3_caja": 0.03,
+        "m3_unidad": 0.001667,
+        "peso_caja_kg": null
+      },
       "precio": 70.0,
       "descontinuado": false,
       "linea_codigo": "01",
@@ -479,6 +657,17 @@ python -m pytest scripts/tests -q
   ]
 }
 ```
+
+`dimensiones_caja` es el tamaño **físico** de la caja (largo/ancho/alto en cm,
+m³ de la caja y m³ por unidad); `un_bx` es **cuántas unidades entran**. Van en
+campos separados a propósito: el API ya usa `caja` para las unidades. Si falta
+largo, ancho o alto, `dimensiones_caja` es `null`: no se inventa volumen.
+`m3_caja` se **calcula en el generador** (no se confía en la fórmula de Excel:
+una celda pegada como valor no se recalcula nunca).
+
+`metadata.fuentes` deja la huella (sha256 corto, tamaño y fecha) de los
+archivos que se leyeron: el catálogo es trazable aunque el archivo se
+reemplace después.
 
 ---
 
