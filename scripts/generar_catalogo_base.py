@@ -59,6 +59,7 @@ from pathlib import Path
 
 from contratos import (
     CONTRATO_ERP,
+    CONTRATO_KARDEX,
     CONTRATO_SKU_BX,
     ErrorContrato,
     calcular_m3,
@@ -891,6 +892,54 @@ def leer_unbx(ruta):
     return datos
 
 
+def leer_um_kardex(ruta: Path) -> tuple[dict[str, str], str]:
+    """Lee UM por SKU desde KARDEX_BASE.xlsx, con cache en disco.
+
+    KARDEX tiene ~180k filas y 68k SKUs; leerlo completo en cada corrida
+    es lento (~2-3s). Se cachea el mapping {sku: um} en
+    data/.cache_kardex_um.json y solo se reconstruye si el archivo cambio
+    (mismo nombre, tamano y fecha). Sin KARDEX devuelve dict vacio.
+    """
+    try:
+        st = ruta.stat()
+    except OSError:
+        return {}, "sin KARDEX"
+    huella = {"archivo": ruta.name, "bytes": st.st_size, "modificado": st.st_mtime}
+    cache = ruta.with_name(".cache_kardex_um.json")
+    try:
+        with open(cache, encoding="utf-8") as f:
+            guardado = json.load(f)
+        if all(guardado.get(k) == v for k, v in huella.items()):
+            return guardado.get("um", {}), "indice cacheado"
+    except (OSError, ValueError):
+        pass
+
+    print("  (leyendo UM desde KARDEX: una sola vez por archivo...)")
+    libro = openpyxl.load_workbook(ruta, read_only=True, data_only=True)
+    try:
+        columnas, hoja = resolver_xlsx(libro, CONTRATO_KARDEX)
+        i_sku = columnas.idx("id_articulo")
+        i_um = columnas.idx("id_um")
+        um_map: dict[str, str] = {}
+        for fila in hoja.iter_rows(min_row=2, values_only=True):
+            if len(fila) <= max(i_sku, i_um):
+                continue
+            sku = sku_texto(fila[i_sku])
+            um = limpiar_texto(fila[i_um])
+            if sku and um:
+                um_map.setdefault(sku, um)
+    except ErrorContrato:
+        return {}, "contrato roto (ver bloque KARDEX)"
+    finally:
+        libro.close()
+    try:
+        with open(cache, "w", encoding="utf-8") as f:
+            json.dump({**huella, "um": um_map}, f)
+    except OSError:
+        pass
+    return um_map, f"{len(um_map)} SKUs con UM"
+
+
 def _entero(valor) -> int:
     """Entero tolerante ('18', 18.0, '18.0'); 0 si no se puede."""
     texto = limpiar_texto(valor)
@@ -915,6 +964,7 @@ def generar_output(
     caja_map=None,
     fuentes=None,
     erp_todos=None,
+    um_kardex=None,
 ):
     """Genera el JSON de catálogo completo.
 
@@ -1035,7 +1085,7 @@ def generar_output(
                 "grupo": p["grupo"],
                 "tipo": p["tipo"],
                 "familia": p["familia"],
-                "um": p.get("um", ""),
+                "um": p.get("um", "") or (um_kardex or {}).get(p["sku"], ""),
                 "un_bx": un_bx,
                 "orden": orden_map.get(p["sku"], 0),
                 "estado_linea": est,
@@ -1643,6 +1693,13 @@ def main():
 
     # Generar output
     print("\nGenerando catálogo...")
+    # UM desde KARDEX (fuente primaria: el ERP no exporta UM, KARDEX sí)
+    um_kardex: dict[str, str] = {}
+    um_nota = ""
+    kardex_ruta = Path("data") / "KARDEX_BASE.xlsx"
+    if kardex_ruta.exists():
+        um_kardex, um_nota = leer_um_kardex(kardex_ruta)
+        print(f"  KARDEX UM: {um_nota}")
     output = generar_output(
         productos,
         unbx_map,
@@ -1656,6 +1713,7 @@ def main():
         caja_map=guia_caja,
         fuentes=[huella_fuente(a.erp), huella_fuente(a.unbx)],
         erp_todos=erp_todos,
+        um_kardex=um_kardex,
     )
 
     print(f"\n{'=' * 50}")
