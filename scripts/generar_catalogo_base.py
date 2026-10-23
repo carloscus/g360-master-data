@@ -349,7 +349,7 @@ LINEA_NOMBRE_A_CODIGO = {
     "ACCESORIOS DEPORTIVOS": "AD",
     "PRODUCTOS INDUSTRIALES": "20",
     "REPRESENTACIONES INDUSTRIALES": "21",
-    "SEGURIDAD Y SEÑALIZACION VIAL": "23",
+    "SEGURIDAD Y SENALIZACION VIAL": "23",
     "CIPTECH ETIQUETAS": "30",
     "CIPTECH CINTAS": "31",
     "CIPTECH CPEI": "32",
@@ -1072,7 +1072,15 @@ def generar_output(
         )
 
     productos_final.sort(
-        key=lambda x: (x.get("orden", 0) == 0, x.get("orden", 0) or 0, x["sku"])
+        # Agrupar por linea para legibilidad; dentro de cada bloque respetar
+        # el orden de guia comercial (campo `orden` del SKU_BX), y al final los
+        # SKUs sin guia ordenados alfabeticamente por SKU.
+        key=lambda x: (
+            x.get("linea", ""),
+            x.get("orden", 0) == 0,
+            x.get("orden", 0) or 0,
+            x["sku"],
+        )
     )
 
     # ── Invariante de cobertura ──────────────────────────────────────────
