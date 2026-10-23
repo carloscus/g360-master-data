@@ -345,6 +345,13 @@ def validar(catalogo: dict, raiz: Path = RAIZ) -> tuple[list[str], list[str]]:
     if isinstance(uni, dict) and uni.get("alerta_caida"):
         errores.append(f"ALERTA: {uni['alerta_caida']}")
 
+    # 9c3. Universo sin taxonomia S1 (parseo viejo o cache anterior en el
+    #      API). El catalogo sale valido pero degradado: cientos de OTROS
+    #      y ningun D enlazado. Bloquea; remedio: verificar deploy/refresh
+    #      del API y regenerar (el BAT muestra fecha_descarga del universo).
+    if isinstance(uni, dict) and uni.get("alerta_sin_taxonomia"):
+        errores.append(f"ALERTA: {uni['alerta_sin_taxonomia']}")
+
     # 9d. Coherencia de la caja: si el SKU publica dimensiones, el volumen
     #     tiene que dar (es un calculo, no un dato libre: una celda pegada a
     #     mano lo rompe). Sin dimensiones se publica null y no se juzga.

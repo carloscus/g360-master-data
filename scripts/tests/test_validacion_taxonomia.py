@@ -103,6 +103,26 @@ def test_detecta_precio_cero():
     assert any("precio" in e for e in errores)
 
 
+def test_detecta_universo_sin_taxonomia():
+    """Un universo sin lineas S1 (parseo viejo/cache) frena la subida."""
+    catalogo = {
+        "metadata": {
+            "categorias_por_linea": {},
+            "universo_stock": {
+                "incluido": True,
+                "skus": 2257,
+                "sin_taxonomia_s1": 513,
+                "alerta_sin_taxonomia": "513/2257 SKUs sin taxonomia",
+            },
+            "universo_skus": [],
+            "cobertura_faltante": [],
+        },
+        "productos": [],
+    }
+    errores, _ = validar(catalogo, RAIZ)
+    assert any("sin_taxonomia" in e or "sin taxonomia" in e for e in errores)
+
+
 def test_detecta_linea_sin_declarar():
     """Una linea publicada que no esta en la taxonomia es un error."""
     catalogo = {

@@ -1407,7 +1407,17 @@ def leer_universo_stock(
                     timeout=timeout,
                 )
             r.raise_for_status()
-            items = r.json().get("items", [])
+            payload = r.json()
+            items = payload.get("items", [])
+            # Diagnostico de frescura: si el API sirve cache viejo o un
+            # parseo sin taxonomia, se ve ACA (no despues, en el catalogo).
+            meta_api = payload.get("metadata", {}) or {}
+            if meta_api:
+                print(
+                    f"  Universo del API: descarga {meta_api.get('fecha_descarga', '?')} "
+                    f"| cache_expirado={meta_api.get('cache_expirado', '?')} "
+                    f"| enriquecido={meta_api.get('enriquecido', '?')}"
+                )
             universo: dict[str, dict] = {}
             for i in items:
                 sku = str(i.get("sku", "")).strip()
@@ -1631,6 +1641,20 @@ def main():
                 "con_compromiso": con_compromiso,
                 "error": err,
             }
+            # Taxonomia del universo: si el API sirve un parseo sin lineas
+            # (codigo viejo o cache anterior al parser por anclas), los S1
+            # caen a OTROS y los D no se enlazan. Se avisa fuerte aca.
+            sin_tax = sum(
+                1 for d in universo.values() if not str(d.get("linea") or "").strip()
+            )
+            universo_stock["sin_taxonomia_s1"] = sin_tax
+            if universo and sin_tax / len(universo) >= 0.15:
+                universo_stock["alerta_sin_taxonomia"] = (
+                    f"{sin_tax}/{len(universo)} SKUs del universo sin taxonomia S1: "
+                    "el API puede estar sirviendo parseo viejo o cache anterior; "
+                    "revisar deploy/refresh del API antes de publicar"
+                )
+                print(f"  ALERTA: {universo_stock['alerta_sin_taxonomia']}")
 
     stock_skus = {s for s, d in universo.items() if d["stock"] > 0}
     compromiso_skus = {s for s, d in universo.items() if d["predespacho"] > 0}
