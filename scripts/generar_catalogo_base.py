@@ -152,6 +152,10 @@ CATEGORIA_POR_LINEA: dict[str, str] = {
     # caian en el default OTROS sin que la taxonomia publicada lo dijera.
     # Se declara explicitamente para que /stock y /catalog la resuelvan igual.
     "99": "OTROS",
+    # OTROS es el estado terminal de la ficha S1 sin taxonomia (ver fallback
+    # en productos_desde_universo): tiene que estar declarado, o el validador
+    # rechaza esos productos por "linea no publicada" aunque sean legitimos.
+    "OTROS": "OTROS",
 }
 
 # Prefijos para lineas no listadas (mas especifico primero).

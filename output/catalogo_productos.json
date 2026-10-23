@@ -1,7 +1,7 @@
 {
   "metadata": {
     "version": "3.7.0",
-    "generated_at": "2026-10-22T20:30:50.263593",
+    "generated_at": "2026-10-22T20:53:43.719607",
     "source_erp": "PRODUCTOS.xls",
     "source_un_bx": "SKU_BX.xlsx",
     "source_stock": "reporte S1 (stock + predespacho)",
@@ -137,7 +137,8 @@
       "65": "DESCARTE Y VARIOS",
       "98": "DESCARTE Y VARIOS",
       "70": "PRODUCCION",
-      "99": "OTROS"
+      "99": "OTROS",
+      "OTROS": "OTROS"
     },
     "categorias_venta": [
       "VINIBALL",

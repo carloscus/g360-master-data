@@ -28,7 +28,6 @@ Salida: 0 si no hay errores (puede haber avisos), 1 si hay errores.
 from __future__ import annotations
 
 import argparse
-import difflib
 import glob
 import json
 import re
@@ -774,8 +773,12 @@ def _imprimir(bloques: list[Bloque]) -> None:
 # ─────────────────────────────────────────────────────────────────────────────
 
 
-def clasificar_guia(sku, ficha_erp, kardex, codigos_erp) -> tuple[str, str]:
+def clasificar_guia(sku, ficha_erp, kardex) -> tuple[str, str]:
     """Por que un SKU de la guia (SKU_BX/precios) no entra al catalogo.
+
+    Los SKU son EXACTOS: no hay "similares". O el codigo esta en el
+    maestro o no esta; no se sugiere ni se adivina (un "parecido" en un
+    aviso termina cargandose como dato).
 
     `ficha_erp` es None si el SKU no esta en el ERP, o
     {inactivo: bool, linea: str}. `kardex` es el set de colIdArticulo.
@@ -797,24 +800,11 @@ def clasificar_guia(sku, ficha_erp, kardex, codigos_erp) -> tuple[str, str]:
                 "aunque este en guia",
             )
         return ("ok", "")
-
-    sugerencia = ""
-    candidatos = difflib.get_close_matches(sku, codigos_erp, n=1, cutoff=0.8)
-    if candidatos and candidatos[0] != sku:
-        sugerencia = candidatos[0]
     if sku in kardex:
-        detalle = (
-            "existe en KARDEX pero no en ERP: revisar maestro "
-            "(baja, codigo nuevo o reemplazo)"
-        )
-        if sugerencia:
-            detalle += f"; similar a '{sugerencia}'"
-        return ("kardex", detalle)
-    if sugerencia:
         return (
-            "tipeo",
-            "no existe en ERP ni KARDEX; posible tipeo: "
-            f"quisiste decir '{sugerencia}'?",
+            "kardex",
+            "existe en KARDEX pero no en ERP: revisar maestro "
+            "(baja, codigo nuevo o reemplazo)",
         )
     return (
         "inexistente",
@@ -978,12 +968,11 @@ def validar_guia_vs_maestros(data: Path) -> Bloque:
 
     ignorados = cargar_guia_ignorados()
     omitidos_ack = 0
-    codigos = sorted(fichas)
     for sku in sorted(guia):
         if sku in ignorados:
             omitidos_ack += 1
             continue
-        motivo, detalle = clasificar_guia(sku, fichas.get(sku), kardex, codigos)
+        motivo, detalle = clasificar_guia(sku, fichas.get(sku), kardex)
         if motivo == "ok":
             continue
         bloque.avisos.append(f"{sku} ({guia[sku]}): {detalle}")

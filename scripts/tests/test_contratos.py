@@ -645,20 +645,18 @@ class TestDimensionesEnCatalogo:
 
 
 class TestClasificarGuia:
-    """El motivo por el que un SKU manual no entra: inactivo / proceso /
-    tipeo / en KARDEX pero no en ERP / inexistente."""
-
-    CODIGOS = ["A00011", "B0002", "C0003"]
+    """El motivo por el que un SKU manual no entra. Los SKU son EXACTOS:
+    no hay 'similares' ni sugerencias: o el codigo esta en el maestro o no."""
 
     def test_en_erp_activo_entra(self):
         motivo, _ = clasificar_guia(
-            "A00011", {"inactivo": False, "linea": "PELOTAS"}, set(), self.CODIGOS
+            "A00011", {"inactivo": False, "linea": "PELOTAS"}, set()
         )
         assert motivo == "ok"
 
     def test_inactivo_en_erp_no_entra(self):
         motivo, detalle = clasificar_guia(
-            "B0002", {"inactivo": True, "linea": "PELOTAS"}, set(), self.CODIGOS
+            "B0002", {"inactivo": True, "linea": "PELOTAS"}, set()
         )
         assert motivo == "inactivo"
         assert "inactivo" in detalle.lower()
@@ -668,23 +666,26 @@ class TestClasificarGuia:
             "C0003",
             {"inactivo": False, "linea": "PRODUCTOS EN PROCESO"},
             set(),
-            self.CODIGOS,
         )
         assert motivo == "proceso"
         assert "proceso" in detalle.lower()
 
-    def test_posible_tipeo_sugiere(self):
-        motivo, detalle = clasificar_guia("A00012", None, set(), self.CODIGOS)
-        assert motivo == "tipeo"
-        assert "A00011" in detalle
+    def test_sin_similares_solo_exactos(self):
+        # A00012 no existe: aunque A00011 se parezca, no se sugiere nada.
+        motivo, detalle = clasificar_guia("A00012", None, set())
+        assert motivo == "inexistente"
+        assert "A00011" not in detalle
+        assert "similar" not in detalle.lower()
+        assert "tipeo" not in detalle.lower()
 
     def test_en_kardex_pero_no_en_erp(self):
-        motivo, detalle = clasificar_guia("K0009", None, {"K0009"}, self.CODIGOS)
+        motivo, detalle = clasificar_guia("K0009", None, {"K0009"})
         assert motivo == "kardex"
         assert "KARDEX" in detalle
+        assert "similar" not in detalle.lower()
 
     def test_inexistente(self):
-        motivo, detalle = clasificar_guia("ZZZ99", None, set(), self.CODIGOS)
+        motivo, detalle = clasificar_guia("ZZZ99", None, set())
         assert motivo == "inexistente"
         assert "ERP" in detalle and "KARDEX" in detalle
 
@@ -789,4 +790,9 @@ class TestGuiaVsMaestros:
         assert "C0003 (SKU_BX)" in texto and "proceso" in texto.lower()
         assert "K0009 (SKU_BX)" in texto and "KARDEX" in texto
         assert "ZZZ99 (SKU_BX)" in texto
-        assert "A00012 (SKU_BX)" in texto and "A00011" in texto
+        # A00012 no existe: exacto, sin sugerencia de A00011.
+        linea_a12 = next(
+            aviso for aviso in bloque.avisos if aviso.startswith("A00012 ")
+        )
+        assert "mal escrito" in linea_a12
+        assert "A00011" not in linea_a12
