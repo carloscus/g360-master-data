@@ -1361,6 +1361,8 @@ class TestConsultarPorTaxonomia:
                     "un_bx": 12,
                     "stock_snapshot": 5,
                     "categoria": "VINIBALL",
+                    "ean13": "7754807110198",
+                    "ean14": "17754807110195",
                 },
                 {
                     "sku": "VOLE1",
@@ -1405,6 +1407,8 @@ class TestConsultarPorTaxonomia:
         por_sku = {f["sku"]: f for f in rep["filas"]}
         assert por_sku["01019"]["precio"] == 70.0
         assert por_sku["01019"]["un_bx"] == 12
+        assert por_sku["01019"]["ean13"] == "7754807110198"
+        assert por_sku["01019"]["ean14"] == "17754807110195"
         assert por_sku["01VOLE1"]["via_prefijo"] is True
         assert por_sku["01VOLE1"]["cotizable"] is False
 

@@ -123,6 +123,8 @@ def consultar(fichas: dict, catalogo: dict, filtros: dict) -> dict:
                     "en_catalogo": True,
                     "nombre": ficha.get("nombre_corto", ""),
                     "um": ficha.get("um", ""),
+                    "ean13": p.get("ean13", ""),
+                    "ean14": p.get("ean14", ""),
                     "precio": p.get("precio", 0),
                     "peso_kg": p.get("peso_kg", 0),
                     "un_bx": p.get("un_bx", 0),
@@ -170,18 +172,18 @@ def _imprimir(reporte: dict, limite: int) -> None:
     if calce.get("prefijo"):
         print(f"(calce con prefijo numerico: {calce['prefijo']})")
     print(
-        f"{'SKU':<12}{'NOMBRE':<34}{'UM':<5}{'PRECIO':>9}{'UN_BX':>7}{'STOCK':>8}  CATEGORIA"
+        f"{'SKU':<12}{'EAN13':<15}{'NOMBRE':<28}{'UM':<5}{'PRECIO':>9}{'UN_BX':>7}{'STOCK':>8}  CATEGORIA"
     )
     for fila in reporte["filas"][:limite]:
         if fila["en_catalogo"]:
             marca = " *" if fila["via_prefijo"] else ""
             print(
-                f"{fila['sku']:<12}{fila['nombre'][:33]:<34}{fila['um']:<5}"
+                f"{fila['sku']:<12}{fila.get('ean13', ''):<15}{fila['nombre'][:27]:<28}{fila['um']:<5}"
                 f"{fila['precio']:>9.2f}{fila['un_bx'] or '-':>7}{fila['stock'] or 0:>8}  {fila['categoria']}{marca}"
             )
         else:
             print(
-                f"{fila['sku']:<12}{fila['nombre'][:33]:<34}{fila['um']:<5}{'--':>9}  FUERA"
+                f"{fila['sku']:<12}{'':<15}{fila['nombre'][:27]:<28}{fila['um']:<5}{'--':>9}  FUERA"
             )
     resto = len(reporte["filas"]) - min(limite, len(reporte["filas"]))
     if resto:
