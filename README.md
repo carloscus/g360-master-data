@@ -40,9 +40,9 @@ g360-master-data/
 │   │   Aporta: qué se vende, unidades por caja, orden comercial y m³
 │   ├── KARDEX_BASE.xlsx        ← Padrón de artículos por almacén (export manual, 179.591 filas)
 │   │   Columnas: colId/colNom de Almacén, Línea, Grupo, Tipo, Familia,
-│   │              Artículo y UM (sin cantidades ni fechas)
-│   │   Aporta: taxonomía observada SKU × almacén (validar/derivar líneas).
-│   │   Hoy NO lo consume el generador (fase 3: demanda/rotación)
+│   │              Artículo (corto y largo), UM (sin cantidades ni fechas)
+│   │   Aporta: UM por SKU al catálogo (el ERP no la exporta) + taxonomía
+│   │   observada SKU × almacén (revisión de guía, fase 3: demanda/rotación)
 │   └── plantilla_precios.xlsx  ← Plantilla comercial (hoja única SKU_PRECIOS:
 │       SKU, DESC1..6, VIGENCIA_DESC, PRECIO_FIJO, VIGENCIA_PRECIO, OBSERVACION)
 │       Aporta: descuentos y precios fijos (vía scripts/leer_plantilla_precios.py)
@@ -92,11 +92,11 @@ python scripts\crear_plantillas.py --instalar
 python scripts\crear_plantillas.py --migrar
 ```
 
-Hoy el generador consume **PRODUCTOS.xls + SKU_BX.xlsx + el universo de stock**;
-`KARDEX_BASE.xlsx` y `plantilla_precios.xlsx` están para las siguientes fases
-(rotación/demanda, descuentos, etc.). Cuando se sume una fuente nueva, se
-agrega acá, se declara su contrato en `scripts/contratos.py` y se escribe su
-lector en `scripts/`.
+Hoy el generador consume **PRODUCTOS.xls + SKU_BX.xlsx + KARDEX_BASE.xlsx
+(UM por SKU) + el universo de stock**; `plantilla_precios.xlsx` está para la
+siguiente fase (descuentos). Cuando se sume una fuente nueva, se agrega acá,
+se declara su contrato en `scripts/contratos.py` y se escribe su lector en
+`scripts/`.
 
 ---
 
@@ -198,6 +198,15 @@ Los SKUs ya revisados se silencian en `config/guia_ignorados.json`
 (`{"ignorados": {"04058": "baja definitiva"}}`): la próxima corrida ya no
 los muestra. Si el SKU se corrige o se elimina de la guía, la entrada sobra
 y se puede borrar. El generador respeta la misma lista en su WARN final.
+
+**UM desde KARDEX.** El ERP no exporta unidad de medida, así que el catálogo
+la toma de KARDEX (`colIdUM`): coincidencia exacta primero y, si no hay,
+sin prefijo numérico (`01CA001` → `CA001`). No se adivina con códigos
+puramente numéricos (`016763` nunca se reduce a `16763`: son artículos
+distintos) ni con ambigüedad (dos códigos distintos al mismo SKU se omiten
+y se avisan). Verificado: UM 100% consistente por SKU en los 179.591
+registros. El KARDEX se lee una sola vez por archivo (caché en
+`data/.cache_kardex_um.json`).
 
 **Reporte S1 (sin encabezado real).** El `.xls` del S1 trae 9–12 filas de
 preámbulo y una fila de encabezados con celdas combinadas: `ARTICULO` queda en

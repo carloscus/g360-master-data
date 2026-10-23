@@ -570,6 +570,100 @@ class TestLeerUnbxCaja:
             leer_unbx(ruta)
 
 
+class TestResolverUmKardex:
+    """El UM sale de KARDEX: exacto primero, sin prefijo numerico despues."""
+
+    def _resolver(self):
+        from generar_catalogo_base import resolver_um_kardex
+
+        return resolver_um_kardex
+
+    def test_exacta(self):
+        resolver = self._resolver()
+        res, st = resolver({"CA001"}, {"CA001": "UND", "X": "KGR"})
+        assert res == {"CA001": "UND"}
+        assert st["exactos"] == 1
+
+    def test_prefijo_numerico(self):
+        # KARDEX guarda '01CA001' cuando el ERP dice 'CA001'.
+        resolver = self._resolver()
+        res, st = resolver({"CA001"}, {"01CA001": "UND"})
+        assert res == {"CA001": "UND"}
+        assert st["prefijo"] == 1
+
+    def test_ceros_no_se_pierden(self):
+        # '016763' NO es '16763': sin letras no hay reduccion.
+        resolver = self._resolver()
+        res, st = resolver({"16763"}, {"016763": "UND"})
+        assert res == {}
+        assert st["sin_match"] == 1
+
+    def test_exacta_gana_a_prefijo(self):
+        resolver = self._resolver()
+        res, _ = resolver({"CA001"}, {"CA001": "UND", "01CA001": "KGR"})
+        assert res == {"CA001": "UND"}
+
+    def test_ambiguo_no_se_adivina(self):
+        resolver = self._resolver()
+        res, st = resolver({"CA001"}, {"01CA001": "UND", "02CA001": "KGR"})
+        assert res == {}
+        assert st["ambiguos"] == 1
+
+    def test_um_vacia_no_entra(self):
+        resolver = self._resolver()
+        res, _ = resolver({"A"}, {"A": ""})
+        assert res == {"A": ""} or res == {}
+
+
+class TestUmEnCatalogo:
+    def _prod(self, sku, um=""):
+        return {
+            "sku": sku,
+            "nombre": "X",
+            "ean13": "",
+            "ean14": "",
+            "peso_kg": 0.0,
+            "linea": "01",
+            "linea_nombre": "P",
+            "grupo": "P",
+            "tipo": "T",
+            "familia": "F",
+            "categoria": "VINIBALL",
+            "precio": 1.0,
+            "descontinuado": False,
+            "linea_codigo": "01",
+            "um": um,
+            "origen": "erp",
+        }
+
+    def test_um_kardex_completa_al_producto(self, tmp_path):
+        from generar_catalogo_base import generar_output
+
+        res = generar_output(
+            [self._prod("A")],
+            {},
+            {},
+            {},
+            str(tmp_path / "c.json"),
+            um_kardex={"A": "UND"},
+        )
+        assert res["productos"][0]["um"] == "UND"
+        assert res["metadata"]["estadisticas"]["con_um"] == 1
+
+    def test_um_propia_manda_sobre_kardex(self, tmp_path):
+        from generar_catalogo_base import generar_output
+
+        res = generar_output(
+            [self._prod("A", um="BST")],
+            {},
+            {},
+            {},
+            str(tmp_path / "c.json"),
+            um_kardex={"A": "UND"},
+        )
+        assert res["productos"][0]["um"] == "BST"
+
+
 class TestDimensionesEnCatalogo:
     def test_generar_output_publica_caja_y_fuentes(self, tmp_path):
         from generar_catalogo_base import generar_output

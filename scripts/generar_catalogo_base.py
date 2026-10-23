@@ -940,6 +940,52 @@ def leer_um_kardex(ruta: Path) -> tuple[dict[str, str], str]:
     return um_map, f"{len(um_map)} SKUs con UM"
 
 
+def _sin_prefijo_numerico(codigo) -> str:
+    """'01CA001' -> 'CA001'. Quita digitos iniciales SOLO si lo que queda
+    tiene alguna letra: un '016763' jamas se reduce a '16763' (son
+    articulos distintos, los ceros a la izquierda son parte del SKU)."""
+    base = re.sub(r"^[0-9]+", "", str(codigo or "").strip().upper())
+    if base and re.search(r"[A-Z]", base):
+        return base
+    return ""
+
+
+def resolver_um_kardex(skus, um_por_id: dict[str, str]):
+    """Une UM de KARDEX con SKUs del catalogo/ERP.
+
+    1) Coincidencia exacta (tal cual).
+    2) Sin prefijo numerico: KARDEX guarda algunos como '01CA001' cuando
+       el ERP dice 'CA001'. Solo si lo que queda tiene alguna letra (ver
+       _sin_prefijo_numerico) y sin ambiguedad (un solo candidato; el
+       exacto siempre gana).
+    """
+    resueltos: dict[str, str] = {}
+    stats = {"exactos": 0, "prefijo": 0, "ambiguos": 0, "sin_match": 0}
+    for s in dict.fromkeys(skus):
+        if s in um_por_id:
+            resueltos[s] = um_por_id[s]
+            stats["exactos"] += 1
+    por_base: dict[str, list] = {}
+    for kid, um in um_por_id.items():
+        b = _sin_prefijo_numerico(kid)
+        if b:
+            por_base.setdefault(b, []).append((kid, um))
+    for s in dict.fromkeys(skus):
+        if s in resueltos:
+            continue
+        b = _sin_prefijo_numerico(s)
+        cands = por_base.get(b, []) if b else []
+        cands = [(k, u) for k, u in cands if k.upper() != str(s).upper()]
+        if len(cands) == 1:
+            resueltos[s] = cands[0][1]
+            stats["prefijo"] += 1
+        elif len(cands) > 1:
+            stats["ambiguos"] += 1
+        else:
+            stats["sin_match"] += 1
+    return resueltos, stats
+
+
 def _entero(valor) -> int:
     """Entero tolerante ('18', 18.0, '18.0'); 0 si no se puede."""
     texto = limpiar_texto(valor)
@@ -989,6 +1035,7 @@ def generar_output(
         "con_compromiso": 0,
         "por_activar": 0,
         "cotizables": 0,
+        "con_um": 0,
         # Sin enlaces por parecido: siempre 0. Se mantiene la clave para no
         # romper consumidores del metadata.
         "derivados": 0,
@@ -1064,6 +1111,8 @@ def generar_output(
             estadisticas["por_activar"] += 1
         if cotizable:
             estadisticas["cotizables"] += 1
+        if p.get("um", "") or (um_kardex or {}).get(p["sku"], ""):
+            estadisticas["con_um"] += 1
         if origen == "s1":
             estadisticas["solo_s1"] += 1
         estadisticas["por_categoria_venta"][cat_venta] = (
@@ -1693,13 +1742,21 @@ def main():
 
     # Generar output
     print("\nGenerando catálogo...")
-    # UM desde KARDEX (fuente primaria: el ERP no exporta UM, KARDEX sí)
+    # UM desde KARDEX (fuente primaria: el ERP no exporta UM, KARDEX sí).
+    # Se resuelve por SKU exacto y, si no hay, sin prefijo numerico
+    # ('01CA001' -> 'CA001'). Sin KARDEX, um queda como esta (S1 o vacio).
     um_kardex: dict[str, str] = {}
-    um_nota = ""
     kardex_ruta = Path("data") / "KARDEX_BASE.xlsx"
     if kardex_ruta.exists():
-        um_kardex, um_nota = leer_um_kardex(kardex_ruta)
-        print(f"  KARDEX UM: {um_nota}")
+        um_crudo, um_nota = leer_um_kardex(kardex_ruta)
+        um_kardex, um_stats = resolver_um_kardex(
+            {p["sku"] for p in productos}, um_crudo
+        )
+        print(
+            f"  KARDEX UM: {um_nota}; calce exacto={um_stats['exactos']} "
+            f"prefijo={um_stats['prefijo']} ambiguos={um_stats['ambiguos']} "
+            f"sin_match={um_stats['sin_match']}"
+        )
     output = generar_output(
         productos,
         unbx_map,

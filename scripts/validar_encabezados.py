@@ -711,16 +711,17 @@ def validar_kardex(ruta: Path) -> Bloque:
         _aviso_columnas(bloque, columnas)
         bloque.info.append(f"{hoja.max_row} filas")
 
-        # colNomArticulo viene DOS veces (posiciones 12 y 13) con valores
-        # distintos: por nombre solo se lee la primera, asi que hay que decirlo.
+        # colNomArticulo viene DOS veces: la primera es el nombre CORTO
+        # ("CRAYONES DELGADOS") y la segunda la descripcion larga
+        # ("CRAYOLA CRAYONES DELGADOS -CAJITA X 16UN"). Por nombre solo se
+        # lee la primera (el contrato la usa como nom_articulo).
         repetidos = [
             a for a in columnas.avisos if "duplicado" in a and "COLNOM" in a.upper()
         ]
         if repetidos:
-            bloque.avisos.append(
-                "KARDEX trae colNomArticulo duplicado: se lee la primera "
-                "ocurrencia; si el nombre bueno es el de la segunda, hay que "
-                "renombrar la columna en el origen"
+            bloque.info.append(
+                "colNomArticulo x2: se lee la primera (nombre corto); "
+                "la segunda es la descripcion larga y se ignora"
             )
 
         i_alm = columnas.idx("nom_almacen")
