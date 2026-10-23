@@ -159,8 +159,20 @@ python scripts\validar_encabezados.py --json
 ```
 
 Un error en las fuentes que alimentan el catálogo (ERP, SKU_BX, S1) **frena
-todo**. Un problema en las informativas (plantilla de precios, KARDEX) se
-reporta pero no bloquea la publicación.
+todo**. Un problema en las informativas (plantilla de precios, KARDEX,
+revisión de guía) se reporta pero no bloquea la publicación. Dos avisos
+merecen atención especial porque anticipan sorpresas:
+
+- **ERP viejo**: el paso 0 informa hace cuántos días se exportó y avisa si
+  pasa de 60 (el catálogo saldría "válido" pero rancio: altas que no entran,
+  precios desactualizados).
+- **Universo S1 parcial**: si el API devuelve un reporte cortado con HTTP
+  200, la cobertura da OK (se calcula contra ese mismo universo) y nadie lo
+  nota. Por eso el generador compara contra la corrida anterior y publica
+  `metadata.universo_stock.previo_skus/variacion`: una caída ≥ 15% sale como
+  ALERTA en consola, queda registrada en el metadata y el validador la
+  convierte en error (bloquea el upload). Si la caída es real (baja masiva),
+  se revisa y se publica con `actualizar_catalogo.bat --upload`.
 
 > **SKU siempre es TEXTO.** `016763` y `16763` son artículos distintos: si la
 > celda se guarda como número, los ceros a la izquierda se pierden y el SKU

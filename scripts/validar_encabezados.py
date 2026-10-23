@@ -33,6 +33,7 @@ import json
 import re
 import sys
 from dataclasses import dataclass, field
+from datetime import date
 from pathlib import Path
 
 from contratos import (
@@ -77,6 +78,10 @@ ORDEN_ERP_HISTORICO = (
 
 MUESTRA = 200
 UMBRAL_CONTENIDO = 0.90
+
+# El ERP es mensual/bimestral: mas alla de esto el catalogo sale rancio
+# (altas que no entran, precios viejos). Aviso, no error.
+UMBRAL_ERP_DIAS = 60
 
 
 @dataclass
@@ -156,6 +161,22 @@ def validar_erp(ruta: Path) -> Bloque:
     if not ruta.exists():
         bloque.omitido = f"no existe {ruta}"
         return bloque
+
+    # Frescura del export: un ERP viejo genera un catalogo "valido" pero
+    # rancio (altas que no entran, precios desactualizados). No bloquea,
+    # pero nadie deberia publicar sin ver este aviso.
+    try:
+        dias = (date.today() - date.fromtimestamp(ruta.stat().st_mtime)).days
+    except OSError:
+        dias = -1
+    if dias >= 0:
+        bloque.info.append(f"exportado hace {dias} dia(s)")
+        if dias > UMBRAL_ERP_DIAS:
+            bloque.avisos.append(
+                f"el ERP tiene {dias} dias (>{UMBRAL_ERP_DIAS}): si hubo altas, "
+                "bajas o cambios de precio despues, el catalogo sale desactualizado; "
+                "pedir export nuevo al ERP"
+            )
 
     import xlrd
 

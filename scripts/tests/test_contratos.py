@@ -705,6 +705,59 @@ class TestGuiaIgnorados:
         assert cargar_guia_ignorados(tmp_path / "no_existe.json") == {}
 
 
+class TestFrescuraErp:
+    """El paso 0 avisa si el export del ERP es viejo (catalogo rancio)."""
+
+    def _erp(self, ruta, dias_atras=0):
+        import os
+        import time
+
+        import xlwt
+
+        libro = xlwt.Workbook(encoding="utf-8")
+        hoja = libro.add_sheet("codigos productos")
+        columnas = [
+            "CODIGO",
+            "NOMBRE",
+            "LINEA",
+            "GRUPO",
+            "PRECIO",
+            "FLG_INACTIVO",
+            "FLG_DESCONTINUADO",
+        ]
+        for i, nombre in enumerate(columnas):
+            hoja.write(0, i, nombre)
+        hoja.write(1, 0, "016763")
+        hoja.write(1, 1, "PELOTA")
+        hoja.write(1, 2, "PELOTAS")
+        hoja.write(1, 3, "PELOTAS")
+        hoja.write(1, 4, "10")
+        hoja.write(1, 5, "Unchecked")
+        hoja.write(1, 6, "Unchecked")
+        libro.save(str(ruta))
+        if dias_atras:
+            viejo = time.time() - dias_atras * 86400
+            os.utime(ruta, (viejo, viejo))
+
+    def test_erp_reciente_no_avisa_edad(self, tmp_path):
+        from validar_encabezados import validar_erp
+
+        ruta = tmp_path / "PRODUCTOS.xls"
+        self._erp(ruta, dias_atras=5)
+        bloque = validar_erp(ruta)
+        assert bloque.estado in ("ok", "aviso")
+        assert not any("dias" in a and "ERP tiene" in a for a in bloque.avisos)
+
+    def test_erp_viejo_avisa_pero_no_bloquea(self, tmp_path):
+        from validar_encabezados import validar_erp
+
+        ruta = tmp_path / "PRODUCTOS.xls"
+        self._erp(ruta, dias_atras=90)
+        bloque = validar_erp(ruta)
+        assert bloque.estado != "error"
+        assert any("90 dias" in a for a in bloque.avisos)
+
+
 class TestGuiaVsMaestros:
     """Integracion con archivos temporales: el bloque detecta cada caso."""
 
@@ -796,3 +849,130 @@ class TestGuiaVsMaestros:
         )
         assert "mal escrito" in linea_a12
         assert "A00011" not in linea_a12
+
+
+class TestCaidaUniverso:
+    """Un universo parcial con HTTP 200 es invisible para la cobertura
+    (se calcula contra ese mismo universo): se compara contra la corrida
+    anterior y se publica la variacion en el metadata."""
+
+    def _prod(self, sku):
+        return {
+            "sku": sku,
+            "nombre": "X",
+            "ean13": "",
+            "ean14": "",
+            "peso_kg": 0.0,
+            "linea": "01",
+            "linea_nombre": "P",
+            "grupo": "P",
+            "tipo": "T",
+            "familia": "F",
+            "categoria": "VINIBALL",
+            "precio": 1.0,
+            "descontinuado": False,
+            "linea_codigo": "01",
+            "um": "",
+            "origen": "erp",
+        }
+
+    def _previo(self, ruta, skus_universo):
+        import json
+
+        with open(ruta, "w", encoding="utf-8") as f:
+            json.dump(
+                {
+                    "metadata": {
+                        "total_productos": 10,
+                        "universo_stock": {
+                            "incluido": True,
+                            "skus": skus_universo,
+                        },
+                    },
+                    "productos": [],
+                },
+                f,
+            )
+
+    def _universo(self, n):
+        return {
+            f"S{i:05d}": {"stock": 1, "predespacho": 0, "linea": "0178 - ARCHIVO"}
+            for i in range(n)
+        }
+
+    def test_caida_fuerte_deja_alerta_en_metadata(self, tmp_path, capsys):
+        from generar_catalogo_base import generar_output
+
+        salida = tmp_path / "catalogo.json"
+        self._previo(salida, 100)
+        res = generar_output(
+            [self._prod("A")],
+            {},
+            {},
+            {},
+            str(salida),
+            universo=self._universo(80),
+            universo_stock={"incluido": True, "skus": 80, "error": ""},
+        )
+        uni = res["metadata"]["universo_stock"]
+        assert uni["previo_skus"] == 100
+        assert uni["variacion"] == -0.2
+        assert "alerta_caida" in uni
+        assert "ALERTA" in capsys.readouterr().out
+
+    def test_sin_caida_no_hay_alerta(self, tmp_path):
+        from generar_catalogo_base import generar_output
+
+        salida = tmp_path / "catalogo.json"
+        self._previo(salida, 100)
+        res = generar_output(
+            [self._prod("A")],
+            {},
+            {},
+            {},
+            str(salida),
+            universo=self._universo(100),
+            universo_stock={"incluido": True, "skus": 100, "error": ""},
+        )
+        uni = res["metadata"]["universo_stock"]
+        assert uni["previo_skus"] == 100
+        assert uni["variacion"] == 0.0
+        assert "alerta_caida" not in uni
+
+    def test_sin_previo_no_compara(self, tmp_path):
+        from generar_catalogo_base import generar_output
+
+        salida = tmp_path / "catalogo.json"
+        res = generar_output(
+            [self._prod("A")],
+            {},
+            {},
+            {},
+            str(salida),
+            universo=self._universo(50),
+            universo_stock={"incluido": True, "skus": 50, "error": ""},
+        )
+        uni = res["metadata"]["universo_stock"]
+        assert "previo_skus" not in uni
+        assert "alerta_caida" not in uni
+
+    def test_validador_frena_con_alerta_caida(self):
+        from validar_taxonomia import validar
+
+        catalogo = {
+            "metadata": {
+                "categorias_por_linea": {},
+                "universo_stock": {
+                    "incluido": True,
+                    "skus": 80,
+                    "previo_skus": 100,
+                    "variacion": -0.2,
+                    "alerta_caida": "el universo cayo -20% vs la corrida anterior",
+                },
+                "universo_skus": [],
+                "cobertura_faltante": [],
+            },
+            "productos": [],
+        }
+        errores, _ = validar(catalogo, Path(__file__).resolve().parent.parent.parent)
+        assert any("cayo -20%" in e for e in errores)

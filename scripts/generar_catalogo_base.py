@@ -37,6 +37,12 @@ son las tres categorías de negocio; todo el resto queda en REVISION_VENTA.
 # README terminaba describiendo un producto que no existía.
 VERSION = "3.7.0"
 
+# Caida del universo vs la corrida anterior que dispara la alerta: el API
+# pudo devolver un reporte parcial con HTTP 200 (corte a medias). La
+# cobertura no lo ve (se calcula contra este mismo universo), asi que se
+# compara aca. No bloquea por si solo: el validador lo convierte en error.
+UMBRAL_CAIDA_UNIVERSO = 0.15
+
 # API de stock por defecto. El universo de stock (SKUs con despacho pendiente)
 # es parte del catalogo: sin el, el catalogo sale incompleto y nadie lo nota.
 URL_STOCK_DEFAULT = "https://g360-stock-api.onrender.com"
@@ -1254,6 +1260,40 @@ def generar_output(
         "universo_skus": universo_skus,
         "cobertura_faltante": faltantes,
     }
+
+    # Caida del universo vs la corrida anterior (mismo archivo de salida).
+    # Un universo parcial con HTTP 200 es indistinguible de uno real si no
+    # se compara: la cobertura se calcula contra ESTE universo y daria OK.
+    try:
+        previo_meta = {}
+        if Path(ruta_salida).exists():
+            previo_meta = json.loads(Path(ruta_salida).read_text(encoding="utf-8")).get(
+                "metadata", {}
+            )
+    except (OSError, ValueError):
+        previo_meta = {}
+    uni_meta = metadata.get("universo_stock")
+    if isinstance(uni_meta, dict) and uni_meta.get("incluido"):
+        n_ahora = int(uni_meta.get("skus", 0) or 0)
+        uni_antes = previo_meta.get("universo_stock", {})
+        n_antes = (
+            int(uni_antes.get("skus", 0) or 0) if isinstance(uni_antes, dict) else 0
+        )
+        if n_antes > 0:
+            variacion = (n_ahora - n_antes) / n_antes
+            uni_meta["previo_skus"] = n_antes
+            uni_meta["variacion"] = round(variacion, 4)
+            if variacion <= -UMBRAL_CAIDA_UNIVERSO:
+                uni_meta["alerta_caida"] = (
+                    f"el universo cayo {variacion:.0%} vs la corrida anterior "
+                    f"({n_antes} -> {n_ahora} SKUs): posible reporte parcial "
+                    "del API; revisar antes de publicar"
+                )
+                print(f"  ALERTA: {uni_meta['alerta_caida']}")
+            elif variacion:
+                print(
+                    f"  Universo vs anterior: {n_antes} -> {n_ahora} ({variacion:+.0%})"
+                )
 
     output = {"metadata": metadata, "productos": productos_final}
 

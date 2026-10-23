@@ -335,6 +335,16 @@ def validar(catalogo: dict, raiz: Path = RAIZ) -> tuple[list[str], list[str]]:
                 f"{'...' if len(fuera) > 10 else ''}"
             )
 
+    # 9c2. Caida del universo vs la corrida anterior (la declara el
+    #      generador en metadata.universo_stock.alerta_caida). Un reporte
+    #      parcial con HTTP 200 es indistinguible de uno real si no se
+    #      compara: la cobertura daria OK con un catalogo incompleto.
+    #      Bloquea la subida; si la caida es real (baja masiva), revisar
+    #      y publicar con: actualizar_catalogo.bat --upload
+    uni = meta.get("universo_stock", {})
+    if isinstance(uni, dict) and uni.get("alerta_caida"):
+        errores.append(f"ALERTA: {uni['alerta_caida']}")
+
     # 9d. Coherencia de la caja: si el SKU publica dimensiones, el volumen
     #     tiene que dar (es un calculo, no un dato libre: una celda pegada a
     #     mano lo rompe). Sin dimensiones se publica null y no se juzga.
