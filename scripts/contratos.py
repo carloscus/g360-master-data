@@ -28,6 +28,7 @@ Este modulo no depende de pandas: sirve igual para xlrd (ERP/S1) y openpyxl
 from __future__ import annotations
 
 import hashlib
+import json
 import re
 import unicodedata
 from dataclasses import dataclass, field
@@ -634,6 +635,7 @@ ALMACENES_S1: tuple[str, ...] = ("121", "129", "VES", "118", "122", "40", "106",
 
 RAIZ = Path(__file__).resolve().parent.parent
 RUTA_CONFIG_ALMACENES = RAIZ / "config" / "almacenes.json"
+RUTA_GUIA_IGNORADOS = RAIZ / "config" / "guia_ignorados.json"
 
 _almacenes_cache: dict | None = None
 
@@ -704,6 +706,23 @@ def almacenes_publicados(ruta=None) -> tuple[str, ...]:
     venta = sorted(c for c, t in config["almacenes"].items() if t == "venta")
     mktd = sorted(c for c, t in config["almacenes"].items() if t == "mktd")
     return tuple(venta + mktd)
+
+
+def cargar_guia_ignorados(ruta=None) -> dict[str, str]:
+    """SKUs de la guia ya revisados a mano: {SKU: motivo}.
+
+    El paso 0 y el generador no vuelven a avisar por ellos: la proxima
+    corrida ya no los muestra. Si el SKU se corrige o se elimina de la
+    guia, la entrada sobra (se puede borrar).
+    """
+    p = Path(ruta) if ruta else RUTA_GUIA_IGNORADOS
+    try:
+        with open(p, encoding="utf-8-sig") as f:
+            datos = json.load(f)
+        ignorados = datos.get("ignorados") or {}
+        return {str(k).strip().upper(): str(v) for k, v in ignorados.items()}
+    except (OSError, ValueError):
+        return {}
 
 
 # Palabras que ocupan la columna del SKU y NO son SKU.

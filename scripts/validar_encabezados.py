@@ -12,6 +12,10 @@ Valida, por fuente:
     columnas que la sola presencia del encabezado no ve;
   - avisos: orden de columnas distinto al historico, duplicados, columnas de
     mas, cajas incompletas, SKUs numericos (perdida de ceros), etc.
+  - revision de guia: cada SKU de SKU_BX/precios que no va a entrar al
+    catalogo se reporta con el motivo (inactivo / proceso / tipeo /
+    en KARDEX pero no en ERP / inexistente) para revisarlo o eliminarlo.
+    Los ya revisados se silencian en config/guia_ignorados.json.
 
 Uso:
     python scripts/validar_encabezados.py
@@ -24,6 +28,7 @@ Salida: 0 si no hay errores (puede haber avisos), 1 si hay errores.
 from __future__ import annotations
 
 import argparse
+import difflib
 import glob
 import json
 import re
@@ -42,6 +47,7 @@ from contratos import (
     ErrorContrato,
     almacenes_fuera_de_lista,
     calcular_m3,
+    cargar_guia_ignorados,
     detectar_columnas_s1,
     limpiar_texto,
     normalizar_encabezado,
@@ -763,6 +769,234 @@ def _imprimir(bloques: list[Bloque]) -> None:
     print(f"OK: todas las fuentes cumplen el contrato ({avisos} aviso(s)).")
 
 
+# ─────────────────────────────────────────────────────────────────────────────
+# Revision de guia: SKUs manuales que no entran al catalogo
+# ─────────────────────────────────────────────────────────────────────────────
+
+
+def clasificar_guia(sku, ficha_erp, kardex, codigos_erp) -> tuple[str, str]:
+    """Por que un SKU de la guia (SKU_BX/precios) no entra al catalogo.
+
+    `ficha_erp` es None si el SKU no esta en el ERP, o
+    {inactivo: bool, linea: str}. `kardex` es el set de colIdArticulo.
+    Devuelve (motivo, detalle); motivo 'ok' = entra por guia.
+    """
+    from generar_catalogo_base import LINEAS_EXCLUIR
+
+    if ficha_erp is not None:
+        if ficha_erp.get("inactivo"):
+            return (
+                "inactivo",
+                "inactivo en ERP: no entra al catalogo aunque este en guia; "
+                "dar de baja en guia o reactivar en ERP",
+            )
+        if ficha_erp.get("linea", "") in LINEAS_EXCLUIR:
+            return (
+                "proceso",
+                f"linea de proceso en ERP ({ficha_erp['linea']}): excluido "
+                "aunque este en guia",
+            )
+        return ("ok", "")
+
+    sugerencia = ""
+    candidatos = difflib.get_close_matches(sku, codigos_erp, n=1, cutoff=0.8)
+    if candidatos and candidatos[0] != sku:
+        sugerencia = candidatos[0]
+    if sku in kardex:
+        detalle = (
+            "existe en KARDEX pero no en ERP: revisar maestro "
+            "(baja, codigo nuevo o reemplazo)"
+        )
+        if sugerencia:
+            detalle += f"; similar a '{sugerencia}'"
+        return ("kardex", detalle)
+    if sugerencia:
+        return (
+            "tipeo",
+            "no existe en ERP ni KARDEX; posible tipeo: "
+            f"quisiste decir '{sugerencia}'?",
+        )
+    return (
+        "inexistente",
+        "no existe en ERP ni KARDEX: mal escrito o codigo inexistente "
+        "(solo entraria si reporta stock: ficha S1)",
+    )
+
+
+def _fichas_erp(ruta: Path) -> dict[str, dict] | None:
+    """{sku: {inactivo, linea}} con TODAS las filas del ERP. None si el
+    contrato esta roto (el bloque ERP ya lo reporta: no duplicar el error)."""
+    import xlrd
+
+    try:
+        libro = xlrd.open_workbook(str(ruta))
+    except (OSError, ValueError):
+        return None
+    try:
+        columnas, hoja = resolver_xls(libro, CONTRATO_ERP)
+    except ErrorContrato:
+        return None
+    finally:
+        libro.release_resources()
+    fichas: dict[str, dict] = {}
+    for r in range(1, hoja.nrows):
+        fila = hoja.row_values(r)
+        sku = sku_texto(columnas.valor(fila, "sku"))
+        if not sku or sku in fichas:
+            continue
+        fichas[sku] = {
+            "inactivo": limpiar_texto(columnas.valor(fila, "inactivo")).lower()
+            == "checked",
+            "linea": limpiar_texto(columnas.valor(fila, "linea")),
+        }
+    return fichas
+
+
+def _skus_kardex(ruta: Path) -> tuple[set[str], str]:
+    """Set de colIdArticulo del KARDEX + nota de origen.
+
+    El archivo pesa 11 MB / 179k filas: se cachea el set en
+    data/.cache_kardex_skus.json y solo se reconstruye si el archivo cambio
+    (mismo nombre, tamano y fecha). Sin KARDEX devuelve set vacio.
+    """
+    import openpyxl
+
+    try:
+        st = ruta.stat()
+    except OSError:
+        return set(), "sin KARDEX"
+    huella = {"archivo": ruta.name, "bytes": st.st_size, "modificado": st.st_mtime}
+    cache = ruta.with_name(".cache_kardex_skus.json")
+    try:
+        with open(cache, encoding="utf-8") as f:
+            guardado = json.load(f)
+        if all(guardado.get(k) == v for k, v in huella.items()):
+            return set(guardado.get("skus", [])), "indice cacheado"
+    except (OSError, ValueError):
+        pass
+
+    print("  (construyendo indice KARDEX: una sola vez por archivo...)")
+    libro = openpyxl.load_workbook(ruta, read_only=True, data_only=True)
+    try:
+        columnas, hoja = resolver_xlsx(libro, CONTRATO_KARDEX)
+        i_art = columnas.idx("id_articulo")
+        skus = {
+            sku_texto(f[i_art])
+            for f in hoja.iter_rows(min_row=2, values_only=True)
+            if len(f) > i_art and sku_texto(f[i_art])
+        }
+    except ErrorContrato:
+        return set(), "contrato roto (ver bloque KARDEX)"
+    finally:
+        libro.close()
+    try:
+        with open(cache, "w", encoding="utf-8") as f:
+            json.dump({**huella, "skus": sorted(skus)}, f)
+    except OSError:
+        pass
+    return skus, f"indice reconstruido ({len(skus)} articulos)"
+
+
+def _skus_guia(data: Path) -> dict[str, str]:
+    """{sku: origen} de las guias manuales. Origen: 'SKU_BX', 'precios' o
+    'SKU_BX+precios'. Las hojas con contrato roto se omiten (su bloque ya
+    lo reporta)."""
+    from contratos import (
+        CONTRATO_PLANTILLA_DESCUENTOS,
+        CONTRATO_PLANTILLA_PRECIOS_FIJOS,
+    )
+
+    import openpyxl
+
+    guia: dict[str, str] = {}
+
+    def _agregar(ruta, contrato, etiqueta):
+        try:
+            libro = openpyxl.load_workbook(ruta, read_only=True, data_only=True)
+        except (OSError, ValueError):
+            return
+        try:
+            columnas, hoja = resolver_xlsx(libro, contrato)
+            for fila in hoja.iter_rows(
+                min_row=contrato.fila_header + 1, values_only=True
+            ):
+                sku = sku_texto(columnas.valor(fila, "sku"))
+                if not sku:
+                    continue
+                guia[sku] = f"{guia[sku]}+{etiqueta}" if sku in guia else etiqueta
+        except ErrorContrato:
+            return
+        finally:
+            libro.close()
+
+    _agregar(data / "SKU_BX.xlsx", CONTRATO_SKU_BX, "SKU_BX")
+
+    # Precios: hoja unica actual o layout legacy (2 hojas).
+    ruta_pr = data / "plantilla_precios.xlsx"
+    try:
+        hojas = openpyxl.load_workbook(ruta_pr, read_only=True).sheetnames
+    except (OSError, ValueError):
+        hojas = []
+    if "SKU_PRECIOS" in hojas:
+        _agregar(ruta_pr, CONTRATO_PLANTILLA_PRECIOS, "precios")
+    else:
+        _agregar(ruta_pr, CONTRATO_PLANTILLA_DESCUENTOS, "precios")
+        _agregar(ruta_pr, CONTRATO_PLANTILLA_PRECIOS_FIJOS, "precios")
+    return guia
+
+
+def validar_guia_vs_maestros(data: Path) -> Bloque:
+    """Cruza la guia manual (SKU_BX + precios) contra ERP y KARDEX.
+
+    Avisa por cada SKU que NO va a entrar al catalogo, con el motivo
+    (inactivo / proceso / tipeo / en KARDEX pero no en ERP / inexistente)
+    para revisarlo o eliminarlo. Informativo: no bloquea la publicacion
+    (el generador ya omite estos SKUs por regla).
+    """
+    bloque = Bloque("Guia vs maestros (SKU_BX + precios)", str(data), bloqueante=False)
+    ruta_erp = data / "PRODUCTOS.xls"
+    if not ruta_erp.exists():
+        bloque.omitido = "sin ERP: no se puede cruzar la guia"
+        return bloque
+
+    fichas = _fichas_erp(ruta_erp)
+    if fichas is None:
+        bloque.avisos.append(
+            "ERP ilegible o con contrato roto: la revision de guia se omite "
+            "(ver bloque ERP)"
+        )
+        return bloque
+    bloque.info.append(f"ERP: {len(fichas)} SKUs en maestro")
+
+    guia = _skus_guia(data)
+    if not guia:
+        bloque.info.append("guia vacia o ilegible: nada que revisar")
+        return bloque
+
+    kardex, nota_kardex = _skus_kardex(data / "KARDEX_BASE.xlsx")
+    bloque.info.append(f"KARDEX: {len(kardex)} articulos ({nota_kardex})")
+
+    ignorados = cargar_guia_ignorados()
+    omitidos_ack = 0
+    codigos = sorted(fichas)
+    for sku in sorted(guia):
+        if sku in ignorados:
+            omitidos_ack += 1
+            continue
+        motivo, detalle = clasificar_guia(sku, fichas.get(sku), kardex, codigos)
+        if motivo == "ok":
+            continue
+        bloque.avisos.append(f"{sku} ({guia[sku]}): {detalle}")
+    if omitidos_ack:
+        bloque.info.append(
+            f"{omitidos_ack} SKU(s) ya revisados (config/guia_ignorados.json): "
+            "no se avisan"
+        )
+    if not bloque.avisos:
+        bloque.info.append(f"{len(guia)} SKUs de guia existen en ERP: nada que revisar")
+    return bloque
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(
         description="Valida los encabezados de las fuentes del catalogo"
@@ -799,6 +1033,7 @@ def main() -> int:
         bloques.append(validar_s1(s1))
     if not args.sin_kardex:
         bloques.append(validar_kardex(data / "KARDEX_BASE.xlsx"))
+    bloques.append(validar_guia_vs_maestros(data))
 
     if args.json:
         print(

@@ -166,6 +166,19 @@ reporta pero no bloquea la publicación.
 > celda se guarda como número, los ceros a la izquierda se pierden y el SKU
 > deja de coincidir con el ERP. El validador lo reporta como error.
 
+**Revisión de guía (SKU_BX + precios vs ERP + KARDEX).** El paso 0 también
+cruza cada SKU manual contra los maestros: si no va a entrar al catálogo,
+dice **por qué** — `inactivo` (en ERP pero dado de baja), `proceso` (línea
+excluida), `tipeo` (no existe pero hay un código similar: "quisiste decir
+'X'?"), `kardex` (existe en KARDEX pero no en ERP: revisar maestro) o
+`inexistente` (no está en ningún lado: mal escrito o código que no existe).
+Es informativo (no bloquea): el generador ya omite esos SKUs por regla.
+
+Los SKUs ya revisados se silencian en `config/guia_ignorados.json`
+(`{"ignorados": {"04058": "baja definitiva"}}`): la próxima corrida ya no
+los muestra. Si el SKU se corrige o se elimina de la guía, la entrada sobra
+y se puede borrar. El generador respeta la misma lista en su WARN final.
+
 **Reporte S1 (sin encabezado real).** El `.xls` del S1 trae 9–12 filas de
 preámbulo y una fila de encabezados con celdas combinadas: `ARTICULO` queda en
 la columna de la descripción y el **SKU en la columna anterior**. Por eso no se

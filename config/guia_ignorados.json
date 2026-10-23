@@ -1,0 +1,5 @@
+﻿{
+  "descripcion": "SKUs de la guia (SKU_BX / precios) ya revisados a mano: el paso 0 no vuelve a avisar por ellos. La proxima vez que el SKU se corrija o se elimine de la guia, esta entrada sobra (se puede borrar). Clave = SKU en mayusculas, valor = motivo y fecha de la revision.",
+  "ignorados": {
+  }
+}

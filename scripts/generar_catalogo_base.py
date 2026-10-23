@@ -58,6 +58,7 @@ from contratos import (
     ErrorContrato,
     calcular_m3,
     cargar_almacenes,
+    cargar_guia_ignorados,
     huella_fuente,
     limpiar_texto,
     resolver_xls,
@@ -1612,11 +1613,22 @@ def main():
 
     huerfanos = sorted(set(orden_map) - erp_skus)
     if huerfanos:
-        print(
-            f"  WARN: {len(huerfanos)} SKUs en SKU_BX no existen en ERP (se omiten): "
-            f"{', '.join(huerfanos[:10])}"
-            f"{'...' if len(huerfanos) > 10 else ''}"
-        )
+        # Los ya revisados a mano (config/guia_ignorados.json) no se vuelven
+        # a avisar: el paso 0 ya dio el detalle con el motivo.
+        ignorados = cargar_guia_ignorados()
+        silenciados = [s for s in huerfanos if s in ignorados]
+        huerfanos = [s for s in huerfanos if s not in ignorados]
+        if silenciados:
+            print(
+                f"  ... {len(silenciados)} revisado(s) (guia_ignorados.json): "
+                "no se avisan"
+            )
+        if huerfanos:
+            print(
+                f"  WARN: {len(huerfanos)} SKUs en SKU_BX no existen en ERP (se omiten): "
+                f"{', '.join(huerfanos[:10])}"
+                f"{'...' if len(huerfanos) > 10 else ''}"
+            )
 
     if not productos:
         print("ERROR: No hay productos válidos")

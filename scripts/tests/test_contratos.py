@@ -21,12 +21,17 @@ from contratos import (  # noqa: E402
     almacenes_publicados,
     calcular_m3,
     cargar_almacenes,
+    cargar_guia_ignorados,
     detectar_columnas_s1,
     huella_fuente,
     limpiar_texto,
     normalizar_encabezado,
     resolver_columnas,
     sku_texto,
+)
+from validar_encabezados import (  # noqa: E402
+    clasificar_guia,
+    validar_guia_vs_maestros,
 )
 
 
@@ -637,3 +642,151 @@ class TestDimensionesEnCatalogo:
         }
         res = generar_output([producto], {}, {}, {}, str(tmp_path / "c.json"))
         assert res["productos"][0]["dimensiones_caja"] is None
+
+
+class TestClasificarGuia:
+    """El motivo por el que un SKU manual no entra: inactivo / proceso /
+    tipeo / en KARDEX pero no en ERP / inexistente."""
+
+    CODIGOS = ["A00011", "B0002", "C0003"]
+
+    def test_en_erp_activo_entra(self):
+        motivo, _ = clasificar_guia(
+            "A00011", {"inactivo": False, "linea": "PELOTAS"}, set(), self.CODIGOS
+        )
+        assert motivo == "ok"
+
+    def test_inactivo_en_erp_no_entra(self):
+        motivo, detalle = clasificar_guia(
+            "B0002", {"inactivo": True, "linea": "PELOTAS"}, set(), self.CODIGOS
+        )
+        assert motivo == "inactivo"
+        assert "inactivo" in detalle.lower()
+
+    def test_linea_de_proceso_no_entra(self):
+        motivo, detalle = clasificar_guia(
+            "C0003",
+            {"inactivo": False, "linea": "PRODUCTOS EN PROCESO"},
+            set(),
+            self.CODIGOS,
+        )
+        assert motivo == "proceso"
+        assert "proceso" in detalle.lower()
+
+    def test_posible_tipeo_sugiere(self):
+        motivo, detalle = clasificar_guia("A00012", None, set(), self.CODIGOS)
+        assert motivo == "tipeo"
+        assert "A00011" in detalle
+
+    def test_en_kardex_pero_no_en_erp(self):
+        motivo, detalle = clasificar_guia("K0009", None, {"K0009"}, self.CODIGOS)
+        assert motivo == "kardex"
+        assert "KARDEX" in detalle
+
+    def test_inexistente(self):
+        motivo, detalle = clasificar_guia("ZZZ99", None, set(), self.CODIGOS)
+        assert motivo == "inexistente"
+        assert "ERP" in detalle and "KARDEX" in detalle
+
+
+class TestGuiaIgnorados:
+    def test_carga_y_normaliza(self, tmp_path):
+        import json
+
+        ruta = tmp_path / "guia_ignorados.json"
+        ruta.write_text(
+            json.dumps({"ignorados": {" 04058 ": "baja definitiva"}}),
+            encoding="utf-8",
+        )
+        assert cargar_guia_ignorados(ruta) == {"04058": "baja definitiva"}
+
+    def test_archivo_ausente_es_vacio(self, tmp_path):
+        assert cargar_guia_ignorados(tmp_path / "no_existe.json") == {}
+
+
+class TestGuiaVsMaestros:
+    """Integracion con archivos temporales: el bloque detecta cada caso."""
+
+    def _erp(self, ruta):
+        import xlwt
+
+        libro = xlwt.Workbook(encoding="utf-8")
+        hoja = libro.add_sheet("codigos productos")
+        columnas = [
+            "CODIGO",
+            "NOMBRE",
+            "LINEA",
+            "GRUPO",
+            "PRECIO",
+            "FLG_INACTIVO",
+            "FLG_DESCONTINUADO",
+        ]
+        for i, nombre in enumerate(columnas):
+            hoja.write(0, i, nombre)
+        filas = [
+            ["A00011", "PROD ACTIVO", "PELOTAS", "G", "10", "Unchecked", "Unchecked"],
+            ["B0002", "PROD INACTIVO", "PELOTAS", "G", "5", "Checked", "Unchecked"],
+            [
+                "C0003",
+                "PROCESO",
+                "PRODUCTOS EN PROCESO",
+                "G",
+                "7",
+                "Unchecked",
+                "Unchecked",
+            ],
+        ]
+        for r, fila in enumerate(filas, start=1):
+            for c, valor in enumerate(fila):
+                hoja.write(r, c, valor)
+        libro.save(str(ruta))
+
+    def _xlsx(self, ruta, hoja_nombre, cabecera, filas):
+        import openpyxl
+
+        libro = openpyxl.Workbook()
+        hoja = libro.active
+        hoja.title = hoja_nombre
+        hoja.append(cabecera)
+        for fila in filas:
+            hoja.append(fila)
+        libro.save(ruta)
+
+    def test_detecta_cada_caso(self, tmp_path):
+        self._erp(tmp_path / "PRODUCTOS.xls")
+        self._xlsx(
+            tmp_path / "KARDEX_BASE.xlsx",
+            "KARDEX",
+            [
+                "colIdAlmacen",
+                "colNomAlmacen",
+                "colIdArticulo",
+                "colNomArticulo",
+                "colIdLinea",
+                "colNomLinea",
+                "colIdUM",
+            ],
+            [["1", "A", "K0009", "N", "L", "L", "U"]],
+        )
+        self._xlsx(
+            tmp_path / "SKU_BX.xlsx",
+            "SKU_BX",
+            ["ORDEN", "SKU", "UN_BX"],
+            [
+                [1, "A00011", 10],
+                [2, "B0002", 5],
+                [3, "C0003", 5],
+                [4, "K0009", 5],
+                [5, "ZZZ99", 5],
+                [6, "A00012", 5],
+            ],
+        )
+        bloque = validar_guia_vs_maestros(tmp_path)
+        assert bloque.estado == "aviso"
+        texto = "\n".join(bloque.avisos)
+        assert "A00011 (SKU_BX)" not in texto  # en ERP activo: silencioso
+        assert "B0002 (SKU_BX)" in texto and "inactivo" in texto.lower()
+        assert "C0003 (SKU_BX)" in texto and "proceso" in texto.lower()
+        assert "K0009 (SKU_BX)" in texto and "KARDEX" in texto
+        assert "ZZZ99 (SKU_BX)" in texto
+        assert "A00012 (SKU_BX)" in texto and "A00011" in texto
