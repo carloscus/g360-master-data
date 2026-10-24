@@ -15,7 +15,7 @@ pytest
 ```
 
 - Stack: python (pip)
-- Tests: pytest
+- Tests: pytest en `scripts\tests/`
 
 ## Estructura
 
