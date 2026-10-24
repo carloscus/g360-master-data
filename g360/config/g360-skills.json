@@ -1,0 +1,663 @@
+{
+  "skills": [
+    {
+      "name": "corporativo",
+      "description": "Proyectos para clientes - estilo corporativo conservador",
+      "device": "pc",
+      "theme": "dark",
+      "colors": {
+        "bg": "#0b1220",
+        "surface": "#151e2e",
+        "accent": "#00796B",
+        "text": "#f0f4f8",
+        "muted": "#94a3b8",
+        "accentStrong": "#00574b",
+        "accentBright": "#26a69a",
+        "accentSoft": "rgba(0, 121, 107, 0.14)",
+        "onAccent": "#ffffff",
+        "info": "#0288d1",
+        "success": "#10b981",
+        "warning": "#f59e0b",
+        "error": "#dc2626"
+      },
+      "effects": {
+        "glassmorphism": true,
+        "blur": "16px",
+        "rounded": "16px"
+      },
+      "signature": {
+        "mode": "powered",
+        "text": "powered by G360"
+      },
+      "accentFamily": "teal"
+    },
+    {
+      "name": "corporativo-movil",
+      "description": "Proyectos para clientes - estilo corporativo - enfoque mÃ³vil",
+      "device": "movil",
+      "theme": "dark",
+      "colors": {
+        "bg": "#0b1220",
+        "surface": "#151e2e",
+        "accent": "#00796B",
+        "text": "#f0f4f8",
+        "muted": "#94a3b8",
+        "accentStrong": "#00574b",
+        "accentBright": "#26a69a",
+        "accentSoft": "rgba(0, 121, 107, 0.14)",
+        "onAccent": "#ffffff",
+        "info": "#0288d1",
+        "success": "#10b981",
+        "warning": "#f59e0b",
+        "error": "#dc2626"
+      },
+      "effects": {
+        "glassmorphism": true,
+        "blur": "16px",
+        "rounded": "16px"
+      },
+      "signature": {
+        "mode": "powered",
+        "text": "powered by G360"
+      },
+      "accentFamily": "teal"
+    },
+    {
+      "name": "corporativo-g360",
+      "description": "Proyectos para clientes con colores G360 vibrantes",
+      "device": "pc",
+      "theme": "dark",
+      "colors": {
+        "bg": "#0b1220",
+        "surface": "#151e2e",
+        "accent": "#00d084",
+        "text": "#f0f4f8",
+        "muted": "#94a3b8",
+        "accentStrong": "#047857",
+        "accentBright": "#34d399",
+        "accentSoft": "rgba(0, 208, 132, 0.12)",
+        "onAccent": "#06281c",
+        "info": "#3B82F6",
+        "success": "#22c55e",
+        "warning": "#f59e0b",
+        "error": "#ef4444"
+      },
+      "effects": {
+        "glassmorphism": true,
+        "blur": "16px",
+        "rounded": "16px"
+      },
+      "signature": {
+        "mode": "powered",
+        "text": "powered by G360"
+      },
+      "accentFamily": "emerald"
+    },
+    {
+      "name": "corporativo-g360-movil",
+      "description": "Proyectos para clientes con colores G360 - enfoque mÃ³vil",
+      "device": "movil",
+      "theme": "dark",
+      "colors": {
+        "bg": "#0b1220",
+        "surface": "#151e2e",
+        "accent": "#00d084",
+        "text": "#f0f4f8",
+        "muted": "#94a3b8",
+        "accentStrong": "#047857",
+        "accentBright": "#34d399",
+        "accentSoft": "rgba(0, 208, 132, 0.12)",
+        "onAccent": "#06281c",
+        "info": "#3B82F6",
+        "success": "#22c55e",
+        "warning": "#f59e0b",
+        "error": "#ef4444"
+      },
+      "effects": {
+        "glassmorphism": true,
+        "blur": "16px",
+        "rounded": "16px"
+      },
+      "signature": {
+        "mode": "powered",
+        "text": "powered by G360"
+      },
+      "accentFamily": "emerald"
+    },
+    {
+      "name": "moderno",
+      "description": "Herramientas propias G360 - estilo innovador PC",
+      "device": "pc",
+      "theme": "dark",
+      "colors": {
+        "bg": "#0b1220",
+        "surface": "#151e2e",
+        "accent": "#00d084",
+        "text": "#f0f4f8",
+        "muted": "#94a3b8",
+        "accentStrong": "#047857",
+        "accentBright": "#34d399",
+        "accentSoft": "rgba(0, 208, 132, 0.12)",
+        "onAccent": "#06281c",
+        "info": "#3B82F6",
+        "success": "#22c55e",
+        "warning": "#f59e0b",
+        "error": "#ef4444"
+      },
+      "effects": {
+        "glassmorphism": true,
+        "blur": "16px",
+        "rounded": "16px"
+      },
+      "signature": {
+        "mode": "own",
+        "text": "G360 by ccusi"
+      },
+      "accentFamily": "emerald"
+    },
+    {
+      "name": "moderno-movil",
+      "description": "Herramientas propias G360 - estilo innovador mÃ³vil",
+      "device": "movil",
+      "theme": "dark",
+      "colors": {
+        "bg": "#0b1220",
+        "surface": "#151e2e",
+        "accent": "#00d084",
+        "text": "#f0f4f8",
+        "muted": "#94a3b8",
+        "accentStrong": "#047857",
+        "accentBright": "#34d399",
+        "accentSoft": "rgba(0, 208, 132, 0.12)",
+        "onAccent": "#06281c",
+        "info": "#3B82F6",
+        "success": "#22c55e",
+        "warning": "#f59e0b",
+        "error": "#ef4444"
+      },
+      "effects": {
+        "glassmorphism": true,
+        "blur": "16px",
+        "rounded": "16px"
+      },
+      "signature": {
+        "mode": "own",
+        "text": "G360 by ccusi"
+      },
+      "accentFamily": "emerald"
+    },
+    {
+      "name": "minimalista",
+      "description": "Proyectos minimalistas - scripts, CLI, Python",
+      "device": "both",
+      "theme": "light",
+      "colors": {
+        "bg": "#ffffff",
+        "surface": "#f5f5f5",
+        "accent": "#2563eb",
+        "text": "#1f2937",
+        "muted": "#6b7280",
+        "accentStrong": "#1d4ed8",
+        "accentBright": "#60a5fa",
+        "accentSoft": "rgba(37, 99, 235, 0.12)",
+        "onAccent": "#ffffff",
+        "info": "#0284c7",
+        "success": "#16a34a",
+        "warning": "#d97706",
+        "error": "#dc2626"
+      },
+      "effects": {
+        "glassmorphism": false,
+        "blur": "0px",
+        "rounded": "8px"
+      },
+      "signature": {
+        "mode": "optional",
+        "text": "by @carloscus"
+      },
+      "accentFamily": "blue"
+    },
+    {
+      "name": "custom",
+      "description": "ConfiguraciÃ³n personalizada - colores ajustables",
+      "device": "both",
+      "theme": "dark",
+      "colors": {
+        "bg": "#0b1220",
+        "surface": "#151e2e",
+        "accent": "#00d084",
+        "text": "#f0f4f8",
+        "muted": "#94a3b8",
+        "accentStrong": "#047857",
+        "accentBright": "#34d399",
+        "accentSoft": "rgba(0, 208, 132, 0.12)",
+        "onAccent": "#06281c",
+        "info": "#3B82F6",
+        "success": "#22c55e",
+        "warning": "#f59e0b",
+        "error": "#ef4444"
+      },
+      "effects": {
+        "glassmorphism": false,
+        "blur": "0px",
+        "rounded": "8px"
+      },
+      "signature": {
+        "mode": "custom",
+        "text": "custom"
+      },
+      "accentFamily": "emerald"
+    },
+    {
+      "name": "flet-desktop",
+      "description": "Aplicaciones de escritorio Flet - estilo G360",
+      "device": "pc",
+      "theme": "dark",
+      "colors": {
+        "bg": "#0b1220",
+        "surface": "#1a2332",
+        "accent": "#00d084",
+        "text": "#f0f4f8",
+        "muted": "#94a3b8",
+        "success": "#22c55e",
+        "warning": "#f59e0b",
+        "error": "#ef4444",
+        "accentStrong": "#047857",
+        "accentBright": "#34d399",
+        "accentSoft": "rgba(0, 208, 132, 0.12)",
+        "onAccent": "#06281c",
+        "info": "#3B82F6"
+      },
+      "effects": {
+        "glassmorphism": true,
+        "blur": "12px",
+        "rounded": "12px"
+      },
+      "signature": {
+        "mode": "own",
+        "text": "G360 Desktop"
+      },
+      "framework": "flet",
+      "portable": true,
+      "accentFamily": "emerald"
+    },
+    {
+      "name": "flet-desktop-corporativo",
+      "description": "Aplicaciones Flet para clientes - estilo corporativo",
+      "device": "pc",
+      "theme": "light",
+      "colors": {
+        "bg": "#ffffff",
+        "surface": "#f8fafc",
+        "accent": "#00796B",
+        "text": "#1e293b",
+        "muted": "#64748b",
+        "success": "#10b981",
+        "warning": "#f59e0b",
+        "error": "#dc2626",
+        "accentStrong": "#00574b",
+        "accentBright": "#26a69a",
+        "accentSoft": "rgba(0, 121, 107, 0.14)",
+        "onAccent": "#ffffff",
+        "info": "#0288d1"
+      },
+      "effects": {
+        "glassmorphism": false,
+        "blur": "0px",
+        "rounded": "8px"
+      },
+      "signature": {
+        "mode": "powered",
+        "text": "powered by G360"
+      },
+      "framework": "flet",
+      "portable": true,
+      "accentFamily": "teal"
+    },
+    {
+      "name": "cipsa",
+      "description": "Apps con marca CIPSA - estilo moderno corporativo con identidad G360",
+      "device": "pc",
+      "theme": "dark",
+      "colors": {
+        "bg": "#0d1117",
+        "surface": "#161b22",
+        "accent": "#008254",
+        "text": "#f0f6fc",
+        "muted": "#8b949e",
+        "success": "#22c55e",
+        "warning": "#B45309",
+        "error": "#DC2626",
+        "accentStrong": "#0B6B47",
+        "accentBright": "#34d399",
+        "accentSoft": "rgba(0, 130, 84, 0.14)",
+        "onAccent": "#ffffff",
+        "info": "#0369A1"
+      },
+      "effects": {
+        "glassmorphism": true,
+        "blur": "8px",
+        "rounded": "10px"
+      },
+      "signature": {
+        "mode": "powered",
+        "text": "powered by G360"
+      },
+      "framework": "flet",
+      "portable": true,
+      "brand": "cipsa",
+      "guidelines": {
+        "logo": "Logo_cipsa_solid.svg",
+        "logo_alt": "Logo_cipsa_borde.svg",
+        "app_icon": "cipsa/favicons/cipsa.ico",
+        "description": "Usar logo CIPSA + signature 'powered by G360'. El verde fluorescente #00d084 se mantiene como acento principal."
+      },
+      "accentFamily": "cipsa"
+    },
+    {
+      "name": "cipsa-movil",
+      "description": "Apps movil con marca CIPSA - estilo moderno corporativo",
+      "device": "movil",
+      "theme": "dark",
+      "colors": {
+        "bg": "#0d1117",
+        "surface": "#161b22",
+        "accent": "#008254",
+        "text": "#f0f6fc",
+        "muted": "#8b949e",
+        "success": "#22c55e",
+        "warning": "#B45309",
+        "error": "#DC2626",
+        "accentStrong": "#0B6B47",
+        "accentBright": "#34d399",
+        "accentSoft": "rgba(0, 130, 84, 0.14)",
+        "onAccent": "#ffffff",
+        "info": "#0369A1"
+      },
+      "effects": {
+        "glassmorphism": true,
+        "blur": "8px",
+        "rounded": "10px"
+      },
+      "signature": {
+        "mode": "powered",
+        "text": "powered by G360"
+      },
+      "framework": "flet",
+      "portable": true,
+      "brand": "cipsa",
+      "accentFamily": "cipsa"
+    },
+    {
+      "name": "flet-desktop-polished",
+      "description": "App Flet desktop con patrones UI avanzados: dual theme, auto-refresh, hash cache, search debounce, KPI glow, G360 signature widget",
+      "version": "1.0.0",
+      "device": "pc",
+      "theme": "dark",
+      "colors": {
+        "bg": "#0b1220",
+        "surface": "#1a2333",
+        "accent": "#00d084",
+        "text": "#f0f6fc",
+        "muted": "#8b949e",
+        "success": "#22c55e",
+        "warning": "#f59e0b",
+        "error": "#ef4444",
+        "accentStrong": "#047857",
+        "accentBright": "#34d399",
+        "accentSoft": "rgba(0, 208, 132, 0.12)",
+        "onAccent": "#06281c",
+        "info": "#3B82F6"
+      },
+      "effects": {
+        "glassmorphism": true,
+        "blur": "12px",
+        "rounded": "12px"
+      },
+      "signature": {
+        "mode": "powered",
+        "text": "powered by G360"
+      },
+      "framework": "flet",
+      "portable": true,
+      "features": [
+        "dual-theme",
+        "auto-launcher",
+        "portable-sync",
+        "g360-signature-flet",
+        "custom-fonts",
+        "cache-hash-diff",
+        "auto-refresh-thread",
+        "search-debounce",
+        "kpi-glow-cards",
+        "rotating-logger"
+      ],
+      "accentFamily": "emerald"
+    },
+    {
+      "name": "react-web",
+      "description": "Aplicaciones web con React/JSX - estilo G360 moderno",
+      "device": "pc",
+      "theme": "dark",
+      "colors": {
+        "bg": "#0b1220",
+        "surface": "#1a2332",
+        "accent": "#00d084",
+        "text": "#f0f4f8",
+        "muted": "#94a3b8",
+        "success": "#22c55e",
+        "warning": "#f59e0b",
+        "error": "#ef4444",
+        "accentStrong": "#047857",
+        "accentBright": "#34d399",
+        "accentSoft": "rgba(0, 208, 132, 0.12)",
+        "onAccent": "#06281c",
+        "info": "#3B82F6"
+      },
+      "effects": {
+        "glassmorphism": true,
+        "blur": "12px",
+        "rounded": "12px"
+      },
+      "signature": {
+        "mode": "powered",
+        "text": "powered by G360"
+      },
+      "framework": "react",
+      "accentFamily": "emerald"
+    },
+    {
+      "name": "solid-web",
+      "description": "Aplicaciones web con SolidJS - estilo G360 moderno",
+      "device": "pc",
+      "theme": "dark",
+      "colors": {
+        "bg": "#0b1220",
+        "surface": "#1a2332",
+        "accent": "#00d084",
+        "text": "#f0f4f8",
+        "muted": "#94a3b8",
+        "success": "#22c55e",
+        "warning": "#f59e0b",
+        "error": "#ef4444",
+        "accentStrong": "#047857",
+        "accentBright": "#34d399",
+        "accentSoft": "rgba(0, 208, 132, 0.12)",
+        "onAccent": "#06281c",
+        "info": "#3B82F6"
+      },
+      "effects": {
+        "glassmorphism": true,
+        "blur": "12px",
+        "rounded": "12px"
+      },
+      "signature": {
+        "mode": "powered",
+        "text": "powered by G360"
+      },
+      "framework": "solid",
+      "accentFamily": "emerald"
+    },
+    {
+      "name": "svelte-web",
+      "description": "Aplicaciones web con Svelte/SvelteKit - estilo G360 moderno",
+      "device": "pc",
+      "theme": "dark",
+      "colors": {
+        "bg": "#0b1220",
+        "surface": "#1a2332",
+        "accent": "#00d084",
+        "text": "#f0f4f8",
+        "muted": "#94a3b8",
+        "success": "#22c55e",
+        "warning": "#f59e0b",
+        "error": "#ef4444",
+        "accentStrong": "#047857",
+        "accentBright": "#34d399",
+        "accentSoft": "rgba(0, 208, 132, 0.12)",
+        "onAccent": "#06281c",
+        "info": "#3B82F6"
+      },
+      "effects": {
+        "glassmorphism": true,
+        "blur": "12px",
+        "rounded": "12px"
+      },
+      "signature": {
+        "mode": "powered",
+        "text": "powered by G360"
+      },
+      "framework": "svelte",
+      "accentFamily": "emerald"
+    },
+    {
+      "name": "lit-web",
+      "description": "Aplicaciones web con Lit Web Components - estilo G360 moderno",
+      "device": "pc",
+      "theme": "dark",
+      "colors": {
+        "bg": "#0b1220",
+        "surface": "#1a2332",
+        "accent": "#00d084",
+        "text": "#f0f4f8",
+        "muted": "#94a3b8",
+        "success": "#22c55e",
+        "warning": "#f59e0b",
+        "error": "#ef4444",
+        "accentStrong": "#047857",
+        "accentBright": "#34d399",
+        "accentSoft": "rgba(0, 208, 132, 0.12)",
+        "onAccent": "#06281c",
+        "info": "#3B82F6"
+      },
+      "effects": {
+        "glassmorphism": true,
+        "blur": "12px",
+        "rounded": "12px"
+      },
+      "signature": {
+        "mode": "powered",
+        "text": "powered by G360"
+      },
+      "framework": "lit",
+      "accentFamily": "emerald"
+    },
+    {
+      "name": "customtkinter",
+      "description": "Aplicaciones desktop con CustomTkinter - estilo G360 moderno",
+      "device": "pc",
+      "theme": "dark",
+      "colors": {
+        "bg": "#0b1220",
+        "surface": "#1a2332",
+        "accent": "#00d084",
+        "text": "#f0f4f8",
+        "muted": "#94a3b8",
+        "success": "#22c55e",
+        "warning": "#f59e0b",
+        "error": "#ef4444",
+        "accentStrong": "#047857",
+        "accentBright": "#34d399",
+        "accentSoft": "rgba(0, 208, 132, 0.12)",
+        "onAccent": "#06281c",
+        "info": "#3B82F6"
+      },
+      "effects": {
+        "glassmorphism": true,
+        "blur": "12px",
+        "rounded": "12px"
+      },
+      "signature": {
+        "mode": "powered",
+        "text": "powered by G360"
+      },
+      "framework": "customtkinter",
+      "portable": true,
+      "accentFamily": "emerald"
+    },
+    {
+      "name": "moderno-azure",
+      "description": "Herramientas propias G360 en familia azure â€” misma simetria de tokens, otro hue",
+      "device": "pc",
+      "theme": "dark",
+      "colors": {
+        "bg": "#0b1220",
+        "surface": "#151e2e",
+        "accent": "#38bdf8",
+        "text": "#f0f4f8",
+        "muted": "#94a3b8",
+        "accentStrong": "#0284c7",
+        "accentBright": "#7dd3fc",
+        "accentSoft": "rgba(56, 189, 248, 0.12)",
+        "onAccent": "#0b1220",
+        "info": "#3B82F6",
+        "success": "#22c55e",
+        "warning": "#f59e0b",
+        "error": "#ef4444"
+      },
+      "effects": {
+        "glassmorphism": true,
+        "blur": "16px",
+        "rounded": "16px"
+      },
+      "signature": {
+        "mode": "own",
+        "text": "G360 by ccusi"
+      },
+      "accentFamily": "azure"
+    },
+    {
+      "name": "flet-desktop-indigo",
+      "description": "App Flet desktop en familia indigo â€” patrones pulidos con hue alternativo",
+      "device": "pc",
+      "theme": "dark",
+      "colors": {
+        "bg": "#0b1220",
+        "surface": "#1a2332",
+        "accent": "#818cf8",
+        "text": "#f0f4f8",
+        "muted": "#94a3b8",
+        "success": "#22c55e",
+        "warning": "#f59e0b",
+        "error": "#ef4444",
+        "accentStrong": "#4f46e5",
+        "accentBright": "#a5b4fc",
+        "accentSoft": "rgba(129, 140, 248, 0.12)",
+        "onAccent": "#0b1220",
+        "info": "#3B82F6"
+      },
+      "effects": {
+        "glassmorphism": true,
+        "blur": "12px",
+        "rounded": "12px"
+      },
+      "signature": {
+        "mode": "own",
+        "text": "G360 Desktop"
+      },
+      "framework": "flet",
+      "portable": true,
+      "accentFamily": "indigo"
+    }
+  ]
+}

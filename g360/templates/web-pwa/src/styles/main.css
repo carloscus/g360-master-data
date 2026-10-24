@@ -1,0 +1,118 @@
+/* Tokens G360: una sola fuente para todos los stacks.
+   Se regenera con `g360 tokens` (o `g360 set-accent <familia>`). */
+@import './g360-tokens.css';
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  font-family: var(--g360-font);
+  background: var(--g360-bg);
+  color: var(--g360-text);
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+}
+
+.app {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.container {
+  max-width: 480px;
+  margin: 0 auto;
+  padding: 24px 16px;
+  flex: 1;
+}
+
+.g360-header {
+  background: var(--g360-surface);
+  border-bottom: 1px solid var(--g360-border);
+  padding: 16px 24px;
+}
+
+.header-content {
+  max-width: 480px;
+  margin: 0 auto;
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+}
+
+.logo {
+  font-size: 24px;
+  font-weight: 800;
+  color: var(--g360-accent);
+}
+
+.subtitle {
+  font-size: 14px;
+  color: var(--g360-muted);
+}
+
+h1 { font-size: 24px; font-weight: 700; margin-bottom: 8px; }
+
+.muted { color: var(--g360-muted); font-size: 14px; }
+
+.g360-footer {
+  text-align: center;
+  padding: 12px;
+  font-size: 11px;
+  color: var(--g360-muted);
+  background: var(--g360-surface);
+  border-top: 1px solid var(--g360-border);
+}
+
+.g360-loading-overlay {
+  position: fixed;
+  inset: 0;
+  background: var(--g360-overlay);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  z-index: 1000;
+}
+
+.g360-loading-spinner {
+  width: 40px;
+  height: 40px;
+  border: 3px solid var(--g360-surface);
+  border-top-color: var(--g360-accent);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin { to { transform: rotate(360deg); } }
+
+.g360-card {
+  background: var(--g360-surface);
+  border-radius: var(--g360-rounded);
+  padding: 16px;
+  border: 1px solid var(--g360-border);
+}
+
+.g360-glass {
+  background: var(--g360-glass);
+  backdrop-filter: blur(var(--g360-blur));
+  -webkit-backdrop-filter: blur(var(--g360-blur));
+  border: 1px solid var(--g360-border);
+}
+
+.g360-btn {
+  background: var(--g360-accent);
+  color: var(--g360-on-accent);
+  border: none;
+  border-radius: 8px;
+  padding: 10px 20px;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: opacity 0.2s;
+}
+
+.g360-btn:hover { background: var(--g360-accent-hover); opacity: 1; }
+
+/* Numeros tabulares con monoespaciada (KPIs, tablas, codigo) */
+.g360-num { font-family: var(--g360-font-mono); font-variant-numeric: tabular-nums; }

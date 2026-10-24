@@ -1,0 +1,34 @@
+{
+  "layouts": [
+    {
+      "name": "dashboard-kpi",
+      "file": "dashboard-kpi.md",
+      "description": "Resumen con KPIs + grafico + tabla de detalle",
+      "useWhen": "Dashboards de ventas, KPIs de ERP, reportes periodicos"
+    },
+    {
+      "name": "master-detail",
+      "file": "master-detail.md",
+      "description": "Lista seleccionable + panel de detalle/edicion",
+      "useWhen": "Catalogos (clientes, productos), configuracion por entidad"
+    },
+    {
+      "name": "wizard",
+      "file": "wizard.md",
+      "description": "Proceso guiado en 3-5 pasos con stepper",
+      "useWhen": "Ingesta de datos, alta compleja, onboarding"
+    },
+    {
+      "name": "sidebar-panels",
+      "file": "sidebar-panels.md",
+      "description": "NavRail + vistas independientes (marco contenedor)",
+      "useWhen": "Herramientas multi-modulo; el contenido delega en otro layout"
+    },
+    {
+      "name": "lista-filtros-export",
+      "file": "lista-filtros-export.md",
+      "description": "Listado grande con filtros combinables + export",
+      "useWhen": "Reportes de ventas, logistica, inventarios, auditorias"
+    }
+  ]
+}

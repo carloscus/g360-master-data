@@ -1,0 +1,60 @@
+{
+  "name": "g360-flet-polished",
+  "device": "pc",
+  "version": "1.0.0",
+  "updatedAt": "2026-08-13",
+  "brand": "g360",
+  "description": "G360 Flet Polished - Plantilla base con patrones de UI avanzada",
+  "framework": "flet",
+  "flet_version": "0.28.3",
+  "portable": true,
+  "colors": {
+    "bg": "#0b1220",
+    "surface": "#1a2333",
+    "accent": "#00d084",
+    "text": "#f0f6fc",
+    "muted": "#8b949e",
+    "success": "#22c55e",
+    "warning": "#f59e0b",
+    "error": "#ef4444",
+    "accentStrong": "#047857",
+    "accentBright": "#34d399",
+    "accentSoft": "rgba(0, 208, 132, 0.12)",
+    "onAccent": "#06281c",
+    "info": "#3B82F6",
+    "accent_dark": "#047857",
+    "violet": "#8b5cf6",
+    "pink": "#ec4899",
+    "cyan": "#06b6d4",
+    "orange": "#f97316",
+    "surface_variant": "#1b2740",
+    "surface_sunken": "#0e1627",
+    "background": "#0a0f1e",
+    "border": "#ffffff17",
+    "text_muted": "#8fa0ba",
+    "text_primary": "#f1f5fb",
+    "text_secondary": "#c9d4e6"
+  },
+  "effects": {
+    "glassmorphism": true,
+    "blur": "12px",
+    "rounded": "12px"
+  },
+  "signature": {
+    "mode": "powered",
+    "text": "powered by G360"
+  },
+  "events": [
+    "app:{name}:refresh",
+    "app:{name}:data:update",
+    "app:{name}:theme:change",
+    "g360:app:list",
+    "g360:app:register"
+  ],
+  "endpoints": {
+    "health": "/api/health",
+    "data": "/api/data",
+    "events": "/api/events"
+  },
+  "theme": "dark"
+}

@@ -1,0 +1,39 @@
+{
+  "note": "Paletas categoricas para series de datos (KPIs, graficos, datatables). Se eligieron por separacion de tono (no por hue) para que las series se distinguan entre si. La variante light es la misma paleta oscurecida para mantener legibilidad sobre fondo claro.",
+  "palettes": {
+    "g360": {
+      "dark": [
+        "#06b6d4",
+        "#8b5cf6",
+        "#0ea5e9",
+        "#6366f1",
+        "#ec4899",
+        "#f59e0b",
+        "#ef4444",
+        "#f97316"
+      ],
+      "light": [
+        "#0891b2",
+        "#7c3aed",
+        "#0284c7",
+        "#4f46e5",
+        "#db2777",
+        "#b45309",
+        "#dc2626",
+        "#ea580c"
+      ]
+    }
+  },
+  "roles": {
+    "g360": {
+      "primary": 0,
+      "secondary": 1,
+      "tertiary": 2,
+      "quaternary": 3,
+      "quinary": 4,
+      "senary": 5,
+      "septenary": 6,
+      "octonary": 7
+    }
+  }
+}

@@ -1,0 +1,168 @@
+{
+  "families": {
+    "emerald": {
+      "accent": "#00d084",
+      "accentStrong": "#047857",
+      "accentBright": "#34d399",
+      "accentSoft": "rgba(0, 208, 132, 0.12)",
+      "onAccent": "#06281c",
+      "accentLight": "#047857",
+      "onAccentLight": "#ffffff",
+      "hue": 158,
+      "note": "Identidad G360 original"
+    },
+    "cyan": {
+      "accent": "#22d3ee",
+      "accentStrong": "#0e7490",
+      "accentBright": "#67e8f9",
+      "accentSoft": "rgba(34, 211, 238, 0.12)",
+      "onAccent": "#0b1220",
+      "accentLight": "#0e7490",
+      "onAccentLight": "#ffffff",
+      "hue": 188,
+      "note": "Verde-azulado; separa bien del success"
+    },
+    "azure": {
+      "accent": "#38bdf8",
+      "accentStrong": "#0284c7",
+      "accentBright": "#7dd3fc",
+      "accentSoft": "rgba(56, 189, 248, 0.12)",
+      "onAccent": "#0b1220",
+      "accentLight": "#0369a1",
+      "onAccentLight": "#ffffff",
+      "hue": 198,
+      "note": "Azul cielo; eleccion para apps de datos"
+    },
+    "indigo": {
+      "accent": "#818cf8",
+      "accentStrong": "#4f46e5",
+      "accentBright": "#a5b4fc",
+      "accentSoft": "rgba(129, 140, 248, 0.12)",
+      "onAccent": "#0b1220",
+      "accentLight": "#4338ca",
+      "onAccentLight": "#ffffff",
+      "hue": 234,
+      "note": "Serio; contrasta bien en light mode"
+    },
+    "violet": {
+      "accent": "#a78bfa",
+      "accentStrong": "#7c3aed",
+      "accentBright": "#c4b5fd",
+      "accentSoft": "rgba(167, 139, 250, 0.12)",
+      "onAccent": "#0b1220",
+      "accentLight": "#6d28d9",
+      "onAccentLight": "#ffffff",
+      "hue": 255,
+      "note": "Distintivo sin ser agresivo"
+    },
+    "amber": {
+      "accent": "#fbbf24",
+      "accentStrong": "#b45309",
+      "accentBright": "#fcd34d",
+      "accentSoft": "rgba(251, 191, 36, 0.12)",
+      "onAccent": "#0b1220",
+      "accentLight": "#b45309",
+      "onAccentLight": "#ffffff",
+      "hue": 43,
+      "note": "Maxima energia; cuidado junto a warnings naranjas"
+    },
+    "rose": {
+      "accent": "#fb7185",
+      "accentStrong": "#be123c",
+      "accentBright": "#fda4af",
+      "accentSoft": "rgba(251, 113, 133, 0.12)",
+      "onAccent": "#0b1220",
+      "accentLight": "#be123c",
+      "onAccentLight": "#ffffff",
+      "hue": 351,
+      "note": "Para contenido emocional/marca fuerte"
+    },
+    "teal": {
+      "legacy": true,
+      "accent": "#00796B",
+      "accentStrong": "#00574b",
+      "accentBright": "#26a69a",
+      "accentSoft": "rgba(0, 121, 107, 0.14)",
+      "onAccent": "#ffffff",
+      "accentLight": "#00796B",
+      "onAccentLight": "#ffffff",
+      "hue": 162,
+      "note": "Tono corporativo conservador (skills corporativo y flet-desktop-corporativo)"
+    },
+    "blue": {
+      "legacy": true,
+      "accent": "#2563eb",
+      "accentStrong": "#1d4ed8",
+      "accentBright": "#60a5fa",
+      "accentSoft": "rgba(37, 99, 235, 0.12)",
+      "onAccent": "#ffffff",
+      "accentLight": "#2563eb",
+      "onAccentLight": "#ffffff",
+      "hue": 221,
+      "note": "Azul corporativo del skill minimalista (light)"
+    },
+    "cipsa": {
+      "legacy": true,
+      "accent": "#008254",
+      "accentStrong": "#0B6B47",
+      "accentBright": "#34d399",
+      "accentSoft": "rgba(0, 130, 84, 0.14)",
+      "onAccent": "#ffffff",
+      "accentLight": "#008254",
+      "onAccentLight": "#ffffff",
+      "hue": 152,
+      "note": "Verde de marca CIPSA (brand-locked); ajustado a #008254 para pasar AA con texto blanco (4.86:1)"
+    },
+    "navy": {
+      "accent": "#1E40AF",
+      "accentStrong": "#172554",
+      "accentBright": "#3B82F6",
+      "accentSoft": "rgba(30, 64, 175, 0.12)",
+      "onAccent": "#ffffff",
+      "accentLight": "#1E40AF",
+      "onAccentLight": "#ffffff",
+      "hue": 224,
+      "note": "Azul marino neutro: decks y apps sin marca definida (tono deck, no apto como acento de app)",
+      "legacy": true
+    }
+  },
+  "semantics": {
+    "dark": {
+      "success": "#22c55e",
+      "warning": "#f59e0b",
+      "error": "#ef4444",
+      "info": "#3b82f6"
+    },
+    "light": {
+      "success": "#15803d",
+      "warning": "#b45309",
+      "error": "#dc2626",
+      "info": "#0369a1"
+    }
+  },
+  "bases": {
+    "dark": {
+      "bg": "#0b1220",
+      "surface": "#151e2e",
+      "text": "#f0f4f8",
+      "muted": "#94a3b8"
+    },
+    "light": {
+      "bg": "#ffffff",
+      "surface": "#f8fafc",
+      "text": "#1e293b",
+      "muted": "#64748b"
+    }
+  },
+  "rules": {
+    "minContrast": 4.5,
+    "minHueDistance": 25,
+    "exemptFamilies": {
+      "emerald": "Identidad G360 historica: accent verde vs success #22c55e comparten familia; se diferencia por luminosidad y forma (icono + texto). Prohibido igualdad exacta.",
+      "teal": "Tono teal corporativo #00796B: mismo caso que emerald contra success verde.",
+      "cipsa": "Marca CIPSA: verde corporativo del cliente; misma excepcion que emerald.",
+      "navy": "Tono navy de deck: no cumple AA como acento sobre superficie oscura por ser un azul profundo. Se usa solo en presentaciones corporativas."
+    }
+  },
+  "semanticsNote": "Variantes por tema: sobre superficie clara (#ffffff) los semanticos claros no llegan a AA (success 2.28, warning 2.15, error 3.76, info 3.68)."
+}

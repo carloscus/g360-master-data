@@ -1,0 +1,49 @@
+/* ============================================
+ * G360 Theme - Estilos principales
+ * Sistema de diseño para proyectos G360
+ * ============================================ */
+
+/* Tokens G360: una sola fuente para todos los stacks.
+   Se regenera con `g360 tokens` (o `g360 set-accent <familia>`). */
+@import './styles/g360-tokens.css';
+
+/* === ESTILOS BASE === */
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: var(--g360-font);
+  font-size: var(--g360-font-size);
+  background: var(--g360-bg);
+  color: var(--g360-text);
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* === UTILIDADES === */
+.g360-card {
+  background: var(--g360-surface);
+  border: 1px solid var(--g360-border);
+  border-radius: var(--g360-rounded);
+  padding: var(--g360-space-md);
+}
+
+.g360-btn {
+  background: var(--g360-accent);
+  color: var(--g360-on-accent);
+  border: none;
+  border-radius: var(--g360-rounded);
+  padding: var(--g360-space-sm) var(--g360-space-md);
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.g360-btn:hover {
+  background: var(--g360-accent-hover);
+}
+
+/* Numeros tabulares con monoespaciada (KPIs, tablas, codigo) */
+.g360-num { font-family: var(--g360-font-mono); font-variant-numeric: tabular-nums; }

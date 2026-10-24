@@ -1,0 +1,4 @@
+flet[desktop]==0.28.3
+pip-system-certs>=4.38
+requests>=2.31.0
+openpyxl>=3.0.0

@@ -1,0 +1,85 @@
+/* ============================================
+ * G360 Design Tokens
+ * Generado por `g360 tokens` — no editar a mano.
+ * Skill: solid-web | acento: emerald | tema: dark
+ *
+ * Tema: `color-scheme` decide. `dark light` = sigue al sistema.
+ * Toggle manual: <html data-theme="light"> (o "dark").
+ * ============================================ */
+
+:root {
+  color-scheme: dark light;
+
+  --g360-bg: #0b1220;
+  --g360-bg: light-dark(#0b1220, #ffffff);
+  --g360-surface: #1a2332;
+  --g360-surface: light-dark(#1a2332, #f8fafc);
+  --g360-surface-alt: #1c2941;
+  --g360-surface-alt: light-dark(#1c2941, #eef2f7);
+  --g360-overlay: rgba(11, 18, 32, 0.90);
+  --g360-overlay: light-dark(rgba(11, 18, 32, 0.90), rgba(255, 255, 255, 0.92));
+  --g360-border: rgba(255, 255, 255, 0.10);
+  --g360-border: light-dark(rgba(255, 255, 255, 0.10), rgba(0, 0, 0, 0.10));
+  --g360-border-strong: rgba(255, 255, 255, 0.18);
+  --g360-border-strong: light-dark(rgba(255, 255, 255, 0.18), rgba(0, 0, 0, 0.18));
+  --g360-text: #f0f4f8;
+  --g360-text: light-dark(#f0f4f8, #1e293b);
+  --g360-text-muted: #94a3b8;
+  --g360-text-muted: light-dark(#94a3b8, #64748b);
+  --g360-muted: #94a3b8;
+  --g360-text-inverse: #0b1220;
+  --g360-text-inverse: light-dark(#0b1220, #ffffff);
+  --g360-accent: #00d084;
+  --g360-accent: light-dark(#00d084, #047857);
+  --g360-accent-strong: #047857;
+  --g360-accent-bright: #34d399;
+  --g360-accent-bright: light-dark(#34d399, #00d084);
+  --g360-accent-soft: rgba(0, 208, 132, 0.12);
+  --g360-accent-hover: #34d399;
+  --g360-accent-hover: light-dark(#34d399, #047857);
+  --g360-on-accent: #06281c;
+  --g360-on-accent: light-dark(#06281c, #ffffff);
+  --g360-success: #22c55e;
+  --g360-success: light-dark(#22c55e, #15803d);
+  --g360-warning: #f59e0b;
+  --g360-warning: light-dark(#f59e0b, #b45309);
+  --g360-error: #ef4444;
+  --g360-error: light-dark(#ef4444, #dc2626);
+  --g360-info: #3b82f6;
+  --g360-info: light-dark(#3b82f6, #0369a1);
+  --g360-glass: rgba(21, 30, 46, 0.75);
+  --g360-glass: light-dark(rgba(21, 30, 46, 0.75), rgba(255, 255, 255, 0.75));
+  --g360-blur: 12px;
+  --g360-blur: light-dark(12px, 16px);
+  --g360-radius: 12px;
+  --g360-radius: light-dark(12px, 16px);
+  --g360-rounded: 12px;
+  --g360-radius-sm: 8px;
+  --g360-font: system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --g360-font-mono: 'JetBrains Mono', 'Consolas', monospace;
+  --g360-font-size: 14px;
+  --g360-space-xs: 4px;
+  --g360-space-sm: 8px;
+  --g360-space-md: 16px;
+  --g360-space-lg: 24px;
+  --g360-space-xl: 32px;
+  --g360-chart-1: #06b6d4;
+  --g360-chart-1: light-dark(#06b6d4, #0891b2);
+  --g360-chart-2: #8b5cf6;
+  --g360-chart-2: light-dark(#8b5cf6, #7c3aed);
+  --g360-chart-3: #0ea5e9;
+  --g360-chart-3: light-dark(#0ea5e9, #0284c7);
+  --g360-chart-4: #6366f1;
+  --g360-chart-4: light-dark(#6366f1, #4f46e5);
+  --g360-chart-5: #ec4899;
+  --g360-chart-5: light-dark(#ec4899, #db2777);
+  --g360-chart-6: #f59e0b;
+  --g360-chart-6: light-dark(#f59e0b, #b45309);
+  --g360-chart-7: #ef4444;
+  --g360-chart-7: light-dark(#ef4444, #dc2626);
+  --g360-chart-8: #f97316;
+  --g360-chart-8: light-dark(#f97316, #ea580c);
+}
+
+html[data-theme="light"] { color-scheme: light; }
+html[data-theme="dark"] { color-scheme: dark; }

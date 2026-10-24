@@ -1,0 +1,297 @@
+{
+  "snippets": [
+    {
+      "name": "cli-argparse-basic",
+      "description": "Basic argparse CLI structure",
+      "language": "python",
+      "code": "import argparse\n\nparser = argparse.ArgumentParser(description='My CLI App')\nparser.add_argument('input', help='Input file')\nparser.add_argument('-v', '--verbose', action='store_true')\nparser.add_argument('-o', '--output', default='output.txt')\nargs = parser.parse_args()"
+    },
+    {
+      "name": "cli-subcommands",
+      "description": "CLI with subcommands (git-style)",
+      "language": "python",
+      "code": "import argparse\n\nparser = argparse.ArgumentParser()\nsubparsers = parser.add_subparsers()\n\ninit_parser = subparsers.add_parser('init')\ninit_parser.add_argument('name')\n\nrun_parser = subparsers.add_parser('run')\nrun_parser.add_argument('--watch', action='store_true')"
+    },
+    {
+      "name": "cli-logging",
+      "description": "Logging setup for CLI",
+      "language": "python",
+      "code": "import logging\nimport sys\n\ndef setup_logging(verbose=False):\n    level = logging.DEBUG if verbose else logging.INFO\n    logging.basicConfig(\n        level=level,\n        format='%(asctime)s - %(levelname)s - %(message)s',\n        handlers=[logging.StreamHandler(sys.stdout)]\n    )\n    return logging.getLogger(__name__)"
+    },
+    {
+      "name": "cli-config-json",
+      "description": "Load JSON config file",
+      "language": "python",
+      "code": "import json\nfrom pathlib import Path\n\ndef load_config(config_path='config.json'):\n    path = Path(config_path)\n    if not path.exists():\n        raise FileNotFoundError(f'Config not found: {config_path}')\n    with open(path) as f:\n        return json.load(f)"
+    },
+    {
+      "name": "cli-progress-bar",
+      "description": "Progress bar with tqdm",
+      "language": "python",
+      "code": "from tqdm import tqdm\n\nfor item in tqdm(items, desc='Processing', unit='item'):\n    # process item\n    pass"
+    },
+    {
+      "name": "cli-env-config",
+      "description": "Environment-based configuration",
+      "language": "python",
+      "code": "import os\nfrom pathlib import Path\n\ndef get_config():\n    env = os.getenv('APP_ENV', 'development')\n    config_dir = Path(__file__).parent / 'config'\n    config_file = config_dir / f'{env}.json'\n    return json.loads(config_file.read_text())"
+    },
+    {
+      "name": "cli-exit-codes",
+      "description": "Exit codes constants",
+      "language": "python",
+      "code": "EXIT_OK = 0\nEXIT_ERROR = 1\nEXIT_USAGE = 2\nEXIT_DATA = 3\n\n# Usage: sys.exit(EXIT_ERROR)"
+    },
+    {
+      "name": "g360-header",
+      "description": "Standard G360 header",
+      "language": "html",
+      "code": "<header class='g360-header'>...</header>"
+    },
+    {
+      "name": "g360-button",
+      "description": "G360 styled button",
+      "language": "html",
+      "code": "<button class='g360-btn'>Click</button>"
+    },
+    {
+      "name": "g360-card",
+      "description": "G360 card component",
+      "language": "html",
+      "code": "<div class='g360-card'>...</div>"
+    },
+    {
+      "name": "g360-badge",
+      "description": "G360 status badge",
+      "language": "html",
+      "code": "<span class='g360-badge g360-badge-success'>Active</span>"
+    },
+    {
+      "name": "ctk-window",
+      "description": "CustomTkinter window setup with G360 theme",
+      "language": "python",
+      "code": "import customtkinter as ctk\nfrom core.g360_theme import G360Theme\n\nclass G360App(ctk.CTk):\n    def __init__(self):\n        super().__init__()\n        self.theme = G360Theme()\n        self.title(self.theme.build_name())\n        self.geometry('900x700')\n        self.configure(fg_color=self.theme.bg)\n        ctk.set_appearance_mode('dark')\n        ctk.set_default_color_theme('green')"
+    },
+    {
+      "name": "ctk-button",
+      "description": "G360 styled CustomTkinter button",
+      "language": "python",
+      "code": "# theme = G360Theme()   # src/core/g360_theme.py (lee skill.json)\nctk.CTkButton(\n    parent,\n    text='Aceptar',\n    command=on_click,\n    fg_color=theme.accent,\n    hover_color=theme.accent_bright,\n    text_color=theme.bg,\n    corner_radius=8,\n    height=40,\n    font=('Segoe UI', 14),\n)"
+    },
+    {
+      "name": "ctk-input",
+      "description": "G360 styled CustomTkinter entry",
+      "language": "python",
+      "code": "# theme = G360Theme()   # src/core/g360_theme.py (lee skill.json)\nctk.CTkEntry(\n    parent,\n    placeholder_text='Ingrese valor...',\n    width=300,\n    height=40,\n    fg_color=theme.surface,\n    border_color=theme.accent,\n    text_color=theme.text,\n    placeholder_text_color=theme.muted,\n    corner_radius=8,\n)"
+    },
+    {
+      "name": "ctk-frame",
+      "description": "G360 glass frame container",
+      "language": "python",
+      "code": "# theme = G360Theme()   # src/core/g360_theme.py (lee skill.json)\nctk.CTkFrame(\n    parent,\n    fg_color=theme.surface,\n    corner_radius=12,\n    border_width=1,\n    border_color=theme.accent_soft,\n)"
+    },
+    {
+      "name": "ctk-table",
+      "description": "CustomTkinter Treeview table with G360 styling",
+      "language": "python",
+      "code": "# theme = G360Theme()   # src/core/g360_theme.py (lee skill.json)\nimport tkinter as tk\nfrom tkinter import ttk\n\nstyle = ttk.Style()\nstyle.theme_use('clam')\nstyle.configure('G360.Treeview',\n    background=theme.surface,\n    foreground=theme.text,\n    fieldbackground=theme.surface,\n    rowheight=35,\n    font=('Segoe UI', 12))\nstyle.configure('G360.Treeview.Heading',\n    background=theme.accent,\n    foreground=theme.bg,\n    font=('Segoe UI', 12, 'bold'))\n\ntree = ttk.Treeview(parent, style='G360.Treeview',\n    columns=('sku', 'nombre', 'cantidad'),\n    show='headings')\ntree.heading('sku', text='SKU')\ntree.heading('nombre', text='Nombre')\ntree.heading('cantidad', text='Cantidad')"
+    },
+    {
+      "name": "ctk-dialog",
+      "description": "CustomTkinter message dialog",
+      "language": "python",
+      "code": "# theme = G360Theme()   # src/core/g360_theme.py (lee skill.json)\nimport customtkinter as ctk\n\ndef show_info(parent, title, message):\n    dialog = ctk.CTkToplevel(parent)\n    dialog.title(title)\n    dialog.geometry('400x200')\n    dialog.configure(fg_color=theme.bg)\n    dialog.grab_set()\n    \n    ctk.CTkLabel(dialog, text=message, wraplength=350,\n        text_color=theme.text).pack(pady=20)\n    ctk.CTkButton(dialog, text='OK',\n        command=dialog.destroy,\n        fg_color=theme.accent).pack(pady=10)"
+    },
+    {
+      "name": "ctk-sidebar",
+      "description": "CustomTkinter sidebar navigation",
+      "language": "python",
+      "code": "# theme = G360Theme()   # src/core/g360_theme.py (lee skill.json)\nclass Sidebar(ctk.CTkFrame):\n    def __init__(self, parent, items, on_select):\n        super().__init__(parent, fg_color=theme.surface, width=200)\n        self.on_select = on_select\n        self.buttons = []\n        \n        for i, (text, icon) in enumerate(items):\n            btn = ctk.CTkButton(\n                self, text=text, anchor='w',\n                fg_color='transparent',\n                hover_color=theme.accent_soft,\n                text_color=theme.muted,\n                command=lambda idx=i: self._select(idx))\n            btn.pack(fill='x', padx=10, pady=2)\n            self.buttons.append(btn)\n    \n    def _select(self, idx):\n        for i, btn in enumerate(self.buttons):\n            btn.configure(\n                fg_color=theme.accent_soft if i == idx else 'transparent',\n                text_color=theme.accent if i == idx else theme.muted)\n        self.on_select(idx)"
+    },
+    {
+      "name": "flet-page",
+      "description": "Flet page setup with G360 theme",
+      "code": "# theme = G360Theme()   # src/core/g360_theme.py (lee skill.json)\nimport flet as ft\n\ndef main(page: ft.Page):\n    page.title = 'G360 App'\n    page.theme_mode = ft.ThemeMode.DARK\n    page.bgcolor = theme.bg\n    page.padding = 20\n    page.add(ft.Text('G360 Desktop App', size=24, color=theme.accent))"
+    },
+    {
+      "name": "flet-card",
+      "description": "G360 styled Flet Card",
+      "code": "# theme = G360Theme()   # src/core/g360_theme.py (lee skill.json)\nft.Container(\n    content=ft.Column([...]),\n    bgcolor=theme.surface,\n    border_radius=12,\n    padding=15,\n    shadow=ft.BoxShadow(\n        spread_radius=1,\n        blur_radius=20,\n        color=theme.accent_soft\n    )\n)"
+    },
+    {
+      "name": "flet-button",
+      "description": "G360 styled Flet Button",
+      "code": "# theme = G360Theme()   # src/core/g360_theme.py (lee skill.json)\nft.ElevatedButton(\n    content=ft.Text('G360 Button', color=theme.bg),\n    style=ft.ButtonStyle(\n        bgcolor=theme.accent,\n        color=theme.bg,\n        shape=ft.RoundedRectangleBorder(radius=8),\n        padding=15\n    )\n)"
+    },
+    {
+      "name": "flet-nav-rail",
+      "description": "Flet navigation rail for desktop",
+      "code": "ft.NavigationRail(\n    selected_index=0,\n    label_type=ft.NavigationRailLabelType.ALL,\n    min_width=100,\n    min_extended_width=200,\n    destinations=[\n        ft.NavigationRailDestination(icon=ft.icons.HOME_OUTLINED, selected_icon=ft.icons.HOME, label='Home'),\n        ft.NavigationRailDestination(icon=ft.icons.SETTINGS_OUTLINED, selected_icon=ft.icons.SETTINGS, label='Settings'),\n    ]\n)"
+    },
+    {
+      "name": "flet-datatable",
+      "description": "Flet DataTable with G360 styling",
+      "code": "# theme = G360Theme()   # src/core/g360_theme.py (lee skill.json)\nft.DataTable(\n    heading_row_color=theme.accent,\n    data_row_color=theme.surface,\n    columns=[\n        ft.DataColumn(ft.Text('SKU', color=theme.text)),\n        ft.DataColumn(ft.Text('Descripción', color=theme.text)),\n        ft.DataColumn(ft.Text('Cantidad', color=theme.text)),\n    ],\n    rows=[]\n)"
+    },
+    {
+      "name": "flet-dialog",
+      "description": "Flet modal dialog",
+      "code": "# theme = G360Theme()   # src/core/g360_theme.py (lee skill.json)\ndef show_dialog(page, title, content):\n    dialog = ft.AlertDialog(\n        title=ft.Text(title, color=theme.accent),\n        content=ft.Container(content=content, padding=20),\n        actions=[\n            ft.TextButton('Cancelar', on_click=lambda _: page.close_dialog()),\n            ft.ElevatedButton('Aceptar', bgcolor=theme.accent, color=theme.bg),\n        ]\n    )\n    page.dialog = dialog\n    dialog.open = True\n    page.update()"
+    },
+    {
+      "name": "flet-chart-bar",
+      "description": "Flet bar chart for data visualization",
+      "code": "# theme = G360Theme()   # src/core/g360_theme.py (lee skill.json)\nft.BarChart(\n    bar_groups=[\n        ft.BarChartGroup(\n            x=0,\n            bar_rods=[\n                ft.BarChartRod(\n                    from_y=0,\n                    to_y=50,\n                    width=40,\n                    color=theme.accent,\n                ),\n            ],\n        ),\n    ],\n    left_axis=ft.ChartAxis(labels_size=40),\n    bottom_axis=ft.ChartAxis(labels=[...]),\n)"
+    },
+    {
+      "name": "flet-chart-line",
+      "description": "LineChart for time series data",
+      "code": "# theme = G360Theme()   # src/core/g360_theme.py (lee skill.json)\nft.LineChart(\n    data_series=[\n        ft.LineChartData(\n            data_points=[\n                ft.LineChartDataPoint(x=1, y=10),\n                ft.LineChartDataPoint(x=2, y=25),\n                ft.LineChartDataPoint(x=3, y=15),\n                ft.LineChartDataPoint(x=4, y=40),\n            ],\n            color=theme.accent,\n            stroke_width=3,\n        ),\n    ],\n    left_axis=ft.ChartAxis(labels_size=40),\n    bottom_axis=ft.ChartAxis(labels=[...]),\n)"
+    },
+    {
+      "name": "flet-kpi-card",
+      "description": "Reusable KPI card for dashboards",
+      "code": "# theme = G360Theme()   # src/core/g360_theme.py (lee skill.json)\nft.Container(\n    content=ft.Column([\n        ft.Text(label, size=14, color=theme.muted),\n        ft.Text(value, size=32, weight=ft.FontWeight.BOLD, color=theme.accent),\n        ft.Row([\n            ft.Icon(ft.icons.TRENDING_UP, size=16, color=theme.success),\n            ft.Text(f'{delta}%', size=14, color=theme.success),\n        ]) if delta else ft.Container(),\n    ], spacing=5),\n    bgcolor=theme.surface,\n    border_radius=12,\n    padding=20,\n    expand=True,\n)"
+    },
+    {
+      "name": "flet-drop-zone",
+      "description": "File upload zone with FilePicker",
+      "code": "# theme = G360Theme()   # src/core/g360_theme.py (lee skill.json)\ndef __init__(self, page):\n    self.page = page\n    self.file_picker = ft.FilePicker(on_result=self._on_file_selected)\n    self.page.overlay.append(self.file_picker)\n\ndef _build_drop_zone(self):\n    return ft.Container(\n        content=ft.Column([\n            ft.Icon(ft.icons.UPLOAD_FILE, size=48, color=theme.accent),\n            ft.Text('Arrastra un archivo o haz clic', size=16, color=theme.muted),\n            ft.Text('Formatos: .xlsx, .xls, .csv', size=12, color=theme.muted),\n        ], horizontal_alignment=ft.CrossAxisAlignment.CENTER),\n        bgcolor=theme.surface,\n        border=ft.border.all(2, theme.accent_soft),\n        border_radius=12,\n        padding=40,\n        on_click=lambda _: self.file_picker.pick_files(allow_multiple=False),\n        ink=True,\n    )\n\ndef _on_file_selected(self, e):\n    if e.files:\n        file = e.files[0]\n        self._process_file(file.path, file.name)"
+    },
+    {
+      "name": "flet-progress-bar",
+      "description": "Styled progress bar for loading states",
+      "code": "# theme = G360Theme()   # src/core/g360_theme.py (lee skill.json)\nft.Container(\n    content=ft.Column([\n        ft.Text(label, size=14, color=theme.muted),\n        ft.ProgressBar(\n            value=progress,  # 0.0 to 1.0\n            bar_height=8,\n            color=theme.accent,\n            bgcolor=theme.surface,\n        ),\n        ft.Text(f'{int(progress * 100)}%', size=12, color=theme.muted),\n    ], spacing=5),\n    padding=10,\n)"
+    },
+    {
+      "name": "flet-search-field",
+      "description": "Search field with icon",
+      "code": "# theme = G360Theme()   # src/core/g360_theme.py (lee skill.json)\nft.TextField(\n    hint_text='Buscar...',\n    prefix_icon=ft.icons.SEARCH,\n    border_color=theme.surface,\n    focused_border_color=theme.accent,\n    bgcolor=theme.surface,\n    color=theme.text,\n    hint_style=ft.TextStyle(color=theme.muted),\n    on_change=lambda e: on_search(e.control.value),\n)"
+    },
+    {
+      "name": "flet-tabs",
+      "description": "Tabs for multi-view layouts",
+      "code": "ft.Tabs(\n    selected_index=0,\n    animation_duration=300,\n    tabs=[\n        ft.Tab(text='Resumen', content=resumen_view),\n        ft.Tab(text='Detalle', content=detalle_view),\n        ft.Tab(text='Reportes', content=reportes_view),\n    ],\n    on_change=lambda e: on_tab_change(e),\n)"
+    },
+    {
+      "name": "flet-tooltip",
+      "description": "Rich tooltip on hover",
+      "code": "# theme = G360Theme()   # src/core/g360_theme.py (lee skill.json)\nft.Tooltip(\n    message='Descripcion detallada del elemento',\n    bgcolor=theme.surface,\n    text_style=ft.TextStyle(color=theme.text, size=12),\n    padding=10,\n    border_radius=8,\n    wait_duration=500,\n    content=ft.Text('Elemento con tooltip', color=theme.accent),\n)"
+    },
+    {
+      "name": "flet-pagination",
+      "description": "Pagination control for large tables",
+      "code": "# theme = G360Theme()   # src/core/g360_theme.py (lee skill.json)\ndef _build_pagination(self, page, total_pages, on_page_change):\n    controls = []\n    controls.append(ft.IconButton(ft.icons.CHEVRON_LEFT, on_click=lambda _: on_page_change(page - 1)))\n    for p in range(max(0, page - 2), min(total_pages, page + 3)):\n        controls.append(\n            ft.Container(\n                content=ft.Text(str(p + 1), size=14, color=theme.accent if p == page else theme.muted),\n                padding=10,\n                on_click=lambda _, x=p: on_page_change(x),\n            )\n        )\n    controls.append(ft.IconButton(ft.icons.CHEVRON_RIGHT, on_click=lambda _: on_page_change(page + 1)))\n    return ft.Row(controls, alignment=ft.MainAxisAlignment.CENTER)"
+    },
+    {
+      "name": "flet-export-menu",
+      "description": "Export dropdown with PopupMenuButton",
+      "code": "# theme = G360Theme()   # src/core/g360_theme.py (lee skill.json)\nft.PopupMenuButton(\n    content=ft.Row([\n        ft.Icon(ft.icons.DOWNLOAD, color=theme.accent),\n        ft.Text('Exportar', color=theme.accent),\n    ]),\n    items=[\n        ft.PopupMenuItem(text='Exportar a Excel', icon=ft.icons.TABLE_CHART, on_click=lambda _: export_excel()),\n        ft.PopupMenuItem(text='Exportar a CSV', icon=ft.icons.CSV, on_click=lambda _: export_csv()),\n        ft.PopupMenuItem(text='Exportar a PDF', icon=ft.icons.PICTURE_AS_PDF, on_click=lambda _: export_pdf()),\n        ft.PopupMenuDivider(),\n        ft.PopupMenuItem(text='Copiar al portapapeles', icon=ft.icons.CONTENT_COPY, on_click=lambda _: copy_clipboard()),\n    ],\n)"
+    },
+    {
+      "name": "pandas-groupby-agg",
+      "description": "Data aggregation with groupby and agg",
+      "code": "import pandas as pd\n\ndef aggregate_data(df, group_cols, agg_map):\n    \"\"\"Agrega datos usando groupby + agg.\n    \n    Args:\n        df: DataFrame\n        group_cols: Lista de columnas para agrupar\n        agg_map: Dict {col: agg_func}, ej: {'venta': 'sum', 'cantidad': 'mean'}\n    \"\"\"\n    result = df.groupby(group_cols, as_index=False).agg(agg_map)\n    return result"
+    },
+    {
+      "name": "pandas-nc-normalize",
+      "description": "Normalize Notas de Credito from ERP data",
+      "code": "import pandas as pd\nimport numpy as np\n\ndef normalize_nc(df, monto_col='monto', tipo_col='tipo_doc'):\n    \"\"\"Normaliza Notas de Credito: montos positivos y flag NC.\"\"\"\n    df = df.copy()\n    df['es_nc'] = df[tipo_col].str.contains('NC|NOTA CREDITO|DEVOLUCION', case=False, na=False).astype(int)\n    df[monto_col] = df.apply(\n        lambda r: -abs(r[monto_col]) if r['es_nc'] else abs(r[monto_col]),\n        axis=1\n    )\n    return df"
+    },
+    {
+      "name": "pandas-calculate-kpi",
+      "description": "Calculate derived KPIs from data",
+      "code": "import pandas as pd\nimport numpy as np\n\ndef calculate_kpis(df, venta_col='venta_bruta', costo_col='costo', devolucion_col='devolucion'):\n    \"\"\"Calcula KPIs derivados: margen, ratio devolucion, etc.\"\"\"\n    result = df.copy()\n    result['margen_bruto'] = result[venta_col] - result[costo_col]\n    result['margen_pct'] = np.where(\n        result[venta_col] != 0,\n        (result['margen_bruto'] / result[venta_col]) * 100,\n        0\n    )\n    if devolucion_col in result.columns:\n        result['ratio_devolucion'] = np.where(\n            result[venta_col] != 0,\n            (abs(result[devolucion_col]) / result[venta_col]) * 100,\n            0\n        )\n    return result"
+    },
+    {
+      "name": "pandas-date-range",
+      "description": "Filter DataFrame by date range",
+      "code": "import pandas as pd\n\ndef filter_by_date_range(df, date_col, start_date, end_date):\n    \"\"\"Filtra DataFrame por rango de fechas.\"\"\"\n    mask = (df[date_col] >= pd.Timestamp(start_date)) & (df[date_col] <= pd.Timestamp(end_date))\n    return df[mask].copy()\n\n# Uso:\n# df_filtrado = filter_by_date_range(df, 'fecha', '2025-01-01', '2025-12-31')"
+    },
+    {
+      "name": "pandas-gap-analysis",
+      "description": "Gap analysis between catalog and purchases",
+      "code": "import pandas as pd\n\ndef gap_analysis(catalogo, compras, key_col='sku'):\n    \"\"\"Analiza gaps entre catalogo y compras.\n    \n    Returns:\n        Dict con: en_catalogo, en_compras, en_ambos, sin_compras, no_catalogados\n    \"\"\"\n    cat_set = set(catalogo[key_col].unique())\n    comp_set = set(compras[key_col].unique())\n    return {\n        'en_catalogo': len(cat_set),\n        'en_compras': len(comp_set),\n        'en_ambos': len(cat_set & comp_set),\n        'sin_compras': len(cat_set - comp_set),\n        'no_catalogados': len(comp_set - cat_set),\n    }"
+    },
+    {
+      "name": "pandas-temporal-compare",
+      "description": "Temporal comparison A vs B period",
+      "code": "import pandas as pd\n\ndef temporal_compare(df, date_col, value_col, group_col, period_a, period_b):\n    \"\"\"Compara metricas entre dos periodos.\n    \n    Args:\n        period_a, period_b: Tuplas (start, end) como strings 'YYYY-MM-DD'\n    \"\"\"\n    a = df[(df[date_col] >= period_a[0]) & (df[date_col] <= period_a[1])]\n    b = df[(df[date_col] >= period_b[0]) & (df[date_col] <= period_b[1])]\n    \n    a_agg = a.groupby(group_col)[value_col].sum().rename('periodo_a')\n    b_agg = b.groupby(group_col)[value_col].sum().rename('periodo_b')\n    \n    result = pd.concat([a_agg, b_agg], axis=1).fillna(0)\n    result['variacion'] = result['periodo_b'] - result['periodo_a']\n    result['variacion_pct'] = (result['variacion'] / result['periodo_a'].replace(0, float('nan'))) * 100\n    return result"
+    },
+    {
+      "name": "pandas-hhi-index",
+      "description": "Calculate Herfindahl-Hirschman Index",
+      "code": "import pandas as pd\nimport numpy as np\n\ndef calculate_hhi(df, group_col, value_col):\n    \"\"\"Calcula el indice HHI de concentracion.\n    \n    HHI = sum((share_i)^2) donde share_i es proporcion del total.\n    > 2500: Alta concentracion\n    1500-2500: Concentracion moderada\n    < 1500: Baja concentracion\n    \"\"\"\n    total = df[value_col].sum()\n    if total == 0:\n        return 0.0\n    shares = df.groupby(group_col)[value_col].sum() / total\n    hhi = (shares ** 2).sum() * 10000\n    return round(hhi, 2)"
+    },
+    {
+      "name": "openpyxl-workbook",
+      "description": "Create Excel workbook with G360 styling",
+      "code": "from openpyxl import Workbook\nfrom openpyxl.styles import Font, PatternFill, Alignment, Border, Side\n\nG360_ACCENT = '00D084'\nG360_SURFACE = '1A2332'\nG360_TEXT = 'F0F4F8'\n\ndef create_g360_workbook():\n    wb = Workbook()\n    ws = wb.active\n    ws.title = 'Reporte G360'\n    \n    # Header styling\n    header_fill = PatternFill(start_color=G360_ACCENT, end_color=G360_ACCENT, fill_type='solid')\n    header_font = Font(bold=True, color=G360_TEXT, size=11)\n    thin_border = Border(\n        left=Side(style='thin', color=G360_SURFACE),\n        right=Side(style='thin', color=G360_SURFACE),\n        top=Side(style='thin', color=G360_SURFACE),\n        bottom=Side(style='thin', color=G360_SURFACE),\n    )\n    \n    return wb, ws, header_fill, header_font, thin_border"
+    },
+    {
+      "name": "openpyxl-styled-table",
+      "description": "Write styled table to Excel sheet",
+      "code": "def write_styled_table(ws, headers, data, header_fill, header_font, thin_border):\n    \"\"\"Escribe una tabla con headers estilizados G360.\"\"\"\n    # Headers\n    for col_idx, header in enumerate(headers, 1):\n        cell = ws.cell(row=1, column=col_idx, value=header)\n        cell.fill = header_fill\n        cell.font = header_font\n        cell.alignment = Alignment(horizontal='center')\n        cell.border = thin_border\n    \n    # Data\n    for row_idx, row_data in enumerate(data, 2):\n        for col_idx, value in enumerate(row_data, 1):\n            cell = ws.cell(row=row_idx, column=col_idx, value=value)\n            cell.border = thin_border\n            cell.alignment = Alignment(horizontal='center')\n    \n    # Auto-width\n    for col in ws.columns:\n        max_length = max(len(str(cell.value or '')) for cell in col)\n        ws.column_dimensions[col[0].column_letter].width = max_length + 3"
+    },
+    {
+      "name": "openpyxl-kpi-sheet",
+      "description": "Create KPI summary sheet with formatting",
+      "code": "def write_kpi_sheet(wb, sheet_name, kpis):\n    \"\"\"Crea un sheet de KPIs con formato G360.\n    \n    kpis: [(nombre, valor, formato), ...]\n    \"\"\"\n    ws = wb.create_sheet(title=sheet_name)\n    \n    accent_fill = PatternFill(start_color='00D084', end_color='00D084', fill_type='solid')\n    accent_font = Font(bold=True, color='F0F4F8', size=14)\n    value_font = Font(bold=True, size=20, color='00D084')\n    \n    ws.cell(row=1, column=1, value='KPI').fill = accent_fill\n    ws.cell(row=1, column=1).font = accent_font\n    ws.cell(row=1, column=2, value='Valor').fill = accent_fill\n    ws.cell(row=1, column=2).font = accent_font\n    \n    for i, (name, value, fmt) in enumerate(kpis, 2):\n        ws.cell(row=i, column=1, value=name)\n        ws.cell(row=i, column=2, value=value)\n        ws.cell(row=i, column=2).font = value_font\n        if fmt:\n            ws.cell(row=i, column=2).number_format = fmt\n    \n    ws.column_dimensions['A'].width = 30\n    ws.column_dimensions['B'].width = 20"
+    },
+    {
+      "name": "openpyxl-multi-sheet",
+      "description": "Create multi-sheet Excel report",
+      "code": "def create_multi_sheet_report(output_path, sheets_data):\n    \"\"\"Crea un Excel con multiples sheets.\n    \n    sheets_data: [(name, headers, rows), ...]\n    \"\"\"\n    from openpyxl import Workbook\n    wb = Workbook()\n    wb.remove(wb.active)\n    \n    header_fill = PatternFill(start_color='00D084', end_color='00D084', fill_type='solid')\n    header_font = Font(bold=True, color='F0F4F8', size=11)\n    \n    for name, headers, rows in sheets_data:\n        ws = wb.create_sheet(title=name[:31])\n        for col_idx, h in enumerate(headers, 1):\n            cell = ws.cell(row=1, column=col_idx, value=h)\n            cell.fill = header_fill\n            cell.font = header_font\n        for row_idx, row in enumerate(rows, 2):\n            for col_idx, val in enumerate(row, 1):\n                ws.cell(row=row_idx, column=col_idx, value=val)\n    \n    wb.save(output_path)\n    return output_path"
+    },
+    {
+      "name": "flet-loading-overlay",
+      "description": "Loading overlay with spinner for blocking operations",
+      "code": "# theme = G360Theme()   # src/core/g360_theme.py (lee skill.json)\nself.loading = ft.Container(\n    content=ft.Column([\n        ft.ProgressRing(width=48, height=48, color=theme.accent),\n        ft.Container(height=16),\n        ft.Text('Cargando...', size=16, color=theme.text),\n    ], horizontal_alignment=ft.CrossAxisAlignment.CENTER, alignment=ft.MainAxisAlignment.CENTER),\n    bgcolor=theme.overlay,\n    expand=True,\n    alignment=ft.alignment.center,\n    visible=False,\n)\n\n# En el layout, dentro de un Stack:\nft.Stack([page_content, self.loading], expand=True)\n\ndef show_loading(self, message='Procesando...'):\n    self.loading.content.controls[2].value = message\n    self.loading.visible = True\n    self.page.update()\n\ndef hide_loading(self):\n    self.loading.visible = False\n    self.page.update()"
+    },
+    {
+      "name": "flet-logo-base64",
+      "description": "Embed logo as base64 (PyInstaller-safe, no file paths)",
+      "code": "import base64\nfrom pathlib import Path\n\nLOGO_B64 = None\n\ndef get_logo_src():\n    global LOGO_B64\n    if LOGO_B64:\n        return LOGO_B64\n    candidates = [\n        Path('assets/images/logo-g360-dark.svg'),\n        Path(__file__).parent / 'assets' / 'images' / 'logo-g360-dark.svg',\n    ]\n    for p in candidates:\n        if p.exists():\n            raw = p.read_bytes()\n            b64 = base64.b64encode(raw).decode()\n            LOGO_B64 = f'data:image/svg+xml;base64,{b64}'\n            return LOGO_B64\n    return None\n\n# Uso en Flet:\n# ft.Image(src_base64=get_logo_src(), height=40, fit=ft.ImageFit.CONTAIN)"
+    },
+    {
+      "name": "flet-logging-setup",
+      "description": "Logging setup for desktop apps (debug remoto)",
+      "code": "import logging\nimport sys\nfrom pathlib import Path\n\ndef setup_logging(app_name='g360-app'):\n    log_dir = Path.home() / '.g360' / 'logs'\n    log_dir.mkdir(parents=True, exist_ok=True)\n    log_file = log_dir / f'{app_name}.log'\n    \n    logging.basicConfig(\n        level=logging.DEBUG,\n        format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',\n        handlers=[\n            logging.FileHandler(log_file, encoding='utf-8'),\n            logging.StreamHandler(sys.stdout),\n        ]\n    )\n    return logging.getLogger(app_name)\n\n# Uso:\n# logger = setup_logging('mi-app')\n# logger.info('App iniciada')"
+    },
+    {
+      "name": "flet-footer-signature",
+      "description": "G360 signature footer with logo + powered by",
+      "code": "# theme = G360Theme()   # src/core/g360_theme.py (lee skill.json)\nft.Container(\n    content=ft.Row([\n        ft.Image(src_base64=get_logo_src(), height=16, fit=ft.ImageFit.CONTAIN),\n        ft.Container(width=8),\n        ft.Text('powered by G360', size=10, color=theme.muted),\n    ], alignment=ft.MainAxisAlignment.CENTER),\n    padding=8,\n    bgcolor=theme.surface,\n)"
+    },
+    {
+      "name": "flet-error-boundary",
+      "description": "Global error handler for Flet callbacks",
+      "code": "# theme = G360Theme()   # src/core/g360_theme.py (lee skill.json)\nimport traceback\nimport logging\n\nlogger = logging.getLogger('g360-app')\n\ndef safe_handler(fn):\n    \"\"\"Decorator que atrapa excepciones en callbacks Flet.\"\"\"\n    def wrapper(*args, **kwargs):\n        try:\n            return fn(*args, **kwargs)\n        except Exception as e:\n            logger.error(f'Error en {fn.__name__}: {e}\\n{traceback.format_exc()}')\n            page = args[0].page if hasattr(args[0], 'page') else None\n            if page:\n                page.snack_bar = ft.SnackBar(\n                    content=ft.Text(f'Error: {str(e)[:80]}'),\n                    bgcolor=theme.error,\n                )\n                page.snack_bar.open = True\n                page.update()\n    return wrapper\n\n# Uso:\n# @safe_handler\n# def on_click(e): ..."
+    },
+    {
+      "name": "flet-snackbar-error",
+      "description": "Show error message via SnackBar",
+      "code": "# theme = G360Theme()   # src/core/g360_theme.py (lee skill.json)\ndef show_error(page, message):\n    page.snack_bar = ft.SnackBar(\n        content=ft.Row([\n            ft.Icon(ft.icons.ERROR_OUTLINE, color=theme.text, size=20),\n            ft.Text(str(message)[:120], color=theme.text, size=14),\n        ]),\n        bgcolor=theme.error,\n        duration=5000,\n    )\n    page.snack_bar.open = True\n    page.update()\n\ndef show_success(page, message):\n    page.snack_bar = ft.SnackBar(\n        content=ft.Row([\n            ft.Icon(ft.icons.CHECK_CIRCLE, color=theme.bg, size=20),\n            ft.Text(message, color=theme.bg, size=14),\n        ]),\n        bgcolor=theme.success,\n        duration=3000,\n    )\n    page.snack_bar.open = True\n    page.update()\n\ndef show_warning(page, message):\n    page.snack_bar = ft.SnackBar(\n        content=ft.Row([\n            ft.Icon(ft.icons.WARNING, color=theme.bg, size=20),\n            ft.Text(message, color=theme.bg, size=14),\n        ]),\n        bgcolor=theme.warning,\n        duration=4000,\n    )\n    page.snack_bar.open = True\n    page.update()"
+    },
+    {
+      "name": "openpyxl-metadata",
+      "description": "G360 standard author (ccusi) + metadata on openpyxl workbook",
+      "code": "from openpyxl import Workbook\n\nwb = Workbook()\n# G360 standard metadata - autor consistente en todo el ecosistema\nwb.properties.creator = \"ccusi\"\nwb.properties.title = \"<APP_NAME>\"\nwb.properties.description = \"Generado por G360\"\n\nws = wb.active\n# ... populate data ...\nwb.save(\"reporte.xlsx\")"
+    },
+    {
+      "name": "openpyxl-excel-table",
+      "description": "Create Excel Table with formulas, totals outside sort range",
+      "code": "from openpyxl.worksheet.table import Table, TableStyleInfo\n\ndef write_table_with_formulas(ws, headers, data, total_values):\n    \"\"\"Escribe datos como Tabla Excel con formulas vivas.\n    \n    La fila TOTAL queda fuera de la tabla para que el ordenamiento\n    no la mueva. Los porcentajes usan =IFERROR(D{row}/D$total, 0).\n    \"\"\"\n    n_data = len(data)\n    total_row = n_data + 2\n    ncols = len(headers)\n    \n    # Headers\n    for ci, h in enumerate(headers, 1):\n        ws.cell(row=1, column=ci, value=h)\n    \n    # Data\n    for ri, row in enumerate(data, 2):\n        for ci, val in enumerate(row, 1):\n            ws.cell(row=ri, column=ci, value=val)\n    \n    # Total row (FUERA del rango de la tabla)\n    ws.cell(row=total_row, column=1, value=\"TOTAL\")\n    ws.cell(row=total_row, column=4).value = f\"=SUM(D2:D{n_data+1})\"\n    ws.cell(row=total_row, column=5).value = f\"=SUM(E2:E{n_data+1})\"\n    ws.cell(row=total_row, column=6).value = 1.0\n    ws.cell(row=total_row, column=7).value = 1.0\n    \n    # Live percentage formulas (IFERROR para evitar #DIV/0!)\n    for ri in range(2, n_data + 2):\n        ws.cell(row=ri, column=6).value = f\"=IFERROR(D{ri}/D${total_row}, 0)\"\n        ws.cell(row=ri, column=7).value = f\"=IFERROR(E{ri}/E${total_row}, 0)\"\n    \n    # Crear tabla Excel (solos datos, sin total)\n    col_letter = get_column_letter(ncols)\n    table_ref = f\"A1:{col_letter}{n_data+1}\"\n    table_name = f\"tbl_data\"\n    tab = Table(displayName=table_name, ref=table_ref)\n    tab.tableStyleInfo = TableStyleInfo(\n        name=\"TableStyleMedium9\",\n        showFirstColumn=False,\n        showLastColumn=False,\n        showRowStripes=True,\n        showColumnStripes=False,\n    )\n    ws.add_table(tab)"
+    },
+    {
+      "name": "flet-export-progress",
+      "description": "Progress bars per vendor with on_file_done callback",
+      "code": "# En consolidate_view.py:_exportar()\ndef _exportar(self):\n    vendedores_info = [\n        (vid, vendedor.nom_vendedor)\n        for vid, vendedor in self.vendedores.items()\n        if self.seleccion.get(vid, [])\n    ]\n    if not vendedores_info:\n        return\n\n    self._prog_rows.clear()\n    for _, nombre in vendedores_info:\n        bar = ft.ProgressBar(width=380, color=self.p.accent, value=0)\n        row = ft.Row([\n            ft.Text(nombre, size=12, color=self.p.text, width=160),\n            bar,\n        ], spacing=8, vertical_alignment=ft.CrossAxisAlignment.CENTER)\n        self._prog_rows[nombre] = row\n\n    self._prog_col.controls = list(self._prog_rows.values())\n    self._prog_col.visible = True\n    self.status.value = \"Exportando...\"\n    self.page.update()\n\n    def on_file_done(nombre: str):\n        row = self._prog_rows.get(nombre)\n        if row:\n            row.controls[1].value = 1.0\n            self.page.update()\n\n    def task():\n        try:\n            paths = exportar_xlsx(\n                ...,\n                on_file_done=on_file_done,\n            )\n            self.status.value = f\"Reportes: {len(paths)} archivo(s)\"\n            self.status.color = self.p.success\n            self.page.update()\n        except Exception as ex:\n            self.status.value = f\"Error: {str(ex)}\"\n\n    threading.Thread(target=task, daemon=True).start()\n\n# En exporter.py: agregar callback en el signature\ndef exportar_xlsx(...,\n                  on_file_done: Optional[callable] = None) -> list[str]:\n    ...\n    for vid, vendedor in por_vendedor.items():\n        ...\n        generados.append(fpath)\n        if on_file_done:\n            on_file_done(vendedor.nom_vendedor)\n    return generados"
+    },
+    {
+      "name": "flet-glass-theme",
+      "description": "G360 glass theme: paleta construida desde los tokens (no hex)",
+      "code": "# theme.py - Paleta construida desde los tokens G360\n#\n# Los tokens se generan con:\n#     g360 tokens            -> crea src/core/g360_tokens.py\n# Cambiar la paleta (familia de acento) con:\n#     g360 set-accent cyan   -> reemite los tokens\n#\n# Un solo origen de verdad: ningun color escrito a mano.\nfrom dataclasses import dataclass\n\nfrom src.core.g360_tokens import TOKENS\n\n\n@dataclass\nclass Paleta:\n    bg: str\n    surface: str\n    surface_hover: str\n    accent: str\n    accent_secondary: str\n    text: str\n    text_secondary: str\n    border: str\n    success: str\n    warning: str\n    danger: str\n    info: str\n    glass_bg: str\n    glass_border: str\n    input_bg: str\n\n\ndef _build(mode: str) -> Paleta:\n    t = TOKENS[mode]\n    return Paleta(\n        bg=t[\"bg\"],\n        surface=t[\"surface\"],\n        surface_hover=t[\"surfaceAlt\"],\n        accent=t[\"accent\"],\n        accent_secondary=t[\"info\"],\n        text=t[\"text\"],\n        text_secondary=t[\"textMuted\"],\n        border=t[\"border\"],\n        success=t[\"success\"],\n        warning=t[\"warning\"],\n        danger=t[\"error\"],\n        info=t[\"info\"],\n        glass_bg=t[\"glass\"],\n        glass_border=t[\"border\"],\n        input_bg=t[\"surfaceAlt\"],\n    )\n\n\nLIGHT = _build(\"light\")\nDARK = _build(\"dark\")\n\n# Uso en containers (efecto glass):\n# ft.Container(\n#     bgcolor=self.p.glass_bg,\n#     border=ft.BorderSide(1, self.p.glass_border),\n#     blur=ft.Blur(12, 12),\n#     border_radius=10,\n#     padding=16,\n# )"
+    }
+  ]
+}

@@ -1,0 +1,19 @@
+[project]
+name = "g360-app-polished"
+version = "1.0.0"
+description = "G360 Desktop Application - Polished Template"
+requires-python = ">=3.11"
+dependencies = [
+    "flet[desktop]==0.28.3",
+    "pip-system-certs>=4.38",
+    "requests>=2.31.0",
+    "openpyxl>=3.0.0",
+]
+
+[project.optional-dependencies]
+build = [
+    "pyinstaller>=6.0.0",
+]
+
+[tool.uv]
+package = false

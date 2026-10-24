@@ -1,0 +1,65 @@
+{
+  "version": "2.0.0",
+  "brands": {
+    "g360": {
+      "name": "G360",
+      "description": "Marca principal del ecosistema G360",
+      "theme": "dark",
+      "default_logo": "logotypes/logo-g360-dark.svg",
+      "assets": {
+        "logotypes": [
+          "logotypes/logo-g360-dark.svg",
+          "logotypes/logo-g360-light.svg"
+        ],
+        "favicons": {
+          "svg": "favicons/favicon.svg",
+          "ico": "favicons/favicon.ico",
+          "png_16": "favicons/favicon-16x16.png",
+          "png_32": "favicons/favicon-32x32.png",
+          "apple_touch": "favicons/apple-touch-icon.png"
+        },
+        "pwa": {
+          "icon_192": "pwa/icon-192.png",
+          "icon_512": "pwa/icon-512.png",
+          "icon_branded": "pwa/icon-g360.png"
+        }
+      },
+      "signature": {
+        "mode": "own",
+        "text": "G360 by ccusi"
+      },
+      "accentFamily": "emerald"
+    },
+    "cipsa": {
+      "name": "CIPSA",
+      "description": "Marca corporativa CIPSA - estilo moderno corporativo",
+      "theme": "dark",
+      "default_logo": "logotypes/Logo_cipsa_solid.svg",
+      "assets": {
+        "logotypes": [
+          "logotypes/Logo_cipsa_solid.svg",
+          "logotypes/Logo_cipsa_borde.svg",
+          "logotypes/Logo_cipsa_solid.png",
+          "logotypes/Logo_cipsa_borde.png"
+        ],
+        "favicons": {
+          "svg": "favicons/favicon.svg",
+          "ico": "favicons/cipsa.ico",
+          "png_16": "favicons/favicon-16x16.png",
+          "png_32": "favicons/favicon-32x32.png",
+          "apple_touch": "favicons/apple-touch-icon.png"
+        },
+        "pwa": {
+          "icon_192": "pwa/icon-192.png",
+          "icon_512": "pwa/icon-512.png",
+          "icon_branded": "pwa/icon-cipsa.png"
+        }
+      },
+      "signature": {
+        "mode": "powered",
+        "text": "powered by G360"
+      },
+      "accentFamily": "cipsa"
+    }
+  }
+}

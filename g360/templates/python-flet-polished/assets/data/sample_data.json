@@ -1,0 +1,12 @@
+{
+  "items": [
+    {"sku": "1001", "descripcion": "Producto ejemplo A", "stock": 150, "predespacho": 30, "disponible": 120, "linea": "PELOTAS", "categoria": "DEPORTES"},
+    {"sku": "1002", "descripcion": "Producto ejemplo B", "stock": 80, "predespacho": 20, "disponible": 60, "linea": "ESCRITURA", "categoria": "OFICINA"},
+    {"sku": "1003", "descripcion": "Producto ejemplo C", "stock": 200, "predespacho": 50, "disponible": 150, "linea": "PELOTAS", "categoria": "DEPORTES"},
+    {"sku": "1004", "descripcion": "Producto ejemplo D", "stock": 10, "predespacho": 5, "disponible": 5, "linea": "ARCHIVO", "categoria": "OFICINA"},
+    {"sku": "1005", "descripcion": "Producto ejemplo E", "stock": 300, "predespacho": 0, "disponible": 300, "linea": "PINTURA", "categoria": "ARTE"},
+    {"sku": "1006", "descripcion": "Producto ejemplo F", "stock": 45, "predespacho": 40, "disponible": 5, "linea": "MASCOTAS", "categoria": "OTROS"},
+    {"sku": "1007", "descripcion": "Producto ejemplo G", "stock": 120, "predespacho": 25, "disponible": 95, "linea": "DIBUJO", "categoria": "ARTE"},
+    {"sku": "1008", "descripcion": "Producto ejemplo H", "stock": 60, "predespacho": 10, "disponible": 50, "linea": "PEGAMENTOS", "categoria": "OFICINA"}
+  ]
+}

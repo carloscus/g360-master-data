@@ -1,0 +1,67 @@
+{
+  "projectTypes": [
+    {
+      "id": "web-pwa",
+      "name": "Web PWA",
+      "description": "Progressive Web App with offline support",
+      "framework": "vanilla",
+      "features": ["pwa", "offline", "service-worker"]
+    },
+    {
+      "id": "web-svelte",
+      "name": "Web Svelte",
+      "description": "Svelte web application",
+      "framework": "svelte",
+      "features": ["routing", "stores", "ssr"]
+    },
+    {
+      "id": "python-cli",
+      "name": "Python CLI",
+      "description": "Python command-line tool",
+      "framework": "python",
+      "features": ["cli", "argparse", "rich"]
+    },
+    {
+      "id": "python-flet-polished",
+      "name": "Python Flet Polished",
+      "description": "Python desktop app with Flet — estandar actual (dual theme, auto-refresh, hash cache, search debounce, KPI glow, G360 signature)",
+      "framework": "flet",
+      "features": ["desktop", "gui", "cross-platform", "portable", "dual-theme", "auto-refresh", "search-debounce", "kpi-glow", "g360-signature"],
+      "portable": true,
+      "default": true
+    },
+    {
+      "id": "python-flet",
+      "name": "Python Flet (Legacy)",
+      "description": "Python desktop app with Flet framework — LEGACY: usar python-flet-polished para nuevos proyectos",
+      "framework": "flet",
+      "features": ["desktop", "gui", "cross-platform"],
+      "portable": true,
+      "deprecated": true,
+      "deprecationNote": "Usa 'python-flet-polished' en su lugar. Este template se mantiene solo por compatibilidad con proyectos existentes."
+    },
+    {
+      "id": "python-flet-migrate",
+      "name": "Python Flet Migration",
+      "description": "Migrate tkinter/ctkinter app to Flet",
+      "framework": "flet",
+      "features": ["migration", "desktop", "gui", "portable"],
+      "portable": true
+    },
+    {
+      "id": "vba-excel",
+      "name": "VBA Excel",
+      "description": "Excel VBA macros",
+      "framework": "vba",
+      "features": ["excel", "macros", "forms"]
+    },
+    {
+      "id": "python-customtkinter",
+      "name": "Python CustomTkinter Desktop",
+      "description": "Python desktop app with CustomTkinter framework",
+      "framework": "customtkinter",
+      "features": ["desktop", "gui", "cross-platform"],
+      "portable": true
+    }
+  ]
+}
