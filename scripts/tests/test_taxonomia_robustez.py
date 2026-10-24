@@ -14,8 +14,6 @@ import sys
 from collections import Counter, defaultdict
 from pathlib import Path
 
-import pytest
-
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from generar_catalogo_base import (  # noqa: E402
@@ -168,7 +166,6 @@ class TestConsistenciaTaxonomia:
         )
 
 
-@pytest.mark.skipif(not RUTA_CATALOGO.exists(), reason="catalogo no generado")
 class TestCatalogoRealSinRegresion:
     """Regresiones sobre el catalogo GENERADO (integridad de los datos)."""
 

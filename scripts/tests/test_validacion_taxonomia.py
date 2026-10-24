@@ -26,7 +26,6 @@ from generar_catalogo_base import CATEGORIA_POR_LINEA  # noqa: E402
 RAIZ = Path(__file__).resolve().parent.parent.parent
 
 
-@pytest.mark.skipif(not CATALOGO_POR_DEFECTO.exists(), reason="catalogo no generado")
 def test_catalogo_real_no_tiene_errores():
     """El catalogo publicado no puede tener incoherencias de taxonomia."""
     with open(CATALOGO_POR_DEFECTO, encoding="utf-8") as f:
@@ -184,8 +183,6 @@ def test_taxonomia_del_maestro_es_la_misma_que_la_del_api():
 
 def test_lineas_crayola_publicadas_como_representadas():
     """Las lineas Crayola del catalogo real son 100% REPRESENTADAS."""
-    if not CATALOGO_POR_DEFECTO.exists():
-        pytest.skip("catalogo no generado")
     with open(CATALOGO_POR_DEFECTO, encoding="utf-8") as f:
         catalogo = json.load(f)
     for p in catalogo["productos"]:
