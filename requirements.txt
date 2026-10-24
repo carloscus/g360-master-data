@@ -1,0 +1,14 @@
+# Dependencias de g360-master-data (versionadas y fijadas).
+# Instalar:  python -m venv .venv && .venv\Scripts\pip install -r requirements.txt
+# El comando unico de verificacion (scripts/verificar.ps1) las instala solas.
+
+# --- Runtime (lectura de fuentes y llamadas al API) ---
+openpyxl==3.1.5      # KARDEX/SKU_BX/plantillas .xlsx
+xlrd==2.0.2          # ERP .xls (PRODUCTOS.xls, S1)
+xlwt==1.3.0          # escritura .xls en tests y creacion de guias
+requests==2.34.2     # universo de stock contra g360-stock-api
+
+# --- Verificacion (pytest + lint) ---
+pytest==9.0.2
+ruff==0.15.7
+black==26.10.1

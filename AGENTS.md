@@ -10,9 +10,13 @@ Sistema centralizado de datos maestros para proyectos G360.
 
 Un solo comando deja el repo listo y verifica que todo esté en verde:
 
-```bash
-pytest
+```powershell
+.\scripts\verificar.ps1
 ```
+
+- Bootstrap: crea `.venv` e instala `requirements.txt` si faltan (red solo la primera vez).
+- Corre `pytest` (tests en `scripts\tests\`) y `ruff check scripts`.
+- Sin `.venv` activado y sin pasos manuales.
 
 - Stack: python (pip)
 - Tests: pytest en `scripts\tests/`

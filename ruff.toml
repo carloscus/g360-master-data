@@ -1,0 +1,8 @@
+# Politica de lint de g360-master-data (versionada: nada se silencia en el chat).
+[lint.per-file-ignores]
+# Los scripts insertan scripts/ en sys.path ANTES de importar modulos
+# locales (contratos, etc.): el import no puede estar arriba del todo.
+"scripts/generar_catalogo_base.py" = ["E402"]
+# Legacy: generar_catalogo.py solo se mantiene por compatibilidad y usa
+# estilo one-liner; no se reescribe hasta que se retire.
+"scripts/generar_catalogo.py" = ["E701", "E702"]

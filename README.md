@@ -62,9 +62,11 @@ g360-master-data/
 │   ├── crear_plantillas.py     ← Genera/migra las plantillas de plantillas/
 │   ├── leer_plantilla_precios.py ← Lee plantilla_precios.xlsx (hoja única SKU_PRECIOS; acepta el layout legacy)
 │   ├── sanitize_key.py         ← Sanea API_KEY (quita whitespace invisible)
+│   ├── consultar_por_taxonomia.py ← Consulta autónoma por jerarquía (KARDEX → JSON)
 │   ├── simular_actualizacion.py ← Simula el ciclo de actualización de código (SKU nuevo)
 │   ├── validar_taxonomia.py     ← Validación cruzada de taxonomía (master-data ↔ stock-api)
 │   ├── ver_estado.py           ← Muestra estado del catálogo generado
+│   ├── verificar.ps1           ← UN comando de verificación (bootstrap + tests + lint)
 │   └── tests/                   ← Tests unitarios (pytest)
 │
 ├── actualizar_catalogo.bat     ← Workflow interactivo + modo automático (--auto)
@@ -97,6 +99,29 @@ Hoy el generador consume **PRODUCTOS.xls + SKU_BX.xlsx + KARDEX_BASE.xlsx
 siguiente fase (descuentos). Cuando se sume una fuente nueva, se agrega acá,
 se declara su contrato en `scripts/contratos.py` y se escribe su lector en
 `scripts/`.
+
+---
+
+## Verificación
+
+Un solo comando deja el repo listo y en verde (es el que declara `AGENTS.md`):
+
+```powershell
+.\scripts\verificar.ps1
+```
+
+- **Primera vez**: crea `.venv` e instala `requirements.txt` (red solo esa vez).
+- **Después**: corre 100% offline, sin activar el venv a mano.
+- Corre `pytest` (`scripts/tests/`) y `ruff check scripts` (política en `ruff.toml`).
+- Con el venv ya activo también vale `pytest` a secas.
+
+Los tests no tocan red ni `data/`: usan archivos temporales y el catálogo
+versionado (`output/catalogo_productos.json`). El único skip restante es el
+test de taxonomía contra `g360-stock-api` (integración cross-repo: se omite
+solo si el repo hermano no está presente).
+
+Variables de entorno: ver `.env.example` (defaults documentados; ninguna es
+obligatoria para generar en modo offline con `G360_S1_CACHE`).
 
 ---
 
