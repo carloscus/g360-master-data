@@ -113,7 +113,9 @@ Un solo comando deja el repo listo y en verde (es el que declara `AGENTS.md`):
 - **Primera vez**: crea `.venv` e instala `requirements.txt` (red solo esa vez).
 - **Después**: corre 100% offline, sin activar el venv a mano.
 - Corre `pytest` (`scripts/tests/`) y `ruff check scripts` (política en `ruff.toml`).
-- Con el venv ya activo también vale `pytest` a secas.
+- Con el venv ya activo también vale `pytest` a secas (un `conftest.py` raíz
+  acota la recolección a `scripts/tests/`: los `test_*.py` de `g360/` son
+  templates de la CLI, no tests de este repo).
 
 Los tests no tocan red ni `data/`: usan archivos temporales y el catálogo
 versionado (`output/catalogo_productos.json`). El único skip restante es el
