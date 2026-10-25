@@ -906,35 +906,10 @@ def _entero(valor) -> int:
         return 0
 
 
-def generar_output(
-    productos,
-    unbx_map,
-    estado_map,
-    orden_map,
-    ruta_salida,
-    exclusiones=None,
-    universo_stock=None,
-    taxonomia_extra=None,
-    universo=None,
-    caja_map=None,
-    fuentes=None,
-    erp_todos=None,
-    um_kardex=None,
-    kardex_ids=None,
-    kardex_nombre=None,
-    almacenes_nombres=None,
-):
-    """Genera el JSON de catálogo completo.
-
-    `universo` es el detalle del reporte S1 {sku: {stock, predespacho, ...}}:
-    con él se publican los flags de negocio (compromiso, cotizable,
-    por_activar) y el snapshot de stock que justificó cada inclusión.
-    `caja_map` son las dimensiones/volumen por SKU (SKU_BX) y `fuentes` la
-    huella (sha256, filas, fecha) de cada archivo que se leyó.
-    """
-    universo = universo or {}
-    caja_map = caja_map or {}
-    estadisticas = {
+def _estadisticas_base() -> dict:
+    """Contadores vacios del metadata. Claves fijas: los consumidores las
+    leen por nombre y ninguna puede desaparecer entre versiones."""
+    return {
         "sin_ean13": 0,
         "con_ean14": 0,
         "sin_unbx": 0,
@@ -961,185 +936,184 @@ def generar_output(
         "por_estado_linea": {},
     }
 
-    productos_final = []
-    for p in productos:
-        tiene_unbx = p["sku"] in unbx_map
-        un_bx = unbx_map.get(p["sku"], 1)
-        caja = caja_map.get(p["sku"])
-        if caja:
-            estadisticas["con_caja"] += 1
-        if tiene_unbx:
-            estadisticas["con_unbx"] += 1
-        else:
-            estadisticas["sin_unbx"] += 1
-        if not p["ean13"]:
-            estadisticas["sin_ean13"] += 1
-        if p["ean14"]:
-            estadisticas["con_ean14"] += 1
-        if p.get("descontinuado"):
-            estadisticas["descontinuados"] += 1
-        if not p.get("linea_codigo"):
-            estadisticas["sin_linea_codigo"] += 1
-        if p.get("linea_codigo") == "OTROS":
-            # S1 no trajo taxonomia para este SKU (ficha minima con fallback).
-            # Si este numero es alto, el reporte S1 o su parseo tienen un
-            # problema: revisar el universo antes de publicar.
-            estadisticas["con_linea_otros"] += 1
 
-        cat = p["categoria"]
-        lin = p["linea"]
-        estadisticas["por_categoria"][cat] = (
-            estadisticas["por_categoria"].get(cat, 0) + 1
-        )
-        estadisticas["por_linea"][lin] = estadisticas["por_linea"].get(lin, 0) + 1
+def _flags_producto(p, universo, orden_map) -> dict:
+    """Flags de negocio (v3.6.0) de un SKU: snapshot del S1 + precio.
 
-        est = estado_map.get(p["sku"], "")
-        if est:
-            estadisticas["por_estado_linea"][est] = (
-                estadisticas["por_estado_linea"].get(est, 0) + 1
-            )
+    `por_activar` = publicado pero todavia no cotizable (sin precio);
+    `derivado_de` siempre vacio: SKU exactos, sin enlaces por parecido.
+    """
+    mov = universo.get(p["sku"], {})
+    precio = float(p.get("precio") or 0.0)
+    predespacho = int(mov.get("predespacho") or 0)
+    return {
+        "stock": int(mov.get("stock") or 0),
+        "predespacho": predespacho,
+        "precio": precio,
+        "origen": p.get("origen", "erp"),
+        "en_guia": p["sku"] in orden_map,
+        "compromiso": predespacho > 0,
+        "vigente": not bool(p.get("descontinuado")),
+        "cotizable": precio > 0,
+        "por_activar": not (precio > 0),
+        "cat_venta": categoria_venta(p["categoria"]),
+        "derivado_de": "",
+    }
 
-        # ── Flags de negocio (v3.6.0) ─────────────────────────────────
-        mov = universo.get(p["sku"], {})
-        stock_snap = int(mov.get("stock") or 0)
-        predespacho_snap = int(mov.get("predespacho") or 0)
-        precio = float(p.get("precio") or 0.0)
-        origen = p.get("origen", "erp")
-        en_guia = p["sku"] in orden_map
-        compromiso = predespacho_snap > 0
-        vigente = not bool(p.get("descontinuado"))
-        # `por_activar` = está en el catálogo pero todavía NO se puede
-        # cotizar: no tiene precio. El origen ('erp'/'s1') ya queda en
-        # su propio campo.
-        cotizable = precio > 0
-        por_activar = not cotizable
-        # Sin enlaces: derivado_de siempre vacio (cada SKU es exacto y
-        # standalone; se mantiene la clave por compatibilidad con el API).
-        derivado_de = ""
-        cat_venta = categoria_venta(cat)
 
-        if en_guia:
-            estadisticas["en_guia"] += 1
-        if compromiso:
-            estadisticas["con_compromiso"] += 1
-        if por_activar:
-            estadisticas["por_activar"] += 1
-        if cotizable:
-            estadisticas["cotizables"] += 1
-        # UM: la ficha (S1-only ya la trae del universo) -> KARDEX (fuente
-        # primaria) -> universo S1 como fallback para un SKU ERP que tenga
-        # stock pero aun no exista en el KARDEX. Si las tres fuentes no lo
-        # saben, queda vacio (no se inventa).
-        um_final = (
-            p.get("um", "")
-            or (um_kardex or {}).get(p["sku"], "")
-            or str((universo.get(p["sku"]) or {}).get("um") or "").strip().upper()
-        )
-        if um_final:
-            estadisticas["con_um"] += 1
-        kid = (kardex_ids or {}).get(p["sku"], {})
-        if not (kid.get("grupo_id") and kid.get("tipo_id") and kid.get("familia_id")):
-            # SKU sin ficha KARDEX emparejada (S1-only o sin calce): resolver
-            # los IDs por NOMBRES contra el maestro, verificado por linea.
-            # Unico candidato -> IDs; 0 o varios -> queda vacio y sin avisar
-            # de adivinar (el stat con_ids_jerarquia refleja el total real).
-            kid = resolver_jerarquia_por_nombre(p, kardex_nombre or {})
-            if kid:
-                estadisticas["ids_por_nombre"] += 1
-        if kid.get("grupo_id") and kid.get("tipo_id") and kid.get("familia_id"):
-            estadisticas["con_ids_jerarquia"] += 1
-        if origen == "s1":
-            estadisticas["solo_s1"] += 1
-        estadisticas["por_categoria_venta"][cat_venta] = (
-            estadisticas["por_categoria_venta"].get(cat_venta, 0) + 1
-        )
-
-        productos_final.append(
-            {
-                "sku": p["sku"],
-                "nombre": p["nombre"],
-                "nombre_corto": generar_nombre_corto(p["nombre"]),
-                "ean13": p["ean13"],
-                "ean14": p["ean14"],
-                "categoria": p["categoria"],
-                "categoria_venta": cat_venta,
-                # linea = CODIGO canonico | linea_nombre = nombre legible
-                "linea": p["linea"],
-                "linea_nombre": p.get("linea_nombre", ""),
-                "grupo": p["grupo"],
-                "grupo_id": kid.get("grupo_id", ""),
-                "tipo": p["tipo"],
-                "tipo_id": kid.get("tipo_id", ""),
-                "familia": p["familia"],
-                "familia_id": kid.get("familia_id", ""),
-                "um": um_final,
-                "un_bx": un_bx,
-                "orden": orden_map.get(p["sku"], 0),
-                "estado_linea": est,
-                "peso_kg": p["peso_kg"],
-                # Caja y volumen (SKU_BX). `un_bx` es unidades por caja; esto
-                # es el tamano fisico. Va como objeto para no confundirlo con
-                # el `caja` (unidades) que usa el API.
-                "dimensiones_caja": caja,
-                "precio": precio,
-                "descontinuado": bool(p.get("descontinuado", False)),
-                "linea_codigo": p.get("linea_codigo", ""),
-                # Flags de negocio: explican POR QUE el SKU está publicado.
-                "en_guia": en_guia,
-                "compromiso": compromiso,
-                "cotizable": cotizable,
-                "vigente": vigente,
-                "por_activar": por_activar,
-                "derivado_de": derivado_de,
-                "origen": origen,
-                # Snapshot del reporte S1 que justificó la inclusión (el
-                # stock vivo lo sirve /api/v1/stock, esto es solo trazabilidad).
-                "stock_snapshot": stock_snap,
-                "predespacho_snapshot": predespacho_snap,
-                "keywords": generar_keywords(
-                    p["nombre"],
-                    # El nombre de la linea (no el codigo) es lo que la gente
-                    # busca ("PELOTAS", "ARCHIVO"). El codigo va aparte, como
-                    # extra, para que buscar "01" tambien encuentre el SKU.
-                    p.get("linea_nombre", "") or p.get("linea", ""),
-                    p["categoria"],
-                    extra=p.get("linea", ""),
-                ),
-            }
-        )
-
-    productos_final.sort(
-        # Agrupar por linea para legibilidad; dentro de cada bloque respetar
-        # el orden de guia comercial (campo `orden` del SKU_BX), y al final los
-        # SKUs sin guia ordenados alfabeticamente por SKU.
-        key=lambda x: (
-            x.get("linea", ""),
-            x.get("orden", 0) == 0,
-            x.get("orden", 0) or 0,
-            x["sku"],
-        )
+def _resolver_um(p, um_kardex, universo) -> str:
+    """UM: ficha (S1-only ya la trae del universo) -> KARDEX (fuente
+    primaria) -> universo S1 como fallback para un SKU ERP con stock que
+    aun no exista en el KARDEX. Si las tres fuentes no lo saben, vacio."""
+    return (
+        p.get("um", "")
+        or (um_kardex or {}).get(p["sku"], "")
+        or str((universo.get(p["sku"]) or {}).get("um") or "").strip().upper()
     )
 
-    # ── Invariante de cobertura ──────────────────────────────────────────
-    # TODO SKU con stock o compromiso tiene que estar en el catálogo (salvo
-    # líneas de proceso, que no son vendibles). Se publica la lista y los
-    # faltantes para que el validador y el consumidor puedan auditarlo sin
-    # volver a leer el reporte S1.
+
+def _resolver_ids(p, kardex_ids, kardex_nombre) -> tuple[dict, bool]:
+    """IDs jerarquicos del SKU: calce directo con KARDEX o resolucion por
+    nombre contra el maestro (verificada por linea). Devuelve (ids,
+    resuelto_por_nombre); nunca adivina: sin candidato unico -> vacio."""
+    kid = (kardex_ids or {}).get(p["sku"], {})
+    if kid.get("grupo_id") and kid.get("tipo_id") and kid.get("familia_id"):
+        return kid, False
+    kid = resolver_jerarquia_por_nombre(p, kardex_nombre or {})
+    return kid, bool(kid)
+
+
+def _acumular_stats(
+    estadisticas, p, flags, kid, um, un_bx_definido, caja, est, ids_por_nombre
+) -> None:
+    """Suma cada SKU a los contadores del metadata: ficha (EAN, caja,
+    descontinuados), flags de negocio, UM, IDs de jerarquia y agregados
+    por categoria/linea/estado."""
+    if caja:
+        estadisticas["con_caja"] += 1
+    if un_bx_definido:
+        estadisticas["con_unbx"] += 1
+    else:
+        estadisticas["sin_unbx"] += 1
+    if not p["ean13"]:
+        estadisticas["sin_ean13"] += 1
+    if p["ean14"]:
+        estadisticas["con_ean14"] += 1
+    if p.get("descontinuado"):
+        estadisticas["descontinuados"] += 1
+    if not p.get("linea_codigo"):
+        estadisticas["sin_linea_codigo"] += 1
+    if p.get("linea_codigo") == "OTROS":
+        # S1 no trajo taxonomia para este SKU (ficha minima con fallback).
+        # Si este numero es alto, el reporte S1 o su parseo tienen un
+        # problema: revisar el universo antes de publicar.
+        estadisticas["con_linea_otros"] += 1
+
+    estadisticas["por_categoria"][p["categoria"]] = (
+        estadisticas["por_categoria"].get(p["categoria"], 0) + 1
+    )
+    estadisticas["por_linea"][p["linea"]] = (
+        estadisticas["por_linea"].get(p["linea"], 0) + 1
+    )
+    if est:
+        estadisticas["por_estado_linea"][est] = (
+            estadisticas["por_estado_linea"].get(est, 0) + 1
+        )
+
+    if flags["en_guia"]:
+        estadisticas["en_guia"] += 1
+    if flags["compromiso"]:
+        estadisticas["con_compromiso"] += 1
+    if flags["por_activar"]:
+        estadisticas["por_activar"] += 1
+    if flags["cotizable"]:
+        estadisticas["cotizables"] += 1
+    if um:
+        estadisticas["con_um"] += 1
+    if kid.get("grupo_id") and kid.get("tipo_id") and kid.get("familia_id"):
+        estadisticas["con_ids_jerarquia"] += 1
+    if ids_por_nombre:
+        estadisticas["ids_por_nombre"] += 1
+    if flags["origen"] == "s1":
+        estadisticas["solo_s1"] += 1
+    estadisticas["por_categoria_venta"][flags["cat_venta"]] = (
+        estadisticas["por_categoria_venta"].get(flags["cat_venta"], 0) + 1
+    )
+
+
+def _construir_producto(p, flags, kid, um, un_bx, caja, est, orden_map) -> dict:
+    """Item del catalogo: identidad (ERP) + jerarquia (KARDEX) + flags de
+    negocio + snapshot del S1 que justifico la inclusion."""
+    return {
+        "sku": p["sku"],
+        "nombre": p["nombre"],
+        "nombre_corto": generar_nombre_corto(p["nombre"]),
+        "ean13": p["ean13"],
+        "ean14": p["ean14"],
+        "categoria": p["categoria"],
+        "categoria_venta": flags["cat_venta"],
+        # linea = CODIGO canonico | linea_nombre = nombre legible
+        "linea": p["linea"],
+        "linea_nombre": p.get("linea_nombre", ""),
+        "grupo": p["grupo"],
+        "grupo_id": kid.get("grupo_id", ""),
+        "tipo": p["tipo"],
+        "tipo_id": kid.get("tipo_id", ""),
+        "familia": p["familia"],
+        "familia_id": kid.get("familia_id", ""),
+        "um": um,
+        "un_bx": un_bx,
+        "orden": orden_map.get(p["sku"], 0),
+        "estado_linea": est,
+        "peso_kg": p["peso_kg"],
+        # Caja y volumen (SKU_BX). `un_bx` es unidades por caja; esto es el
+        # tamano fisico. Va como objeto para no confundirlo con el `caja`
+        # (unidades) que usa el API.
+        "dimensiones_caja": caja,
+        "precio": flags["precio"],
+        "descontinuado": bool(p.get("descontinuado", False)),
+        "linea_codigo": p.get("linea_codigo", ""),
+        # Flags de negocio: explican POR QUE el SKU esta publicado.
+        "en_guia": flags["en_guia"],
+        "compromiso": flags["compromiso"],
+        "cotizable": flags["cotizable"],
+        "vigente": flags["vigente"],
+        "por_activar": flags["por_activar"],
+        "derivado_de": flags["derivado_de"],
+        "origen": flags["origen"],
+        # Snapshot del reporte S1 que justifico la inclusion (el stock vivo
+        # lo sirve /api/v1/stock, esto es solo trazabilidad).
+        "stock_snapshot": flags["stock"],
+        "predespacho_snapshot": flags["predespacho"],
+        "keywords": generar_keywords(
+            p["nombre"],
+            # El nombre de la linea (no el codigo) es lo que la gente busca
+            # ("PELOTAS", "ARCHIVO"). El codigo va aparte, como extra, para
+            # que buscar "01" tambien encuentre el SKU.
+            p.get("linea_nombre", "") or p.get("linea", ""),
+            p["categoria"],
+            extra=p.get("linea", ""),
+        ),
+    }
+
+
+def _calcular_cobertura(universo, productos_final, erp_todos):
+    """Invariante de cobertura: todo SKU con stock o compromiso tiene que
+    estar publicado (salvo lineas de proceso, no vendibles). Devuelve
+    (universo_skus, faltantes) y avisa en pantalla si algo quedo afuera."""
     incluidos = {p["sku"] for p in productos_final}
     universo_skus = []
     faltantes = []
+    erp = erp_todos or {}
     for sku in sorted(universo):
         datos = universo.get(sku, {})
         if (datos.get("stock") or 0) <= 0 and (datos.get("predespacho") or 0) <= 0:
             continue
         # Misma regla que productos_desde_universo: si el ERP lo marca como
-        # línea de proceso, no cuenta para la cobertura.
-        erp = erp_todos or {}
-        if sku in erp:
-            if erp[sku].get("linea", "") in LINEAS_EXCLUIR:
-                continue
-        linea = _extraer_codigo_linea(datos.get("linea", ""))
-        if linea in LINEAS_PROCESO_CODIGOS:
+        # linea de proceso, no cuenta para la cobertura.
+        if sku in erp and erp[sku].get("linea", "") in LINEAS_EXCLUIR:
+            continue
+        if _extraer_codigo_linea(datos.get("linea", "")) in LINEAS_PROCESO_CODIGOS:
             continue
         universo_skus.append(sku)
         if sku not in incluidos:
@@ -1150,7 +1124,24 @@ def generar_output(
             f"FUERA del catalogo: {', '.join(faltantes[:10])}"
             f"{'...' if len(faltantes) > 10 else ''}"
         )
+    return universo_skus, faltantes
 
+
+def _construir_metadata(
+    productos_final,
+    estadisticas,
+    fuentes,
+    taxonomia_extra,
+    almacenes_nombres,
+    exclusiones,
+    universo_stock,
+    universo_skus,
+    faltantes,
+) -> dict:
+    """Metadata completo: fuentes trazables, taxonomia publicada, semaforo
+    de venta, almacenes (config + nombres KARDEX), regla de inclusion e
+    invariantes de cobertura. Todo lo que un consumidor necesita saber del
+    catalogo sin leer el codigo del generador."""
     # Taxonomia publicada: los consumidores la leen de aca en vez de
     # mantener su propia copia (que terminaba contradiciendose).
     # `taxonomia_extra` son las sub-marcas Crayola nuevas detectadas: se
@@ -1166,7 +1157,7 @@ def generar_output(
     for aviso in config_almacenes.get("avisos", []):
         print(f"  AVISO almacenes: {aviso}")
 
-    metadata = {
+    return {
         "version": VERSION,
         "generated_at": datetime.now().isoformat(),
         "source_erp": "PRODUCTOS.xls",
@@ -1207,16 +1198,19 @@ def generar_output(
         # explicar por que el catalogo tiene N SKUs.
         "exclusiones": dict(exclusiones or {}),
         "universo_stock": dict(universo_stock or {"incluido": False}),
-        # Invariante publicado: la lista del universo que justificó el
-        # catálogo y lo que quedó afuera (debe ser []). Con esto el
+        # Invariante publicado: la lista del universo que justifico el
+        # catalogo y lo que quedo afuera (debe ser []). Con esto el
         # validador detecta una cobertura rota sin releer el reporte S1.
         "universo_skus": universo_skus,
         "cobertura_faltante": faltantes,
     }
 
-    # Caida del universo vs la corrida anterior (mismo archivo de salida).
-    # Un universo parcial con HTTP 200 es indistinguible de uno real si no
-    # se compara: la cobertura se calcula contra ESTE universo y daria OK.
+
+def _aplicar_caida_universo(metadata, ruta_salida) -> None:
+    """Variacion del universo vs la corrida anterior (mismo archivo de
+    salida). Un universo PARCIAL con HTTP 200 es indistinguible de uno real
+    si no se compara: la cobertura se calcula contra ESTE universo y daria
+    OK. Publica previo_skus/variacion y alerta si cae >=15%."""
     try:
         previo_meta = {}
         if Path(ruta_salida).exists():
@@ -1248,14 +1242,14 @@ def generar_output(
                     f"  Universo vs anterior: {n_antes} -> {n_ahora} ({variacion:+.0%})"
                 )
 
-    output = {"metadata": metadata, "productos": productos_final}
 
+def _guardar_catalogo(output, ruta_salida) -> None:
+    """Backup del JSON anterior, escritura del nuevo y aviso si el catalogo
+    se achico: una caida suele significar fuente faltante (p.ej. universo
+    de stock incompleto) y no que el ERP tenga menos productos."""
     p = Path(ruta_salida)
     previo = None
     if p.exists():
-        # Guarda el total anterior para avisar si el catalogo se achica: una
-        # caida suele significar que faltó una fuente (p.ej. el universo de
-        # stock) y no que el ERP tenga menos productos.
         try:
             previo = json.loads(p.read_text(encoding="utf-8")).get("metadata", {})
         except (OSError, json.JSONDecodeError):
@@ -1272,7 +1266,7 @@ def generar_output(
 
     if previo and previo.get("total_productos"):
         antes = int(previo["total_productos"])
-        despues = len(productos_final)
+        despues = len(output["productos"])
         if despues < antes:
             print(
                 f"  ALERTA: el catalogo se achico de {antes} a {despues} SKUs "
@@ -1282,6 +1276,90 @@ def generar_output(
             print(
                 f"  OK: el catalogo crecio de {antes} a {despues} SKUs (+{despues - antes})."
             )
+
+
+def generar_output(
+    productos,
+    unbx_map,
+    estado_map,
+    orden_map,
+    ruta_salida,
+    exclusiones=None,
+    universo_stock=None,
+    taxonomia_extra=None,
+    universo=None,
+    caja_map=None,
+    fuentes=None,
+    erp_todos=None,
+    um_kardex=None,
+    kardex_ids=None,
+    kardex_nombre=None,
+    almacenes_nombres=None,
+):
+    """Genera el JSON de catálogo completo.
+
+    `universo` es el detalle del reporte S1 {sku: {stock, predespacho, ...}}:
+    con él se publican los flags de negocio (compromiso, cotizable,
+    por_activar) y el snapshot de stock que justificó cada inclusión.
+    `caja_map` son las dimensiones/volumen por SKU (SKU_BX) y `fuentes` la
+    huella (sha256, filas, fecha) de cada archivo que se leyó.
+    """
+    universo = universo or {}
+    caja_map = caja_map or {}
+    estadisticas = _estadisticas_base()
+
+    productos_final = []
+    for p in productos:
+        flags = _flags_producto(p, universo, orden_map)
+        kid, por_nombre = _resolver_ids(p, kardex_ids, kardex_nombre)
+        um_final = _resolver_um(p, um_kardex, universo)
+        un_bx = unbx_map.get(p["sku"], 1)
+        caja = caja_map.get(p["sku"])
+        est = estado_map.get(p["sku"], "")
+        _acumular_stats(
+            estadisticas,
+            p,
+            flags,
+            kid,
+            um_final,
+            un_bx_definido=p["sku"] in unbx_map,
+            caja=caja,
+            est=est,
+            ids_por_nombre=por_nombre,
+        )
+        productos_final.append(
+            _construir_producto(p, flags, kid, um_final, un_bx, caja, est, orden_map)
+        )
+
+    productos_final.sort(
+        # Agrupar por linea para legibilidad; dentro de cada bloque respetar
+        # el orden de guia comercial (campo `orden` del SKU_BX), y al final los
+        # SKUs sin guia ordenados alfabeticamente por SKU.
+        key=lambda x: (
+            x.get("linea", ""),
+            x.get("orden", 0) == 0,
+            x.get("orden", 0) or 0,
+            x["sku"],
+        )
+    )
+
+    universo_skus, faltantes = _calcular_cobertura(universo, productos_final, erp_todos)
+
+    metadata = _construir_metadata(
+        productos_final,
+        estadisticas,
+        fuentes,
+        taxonomia_extra,
+        almacenes_nombres,
+        exclusiones,
+        universo_stock,
+        universo_skus,
+        faltantes,
+    )
+    _aplicar_caida_universo(metadata, ruta_salida)
+
+    output = {"metadata": metadata, "productos": productos_final}
+    _guardar_catalogo(output, ruta_salida)
     return output
 
 
