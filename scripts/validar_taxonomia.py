@@ -374,6 +374,10 @@ def validar(catalogo: dict, raiz: Path = RAIZ) -> tuple[list[str], list[str]]:
 
 
 def main() -> int:
+    """Gate post-generacion (lo llama el BAT antes de subir): coherencia
+    linea->categoria, cobertura y caida del universo vs la corrida anterior,
+    y cruce master-data vs g360-stock-api. ERRORES => exit 1 y NO SUBIR;
+    los avisos no bloquean la subida."""
     ap = argparse.ArgumentParser(description="Validacion de taxonomia del catalogo")
     ap.add_argument(
         "--catalogo",

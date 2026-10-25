@@ -280,6 +280,13 @@ def _consultar(api_url: str, api_key: str, sku: str) -> dict | None:
 
 
 def ejecutar(api_url: str = "", api_key: str = "") -> int:
+    """Corre el ciclo completo de alta de un SKU nuevo en un temp dir.
+
+    Escribe fuentes simuladas en un directorio aislado, valida, genera y
+    verifica (opcionalmente contra el API, si se pasan url/clave) sin tocar
+    data/ ni el catalogo publicado: es la forma de probar el flujo
+    end-to-end antes de aplicarlo en real.
+    """
     tmp = Path(tempfile.mkdtemp(prefix="g360_sim_"))
     print("=" * 70)
     print("SIMULACION DE ACTUALIZACION DE CODIGO (SKU nuevo)")

@@ -363,6 +363,9 @@ def guardar(datos, ruta):
 
 
 def main() -> int:
+    """CLI del lector de plantilla_precios: lee --input (hoja unica
+    SKU_PRECIOS, acepta el layout legacy), imprime filas/precios leidos y
+    errores de formato, y opcionalmente escribe --output en JSON."""
     ap = argparse.ArgumentParser(
         description=f"G360 Plantilla Precios Reader v{VERSION}"
     )

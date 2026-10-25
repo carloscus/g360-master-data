@@ -1470,6 +1470,14 @@ def _agregar_universo(datos, origen=""):
 
 
 def main():
+    """CLI: genera output/catalogo_productos.json desde las fuentes locales.
+
+    Flujo: args -> ERP + SKU_BX (+ plantilla) -> universo de stock (API o
+    G360_S1_CACHE) -> KARDEX (UM, IDs de jerarquia, almacenes) ->
+    generar_output -> resumen con estadisticas. Los gates de taxonomia y
+    tests los corre el BAT despues de esta salida; --validate-only delega
+    en validar_encabezados sin generar nada.
+    """
     ap = argparse.ArgumentParser(description=f"G360 Catalog Generator v{VERSION}")
     ap.add_argument("--erp", "-e", default="data/PRODUCTOS.xls", help="Archivo ERP")
     ap.add_argument("--unbx", "-u", default="data/SKU_BX.xlsx", help="Archivo SKU_BX")

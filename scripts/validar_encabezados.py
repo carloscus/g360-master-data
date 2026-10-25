@@ -159,6 +159,12 @@ def _aviso_columnas(bloque: Bloque, columnas) -> None:
 
 
 def validar_erp(ruta: Path) -> Bloque:
+    """Contrato del maestro ERP (PRODUCTOS.xls): bloqueante.
+
+    Chequea existencia, encabezados por nombre (CONTRATO_ERP), filas
+    legibles y frescura del export (>60 dias avisa: un ERP rancio genera un
+    catalogo "valido" pero viejo). Sin ERP legible no se genera nada.
+    """
     bloque = Bloque("ERP (PRODUCTOS.xls)", str(ruta))
     if not ruta.exists():
         bloque.omitido = f"no existe {ruta}"
@@ -293,6 +299,12 @@ def validar_erp(ruta: Path) -> Bloque:
 
 
 def validar_sku_bx(ruta: Path) -> Bloque:
+    """Contrato de la guia comercial (SKU_BX.xlsx): bloqueante.
+
+    Columnas ORDEN/SKU/UN_BX/ESTADO_LINEA (+ columnas de caja opcionales),
+    SKUs legibles y deteccion de ceros perdidos en celdas numericas. Sin
+    guia no hay orden comercial ni un_bx que publicar.
+    """
     import openpyxl
 
     bloque = Bloque("SKU_BX.xlsx", str(ruta))
@@ -510,6 +522,12 @@ def validar_sku_precios(ruta: Path) -> Bloque:
 
 
 def validar_plantilla(ruta: Path) -> Bloque:
+    """plantilla_precios.xlsx: informativo, no bloquea.
+
+    Hoja unica SKU_PRECIOS con descuentos y precios fijos. Los precios del
+    catalogo salen del ERP: esta plantilla es la fase futura y una plantilla
+    imperfecta no debe frenar una generacion que aun no la consume.
+    """
     import openpyxl
 
     bloque = Bloque("plantilla_precios.xlsx", str(ruta), bloqueante=False)
@@ -620,6 +638,12 @@ def _fraccion_valida(valor: str) -> bool:
 
 
 def validar_s1(ruta: Path) -> Bloque:
+    """Reporte S1 en .xls (--s1-xls): bloqueante cuando existe.
+
+    Localiza las anclas ARTICULO/ALMACEN/UM/STOCK/PREDESPACHO (fallback
+    posicional con aviso). Si no hay .xls se omite sin bloquear: el universo
+    de stock se lee del API en su lugar.
+    """
     import xlrd
 
     bloque = Bloque("Reporte S1 (.xls)", str(ruta))
@@ -696,6 +720,13 @@ def validar_s1(ruta: Path) -> Bloque:
 
 
 def validar_kardex(ruta: Path) -> Bloque:
+    """KARDEX_BASE.xlsx: informativo, no bloquea.
+
+    Contrato de encabezados + aviso por colNomArticulo duplicado (la 2da
+    ocurrencia es la descripcion larga) y por columnas extra del export.
+    Sin KARDEX el catalogo se genera igual: solo pierde UM, jerarquia y
+    almacenes.
+    """
     import openpyxl
 
     bloque = Bloque("KARDEX_BASE.xlsx", str(ruta), bloqueante=False)
@@ -751,6 +782,10 @@ def validar_kardex(ruta: Path) -> Bloque:
 
 
 def _imprimir(bloques: list[Bloque]) -> None:
+    """Reporte humano: icono por bloque ([OK]/[AVISO]/[ERROR]/[SKIP]) con
+    info/avisos sangrados y el veredicto final. Los avisos informativos
+    documentan divergencias; solo un ERROR en bloque bloqueante cierra el
+    proceso con exit != 0."""
     iconos = {"ok": "OK", "aviso": "AVISO", "error": "ERROR", "skip": "SKIP"}
     print("=" * 70)
     print("VALIDACION DE ENCABEZADOS")
@@ -1114,6 +1149,13 @@ def validar_kardex_vs_erp(data: Path) -> Bloque:
 
 
 def main() -> int:
+    """Paso 0 del workflow (lo llama actualizar_catalogo.bat).
+
+    Valida cada fuente contra su contrato, cruza la guia contra los
+    maestros (con motivo por SKU) y audita KARDEX vs ERP por taxonomia.
+    Exit 1 solo si un bloque BLOQUEANTE fallo: los avisos son informativos
+    por diseno y documentan divergencias entre originales sin frenar nada.
+    """
     ap = argparse.ArgumentParser(
         description="Valida los encabezados de las fuentes del catalogo"
     )

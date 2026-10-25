@@ -246,6 +246,9 @@ def leer_sku_precios(ruta: str, skus_validos: set[str] | None = None):
 
 
 def main() -> int:
+    """CLI del lector unificado SKU_PRECIOS: lee --input, muestra lo que
+    aportaria al catalogo (orden, un_bx, estado, caja, precios) y
+    opcionalmente escribe --output en JSON."""
     ap = argparse.ArgumentParser(description=f"Lector unificado SKU_PRECIOS v{VERSION}")
     ap.add_argument("--input", "-i", required=True, help="SKU_PRECIOS.xlsx")
     ap.add_argument("--output", "-o", default="sku_precios.json")

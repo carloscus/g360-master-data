@@ -181,6 +181,10 @@ def _imprimir(reporte: dict, limite: int) -> None:
 
 
 def main() -> int:
+    """CLI de consulta autonoma: --linea/--grupo/--tipo/--familia por IDs
+    exactos del KARDEX, cruce contra el JSON publicado (exacto primero,
+    prefijo verificado despues) y salida en tabla o --json con
+    precio/EAN/un_bx/stock o el motivo FUERA de cada SKU."""
     ap = argparse.ArgumentParser(
         description="Consulta autonoma por jerarquia KARDEX vs catalogo JSON"
     )

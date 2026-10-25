@@ -368,6 +368,9 @@ def fusionar_plantilla_precios(ruta: Path) -> bool:
 
 
 def main() -> int:
+    """CLI de moldes: genera/refresca plantillas/ (versionados);
+    --instalar los copia a data/ SOLO si no existen (nunca pisa datos);
+    --migrar agrega las columnas de caja a un data/ ya existente."""
     ap = argparse.ArgumentParser(description="Crea/actualiza las plantillas de datos")
     ap.add_argument(
         "--instalar",

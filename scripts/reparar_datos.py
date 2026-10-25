@@ -167,6 +167,14 @@ def _agregar_columnas(ws, columnas_nuevas) -> int:
 
 
 def reparar_sku_bx(indice_erp) -> None:
+    """Repara data/SKU_BX.xlsx en sitio usando el indice del ERP.
+
+    Excel guarda los SKUs numericos como numero y los ceros a la izquierda
+    se pierden para siempre: el reparador convierte la columna a TEXTO,
+    restaura la forma exacta del codigo contra el maestro ERP (indice_erp)
+    y agrega las columnas de caja que falten. Siempre respalda antes de
+    tocar nada.
+    """
     ruta = DATA / "SKU_BX.xlsx"
     if not ruta.exists():
         print("  SKIP: data/SKU_BX.xlsx no existe")
