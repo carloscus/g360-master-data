@@ -593,6 +593,70 @@ def _avisar_columnas(columnas, etiqueta):
     print(f"  {etiqueta}: columnas OK ({columnas.resumen()})")
 
 
+def _fila_erp_cruda(columnas, fila) -> dict | None:
+    """Campos crudos de una fila ERP, leidos por NOMBRE de columna. None si
+    no hay SKU o nombre: las filas vacias/corruptas no generan producto."""
+    sku = sku_texto(columnas.valor(fila, "sku"))
+    nombre = limpiar_texto(columnas.valor(fila, "nombre"))
+    if not sku or not nombre:
+        return None
+    return {
+        "sku": sku,
+        "nombre": nombre,
+        "ean13": _clean_ean(columnas.valor(fila, "ean13")),
+        "ean14": _clean_ean(columnas.valor(fila, "ean14")),
+        "peso_kg": _safe_float(columnas.valor(fila, "peso_kg")),
+        "linea": limpiar_texto(columnas.valor(fila, "linea")),
+        "grupo": limpiar_texto(columnas.valor(fila, "grupo")),
+        "tipo": limpiar_texto(columnas.valor(fila, "tipo")),
+        "familia": limpiar_texto(columnas.valor(fila, "familia")),
+        "inactivo": _es_checked(columnas.valor(fila, "inactivo")),
+        "descontinuado": _es_checked(columnas.valor(fila, "descontinuado")),
+        "precio": _safe_float(columnas.valor(fila, "precio")),
+    }
+
+
+def _resolver_linea_erp(sku, linea, grupo, force_crayola, lineas_desconocidas):
+    """Codigo canonico de linea (2 chars). C* (Crayola) usan su prefijo como
+    linea propia; el resto resuelve LINEA+GRUPO. Sin codigo se anota la
+    linea desconocida: se avisa una vez al terminar de leer."""
+    codigo = codigo_linea_crayola(sku) if force_crayola else ""
+    if not codigo:
+        codigo = resolver_codigo_linea_grupo(linea.upper(), grupo)
+        if not codigo:
+            lineas_desconocidas.add(linea.upper())
+    return codigo
+
+
+def _producto_erp(raw, codigo) -> dict:
+    """Producto publicado desde la fila cruda del ERP: identidad + taxonomia
+    resuelta. `linea` es el CODIGO canonico (2 chars); el nombre legible va
+    en linea_nombre (antes iba el nombre en `linea` y cada consumidor lo
+    interpretaba distinto)."""
+    linea_upper = raw["linea"].upper()
+    categoria = (
+        categoria_de_producto(raw["sku"], codigo) if codigo else CATEGORIA_DEFAULT
+    )
+    return {
+        "sku": raw["sku"],
+        "nombre": raw["nombre"],
+        "ean13": raw["ean13"],
+        "ean14": raw["ean14"],
+        "peso_kg": raw["peso_kg"],
+        "linea": codigo or linea_upper,
+        "linea_nombre": linea_upper,
+        "grupo": raw["grupo"],
+        "tipo": raw["tipo"],
+        "familia": raw["familia"],
+        "categoria": categoria,
+        "precio": round(raw["precio"], 2),
+        "descontinuado": bool(raw["descontinuado"]),
+        "linea_codigo": codigo,
+        "um": "",
+        "origen": "erp",
+    }
+
+
 def leer_erp(ruta, bx_skus=None, stock_skus=None, compromiso_skus=None):
     """Lee PRODUCTOS.xls y retorna (productos, errores, erp_skus, exclusiones, erp_todos).
 
@@ -622,24 +686,10 @@ def leer_erp(ruta, bx_skus=None, stock_skus=None, compromiso_skus=None):
         columnas, ws = resolver_xls(wb, CONTRATO_ERP)
         _avisar_columnas(columnas, "ERP")
         for r in range(CONTRATO_ERP.fila_header, ws.nrows):
-            fila = ws.row_values(r)
-            sku = sku_texto(columnas.valor(fila, "sku"))
-            if not sku:
+            raw = _fila_erp_cruda(columnas, ws.row_values(r))
+            if raw is None:
                 continue
-            nombre = limpiar_texto(columnas.valor(fila, "nombre"))
-            if not nombre:
-                continue
-            ean13 = _clean_ean(columnas.valor(fila, "ean13"))
-            ean14 = _clean_ean(columnas.valor(fila, "ean14"))
-            peso_kg = _safe_float(columnas.valor(fila, "peso_kg"))
-            linea = limpiar_texto(columnas.valor(fila, "linea"))
-            grupo = limpiar_texto(columnas.valor(fila, "grupo"))
-            tipo = limpiar_texto(columnas.valor(fila, "tipo"))
-            familia = limpiar_texto(columnas.valor(fila, "familia"))
-            flg_inactivo = _es_checked(columnas.valor(fila, "inactivo"))
-            flg_discont = _es_checked(columnas.valor(fila, "descontinuado"))
-            precio = _safe_float(columnas.valor(fila, "precio"))
-
+            sku = raw["sku"]
             if sku in skus_vistos:
                 exclusiones["duplicado_erp"] = exclusiones.get("duplicado_erp", 0) + 1
                 continue
@@ -647,23 +697,23 @@ def leer_erp(ruta, bx_skus=None, stock_skus=None, compromiso_skus=None):
             erp_skus.add(sku)
             erp_todos[sku] = {
                 "sku": sku,
-                "nombre": nombre,
-                "linea": linea.upper(),
-                "grupo": grupo,
-                "precio": precio,
-                "inactivo": flg_inactivo,
-                "descontinuado": flg_discont,
+                "nombre": raw["nombre"],
+                "linea": raw["linea"].upper(),
+                "grupo": raw["grupo"],
+                "precio": raw["precio"],
+                "inactivo": raw["inactivo"],
+                "descontinuado": raw["descontinuado"],
             }
 
-            # C* (Crayola) entra sin importar guía/stock: es representada y
+            # C* (Crayola) entra sin importar guia/stock: es representada y
             # hay que llevarla. El precio ya no excluye (v3.6.0): sin precio
             # queda `por_activar` / no cotizable, pero presente.
             force_crayola = sku.upper().startswith("C")
             motivo = motivo_exclusion(
-                flg_inactivo,
-                flg_discont,
-                precio,
-                linea.upper(),
+                raw["inactivo"],
+                raw["descontinuado"],
+                raw["precio"],
+                raw["linea"].upper(),
                 sku in bx_skus,
                 sku in stock_skus,
                 force_incluir=force_crayola,
@@ -672,44 +722,11 @@ def leer_erp(ruta, bx_skus=None, stock_skus=None, compromiso_skus=None):
             if motivo:
                 exclusiones[motivo] = exclusiones.get(motivo, 0) + 1
                 continue
-            descontinuado = bool(flg_discont)
 
-            linea_upper = linea.upper()
-            # C* usan su prefijo como linea propia (CA, CB, CC, CD, CE, CF, CG)
-            # para que cada sub-marca Crayola sea identificable.
-            codigo = codigo_linea_crayola(sku) if force_crayola else ""
-            if not codigo:
-                codigo = resolver_codigo_linea_grupo(linea_upper, grupo)
-                if not codigo:
-                    lineas_desconocidas.add(linea_upper)
-            categoria = (
-                categoria_de_producto(sku, codigo) if codigo else CATEGORIA_DEFAULT
+            codigo = _resolver_linea_erp(
+                sku, raw["linea"], raw["grupo"], force_crayola, lineas_desconocidas
             )
-
-            productos.append(
-                {
-                    "sku": sku,
-                    "nombre": nombre,
-                    "ean13": ean13,
-                    "ean14": ean14,
-                    "peso_kg": peso_kg,
-                    # `linea` es el CODIGO canonico (2 chars); el nombre legible
-                    # va aparte. Antes iba el nombre y el codigo en otro campo:
-                    # esa ambiguedad hacia que cada consumidor lo interpretara
-                    # distinto y la linea apareciera como nombre o como codigo.
-                    "linea": codigo or linea_upper,
-                    "linea_nombre": linea_upper,
-                    "grupo": grupo,
-                    "tipo": tipo,
-                    "familia": familia,
-                    "categoria": categoria,
-                    "precio": round(precio, 2),
-                    "descontinuado": descontinuado,
-                    "linea_codigo": codigo,
-                    "um": "",
-                    "origen": "erp",
-                }
-            )
+            productos.append(_producto_erp(raw, codigo))
         wb.release_resources()
         if lineas_desconocidas:
             print(
@@ -1363,6 +1380,101 @@ def generar_output(
     return output
 
 
+def _universo_desde_cache(ruta):
+    """Universo desde un JSON del reporte S1 (formato del cache del API:
+    {fecha_descarga, datos: {almacen: {sku: item}}})."""
+    with open(ruta, encoding="utf-8") as f:
+        data = json.load(f)
+    return _agregar_universo(data.get("datos", {}), origen=f"cache {ruta}")
+
+
+def _universo_desde_payload(payload) -> dict:
+    """Items del endpoint (compacto con totales o /stock con desglose por
+    almacen) -> universo agregado por SKU. Imprime el diagnostico de
+    frescura del API (fecha_descarga, cache_expirado, enriquecido)."""
+    items = payload.get("items", [])
+    # Diagnostico de frescura: si el API sirve cache viejo o un
+    # parseo sin taxonomia, se ve ACA (no despues, en el catalogo).
+    meta_api = payload.get("metadata", {}) or {}
+    if meta_api:
+        print(
+            f"  Universo del API: descarga {meta_api.get('fecha_descarga', '?')} "
+            f"| cache_expirado={meta_api.get('cache_expirado', '?')} "
+            f"| enriquecido={meta_api.get('enriquecido', '?')}"
+        )
+    universo: dict[str, dict] = {}
+    for i in items:
+        sku = str(i.get("sku", "")).strip()
+        if not sku:
+            continue
+        d = universo.setdefault(
+            sku,
+            {
+                "stock": 0,
+                "predespacho": 0,
+                "descripcion": "",
+                "um": "",
+                "linea": "",
+                "grupo": "",
+                "tipo": "",
+                "familia": "",
+            },
+        )
+        # El endpoint compacto trae los totales; /stock trae el
+        # desglose por almacen.
+        if "almacenes" in i:
+            d["stock"] += sum(int(a.get("stock") or 0) for a in i["almacenes"])
+            d["predespacho"] += sum(
+                int(a.get("predespacho") or 0) for a in i["almacenes"]
+            )
+        else:
+            d["stock"] += int(i.get("stock") or 0)
+            d["predespacho"] += int(i.get("predespacho") or 0)
+        for campo in ("descripcion", "um", "linea", "grupo", "tipo", "familia"):
+            if not d[campo] and i.get(campo):
+                d[campo] = str(i[campo]).strip()
+    return universo
+
+
+def _leer_universo_api(url, key, timeout, intentos) -> tuple:
+    """GET del universo con reintentos (Render free-tier: 504 por cold
+    start) y fallback al endpoint pesado /api/v1/stock si el compacto no
+    existe. Devuelve (universo, "") o (None, ultimo_error) si agoto los
+    intentos: None le dice al llamador que pruebe el cache hermano."""
+    import time
+
+    import requests
+
+    ultimo_error = ""
+    for intento in range(1, intentos + 1):
+        try:
+            r = requests.get(
+                f"{url.rstrip('/')}/api/v1/stock/skus",
+                params={"fuente": "todas"},
+                headers={"x-api-key": key, "Accept": "application/json"},
+                timeout=timeout,
+            )
+            if r.status_code == 404:
+                # API desplegado sin el endpoint compacto: usar el pesado.
+                r = requests.get(
+                    f"{url.rstrip('/')}/api/v1/stock",
+                    params={"fuente": "todas"},
+                    headers={"x-api-key": key, "Accept": "application/json"},
+                    timeout=timeout,
+                )
+            r.raise_for_status()
+            return _universo_desde_payload(r.json()), ""
+        except Exception as e:  # noqa: BLE001
+            ultimo_error = str(e)
+            if intento < intentos:
+                print(
+                    f"    intento {intento}/{intentos} fallido ({ultimo_error}); "
+                    f"reintentando en {intento * 5}s"
+                )
+                time.sleep(intento * 5)
+    return None, ultimo_error
+
+
 def leer_universo_stock(
     api_url=None, api_key=None, timeout=120, intentos=3, cache_local=None
 ):
@@ -1389,19 +1501,12 @@ def leer_universo_stock(
     Reintenta: /stock es pesado y en Render free-tier da 504 por cold start.
     Un fallo puntual NO debe dejar el catalogo incompleto en silencio.
     """
-    import time
-
-    def _desde_cache(ruta):
-        with open(ruta, encoding="utf-8") as f:
-            data = json.load(f)
-        return _agregar_universo(data.get("datos", {}), origen=f"cache {ruta}")
-
     if cache_local:
         ruta = Path(cache_local)
         if not ruta.exists():
             return {}, f"cache S1 no existe: {ruta}"
         try:
-            return _desde_cache(ruta), ""
+            return _universo_desde_cache(ruta), ""
         except (OSError, json.JSONDecodeError) as e:
             return {}, f"cache S1 ilegible: {e}"
 
@@ -1416,79 +1521,13 @@ def leer_universo_stock(
     if not key:
         return {}, "sin G360_STOCK_API_KEY ni API_KEY"
     try:
-        import requests
+        __import__("requests")  # lo usa _leer_universo_api; aqui solo se avisa
     except ImportError:
         return {}, "falta requests (pip install requests)"
 
-    ultimo_error = ""
-    for intento in range(1, intentos + 1):
-        try:
-            r = requests.get(
-                f"{url.rstrip('/')}/api/v1/stock/skus",
-                params={"fuente": "todas"},
-                headers={"x-api-key": key, "Accept": "application/json"},
-                timeout=timeout,
-            )
-            if r.status_code == 404:
-                # API desplegado sin el endpoint compacto: usar el pesado.
-                r = requests.get(
-                    f"{url.rstrip('/')}/api/v1/stock",
-                    params={"fuente": "todas"},
-                    headers={"x-api-key": key, "Accept": "application/json"},
-                    timeout=timeout,
-                )
-            r.raise_for_status()
-            payload = r.json()
-            items = payload.get("items", [])
-            # Diagnostico de frescura: si el API sirve cache viejo o un
-            # parseo sin taxonomia, se ve ACA (no despues, en el catalogo).
-            meta_api = payload.get("metadata", {}) or {}
-            if meta_api:
-                print(
-                    f"  Universo del API: descarga {meta_api.get('fecha_descarga', '?')} "
-                    f"| cache_expirado={meta_api.get('cache_expirado', '?')} "
-                    f"| enriquecido={meta_api.get('enriquecido', '?')}"
-                )
-            universo: dict[str, dict] = {}
-            for i in items:
-                sku = str(i.get("sku", "")).strip()
-                if not sku:
-                    continue
-                d = universo.setdefault(
-                    sku,
-                    {
-                        "stock": 0,
-                        "predespacho": 0,
-                        "descripcion": "",
-                        "um": "",
-                        "linea": "",
-                        "grupo": "",
-                        "tipo": "",
-                        "familia": "",
-                    },
-                )
-                # El endpoint compacto trae los totales; /stock trae el
-                # desglose por almacen.
-                if "almacenes" in i:
-                    d["stock"] += sum(int(a.get("stock") or 0) for a in i["almacenes"])
-                    d["predespacho"] += sum(
-                        int(a.get("predespacho") or 0) for a in i["almacenes"]
-                    )
-                else:
-                    d["stock"] += int(i.get("stock") or 0)
-                    d["predespacho"] += int(i.get("predespacho") or 0)
-                for campo in ("descripcion", "um", "linea", "grupo", "tipo", "familia"):
-                    if not d[campo] and i.get(campo):
-                        d[campo] = str(i[campo]).strip()
-            return universo, ""
-        except Exception as e:  # noqa: BLE001
-            ultimo_error = str(e)
-            if intento < intentos:
-                print(
-                    f"    intento {intento}/{intentos} fallido ({ultimo_error}); "
-                    f"reintentando en {intento * 5}s"
-                )
-                time.sleep(intento * 5)
+    universo, ultimo_error = _leer_universo_api(url, key, timeout, intentos)
+    if universo is not None:
+        return universo, ""
 
     # Ultimo recurso: el cache local del repo hermano (si existe).
     hermano = (
@@ -1499,7 +1538,7 @@ def leer_universo_stock(
     )
     if hermano.exists():
         try:
-            universo = _desde_cache(hermano)
+            universo = _universo_desde_cache(hermano)
             print(
                 f"  WARN: API de stock no respondio ({ultimo_error}). "
                 f"Se uso el cache local {hermano}."
