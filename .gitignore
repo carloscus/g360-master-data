@@ -21,3 +21,8 @@ output/test_estado_linea.json
 # KARDEX_BASE.xlsx, plantilla_precios.xlsx) y el cache local del catalogo.
 # No se versionan: el repo solo lleva el catalogo generado (output/).
 /data/
+
+# Decks: se versionan el spec, la marca, el build y el pptx final;
+# node_modules y el render de revision se regeneran.
+.slides/node_modules/
+.slides/catalogo.review/

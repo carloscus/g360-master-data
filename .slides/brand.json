@@ -1,0 +1,45 @@
+{
+  "fidelity": "brand",
+  "template": "template.pptx",
+  "fonts": {
+    "heading": "Outfit",
+    "body": "Inter"
+  },
+  "colours": {
+    "accent": "#0F172A",
+    "accent2": "#F8FAFC",
+    "accent3": "#FFFFFF",
+    "accent4": "#475569",
+    "accent5": "#64748B",
+    "accent6": "#DC2626",
+    "ink": "#000000",
+    "paper": "#FFFFFF"
+  },
+  "tokens": {
+    "grid": {
+      "margin_x": 609600,
+      "margin_top": 548640,
+      "margin_bottom": 548640,
+      "columns": 12,
+      "gutter": 203606,
+      "baseline": 91211
+    },
+    "type_scale": {
+      "display": 96.0,
+      "title": 60.0,
+      "h1": 40.0,
+      "body": 24.0,
+      "caption": 16.0
+    },
+    "colour_roles": {
+      "ink": "#000000",
+      "paper": "#FFFFFF",
+      "accent": "#0F172A",
+      "muted": "#F8FAFC"
+    },
+    "shape": {
+      "corner": "rounded",
+      "hairline_pt": 1.0
+    }
+  }
+}
