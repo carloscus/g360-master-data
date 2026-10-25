@@ -104,27 +104,17 @@ def _taxonomia_api_stock(ruta: Path) -> dict[str, str] | None:
     return mapa
 
 
-def validar(catalogo: dict, raiz: Path = RAIZ) -> tuple[list[str], list[str]]:
-    """Valida el catálogo.
-
-    Devuelve (errores, avisos):
-      - errores: incoherencias reales. Bloquean la subida al API.
-      - avisos:  mantenimiento pendiente (p.ej. una sub-marca Crayola nueva
-                 que hay que dejar fija en el codigo). No bloquean.
-    """
-    errores: list[str] = []
-    avisos: list[str] = []
-    ps = catalogo.get("productos", [])
-    meta = catalogo.get("metadata", {})
-
+def _check_categorias(ps, errores) -> None:
+    """Checks 1-4: coherencia de CATEGORIA por SKU y por linea (C* son
+    REPRESENTADAS, lineas VINIFAN puras, lineas Crayola y lineas mixtas)."""
     # 1. Todos los C* en catalogo son REPRESENTADAS
-    c_skus = [p for p in ps if str(p.get("sku", "")).upper().startswith("C")]
-    for p in c_skus:
-        if p.get("categoria") != "REPRESENTADAS":
-            errores.append(
-                f"ALERTA: {p['sku']} es C* pero categoria={p.get('categoria')} "
-                "(debe ser REPRESENTADAS)"
-            )
+    for p in ps:
+        if str(p.get("sku", "")).upper().startswith("C"):
+            if p.get("categoria") != "REPRESENTADAS":
+                errores.append(
+                    f"ALERTA: {p['sku']} es C* pero categoria={p.get('categoria')} "
+                    "(debe ser REPRESENTADAS)"
+                )
 
     # 2. Las lineas 72/76/77/79 no tienen REPRESENTADAS
     for p in ps:
@@ -154,7 +144,10 @@ def validar(catalogo: dict, raiz: Path = RAIZ) -> tuple[list[str], list[str]]:
                 f"ALERTA: Linea {lin} tiene categorias mixtas: {sorted(cats)}"
             )
 
-    # 5. Metadata coherente con los productos
+
+def _check_metadata_publicada(ps, meta, errores) -> None:
+    """Checks 5-6: la taxonomia publicada (metadata.categorias_por_linea)
+    tiene que ser coherente con cada producto y cubrir sus codigos."""
     cat_por_linea = meta.get("categorias_por_linea", {})
     for lin in LINEAS_CRAYOLA:
         if cat_por_linea.get(lin) != "REPRESENTADAS":
@@ -171,17 +164,19 @@ def validar(catalogo: dict, raiz: Path = RAIZ) -> tuple[list[str], list[str]]:
                 f"no coincide con metadata categorias_por_linea[{cod}]="
                 f"{cat_por_linea.get(cod)}"
             )
-
-    # 6. El codigo de linea de un C* debe existir en la taxonomia
-    for p in ps:
-        cod = str(p.get("linea_codigo", ""))
         if cod and cod not in cat_por_linea:
             errores.append(
                 f"ALERTA: {p['sku']} tiene linea_codigo={cod} que no esta en la "
                 "taxonomia publicada"
             )
 
-    # 7. Sin claves duplicadas en el diccionario de taxonomia del maestro
+
+def _check_fuentes_taxonomia(raiz, meta, errores, avisos) -> None:
+    """Checks 7-8b: la taxonomia del generador sin claves duplicadas, la
+    misma que declara g360-stock-api (el API y el catalogo no se
+    contradicen) y las sub-marcas Crayola publicadas al vuelo (aviso de
+    mantenimiento, no error)."""
+    cat_por_linea = meta.get("categorias_por_linea", {})
     for cod in _claves_duplicadas(
         raiz / "scripts" / "generar_catalogo_base.py", "CATEGORIA_POR_LINEA"
     ):
@@ -190,7 +185,6 @@ def validar(catalogo: dict, raiz: Path = RAIZ) -> tuple[list[str], list[str]]:
             "(gana la ultima en silencio)"
         )
 
-    # 8. La taxonomia del maestro debe ser la misma que la del API de stock
     api_ruta = raiz.parent / "g360-stock-api" / "app" / "core" / "constants.py"
     tax_api = _taxonomia_api_stock(api_ruta)
     if tax_api:
@@ -205,10 +199,8 @@ def validar(catalogo: dict, raiz: Path = RAIZ) -> tuple[list[str], list[str]]:
                     "contradicen)"
                 )
 
-    # 8b. Sub-marcas Crayola publicadas al vuelo: el generador las declara en
-    #     el metadata, pero si no estan fijas en CATEGORIA_POR_LINEA la
-    #     taxonomia depende de cada generacion (y el API las deja en OTROS
-    #     hasta el proximo deploy). Es mantenimiento pendiente, no un error.
+    # Sub-marcas Crayola publicadas al vuelo: si no estan fijas en
+    # CATEGORIA_POR_LINEA, la taxonomia depende de cada generacion.
     taxonomia_codigo = _taxonomia_de_fuente(
         raiz / "scripts" / "generar_catalogo_base.py", "CATEGORIA_POR_LINEA"
     )
@@ -226,9 +218,11 @@ def validar(catalogo: dict, raiz: Path = RAIZ) -> tuple[list[str], list[str]]:
                 "CATEGORIAS del API)"
             )
 
-    # 9. Coherencia de precio y flags de negocio (v3.6.0).    #    El precio NO decide la presencia (todo SKU con stock/compromiso
-    #    esta en el catalogo aunque no tenga precio), pero si la
-    #    cotizabilidad: lo que no tiene precio no se cotiza.
+
+def _check_flags_negocio(ps, errores) -> None:
+    """Check 9: coherencia de precio y flags de negocio (v3.6.0). El precio
+    NO decide la presencia, pero si la cotizabilidad: lo que no tiene
+    precio no cotiza, y los flags nunca pueden contradecirse."""
     for p in ps:
         sku = p.get("sku", "")
         try:
@@ -287,9 +281,13 @@ def validar(catalogo: dict, raiz: Path = RAIZ) -> tuple[list[str], list[str]]:
                 f"ALERTA: {sku} tiene predespacho_snapshot={predespacho} y "
                 f"compromiso={p.get('compromiso')} (incoherentes)"
             )
-    # 9b. Invariante de cobertura: TODO SKU con stock o compromiso tiene
-    #     que estar en el catalogo (salvo lineas de proceso). El generador
-    #     publica la lista y sus faltantes; los faltantes deben ser cero.
+
+
+def _check_cobertura(ps, meta, errores) -> None:
+    """Checks 9b-9c3: invariante de cobertura (todo SKU con stock o
+    compromiso publicado), cross-check independiente contra universo_skus,
+    caida vs corrida anterior y universo sin taxonomia S1. Todo bloquea:
+    un universo parcial es indistinguible de uno real sin estas barras."""
     faltantes = meta.get("cobertura_faltante", None)
     if faltantes is None and meta.get("universo_stock", {}).get("incluido"):
         errores.append(
@@ -303,9 +301,6 @@ def validar(catalogo: dict, raiz: Path = RAIZ) -> tuple[list[str], list[str]]:
             f"{'...' if len(faltantes) > 10 else ''}"
         )
 
-    # 9c. Cross-check independiente: la lista del universo publicada tiene
-    #     que estar entera en el catalogo (asi el invariante no depende de
-    #     que el generador reporte bien sus propios faltantes).
     universo_skus = meta.get("universo_skus", [])
     if universo_skus:
         en_catalogo = {str(p.get("sku", "")) for p in ps}
@@ -317,26 +312,17 @@ def validar(catalogo: dict, raiz: Path = RAIZ) -> tuple[list[str], list[str]]:
                 f"{'...' if len(fuera) > 10 else ''}"
             )
 
-    # 9c2. Caida del universo vs la corrida anterior (la declara el
-    #      generador en metadata.universo_stock.alerta_caida). Un reporte
-    #      parcial con HTTP 200 es indistinguible de uno real si no se
-    #      compara: la cobertura daria OK con un catalogo incompleto.
-    #      Bloquea la subida; si la caida es real (baja masiva), revisar
-    #      y publicar con: actualizar_catalogo.bat --upload
     uni = meta.get("universo_stock", {})
     if isinstance(uni, dict) and uni.get("alerta_caida"):
         errores.append(f"ALERTA: {uni['alerta_caida']}")
-
-    # 9c3. Universo sin taxonomia S1 (parseo viejo o cache anterior en el
-    #      API). El catalogo sale valido pero degradado: cientos de OTROS
-    #      y ningun D enlazado. Bloquea; remedio: verificar deploy/refresh
-    #      del API y regenerar (el BAT muestra fecha_descarga del universo).
     if isinstance(uni, dict) and uni.get("alerta_sin_taxonomia"):
         errores.append(f"ALERTA: {uni['alerta_sin_taxonomia']}")
 
-    # 9d. Coherencia de la caja: si el SKU publica dimensiones, el volumen
-    #     tiene que dar (es un calculo, no un dato libre: una celda pegada a
-    #     mano lo rompe). Sin dimensiones se publica null y no se juzga.
+
+def _check_caja(ps, errores) -> None:
+    """Check 9d: coherencia de la caja. Si el SKU publica dimensiones, el
+    volumen es un CALCULO (largo*ancho*alto), no un dato libre: una celda
+    pegada a mano lo rompe. Sin dimensiones (null) no se juzga."""
     for p in ps:
         caja = p.get("dimensiones_caja")
         if not caja:
@@ -370,6 +356,26 @@ def validar(catalogo: dict, raiz: Path = RAIZ) -> tuple[list[str], list[str]]:
                     f"coincide con m3_caja/un_bx ({m3_unidad})"
                 )
 
+
+def validar(catalogo: dict, raiz: Path = RAIZ) -> tuple[list[str], list[str]]:
+    """Valida el catálogo.
+
+    Devuelve (errores, avisos):
+      - errores: incoherencias reales. Bloquean la subida al API.
+      - avisos:  mantenimiento pendiente (p.ej. una sub-marca Crayola nueva
+                 que hay que dejar fija en el codigo). No bloquean.
+    """
+    errores: list[str] = []
+    avisos: list[str] = []
+    ps = catalogo.get("productos", [])
+    meta = catalogo.get("metadata", {})
+
+    _check_categorias(ps, errores)
+    _check_metadata_publicada(ps, meta, errores)
+    _check_fuentes_taxonomia(raiz, meta, errores, avisos)
+    _check_flags_negocio(ps, errores)
+    _check_cobertura(ps, meta, errores)
+    _check_caja(ps, errores)
     return errores, avisos
 
 
