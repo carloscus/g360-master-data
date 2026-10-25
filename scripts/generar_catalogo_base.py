@@ -66,8 +66,10 @@ from contratos import (
     cargar_guia_ignorados,
     emparejar_skus,
     huella_fuente,
+    indice_jerarquia_por_nombre,
     leer_kardex,
     limpiar_texto,
+    resolver_jerarquia_por_nombre,
     resolver_xls,
     resolver_xlsx,
     sku_texto,
@@ -919,6 +921,8 @@ def generar_output(
     erp_todos=None,
     um_kardex=None,
     kardex_ids=None,
+    kardex_nombre=None,
+    almacenes_nombres=None,
 ):
     """Genera el JSON de catálogo completo.
 
@@ -945,6 +949,8 @@ def generar_output(
         "cotizables": 0,
         "con_um": 0,
         "con_ids_jerarquia": 0,
+        # IDs resueltos por NOMBRE contra KARDEX (SKU sin calce directo)
+        "ids_por_nombre": 0,
         # Sin enlaces por parecido: siempre 0. Se mantiene la clave para no
         # romper consumidores del metadata.
         "derivados": 0,
@@ -1023,6 +1029,14 @@ def generar_output(
         if p.get("um", "") or (um_kardex or {}).get(p["sku"], ""):
             estadisticas["con_um"] += 1
         kid = (kardex_ids or {}).get(p["sku"], {})
+        if not (kid.get("grupo_id") and kid.get("tipo_id") and kid.get("familia_id")):
+            # SKU sin ficha KARDEX emparejada (S1-only o sin calce): resolver
+            # los IDs por NOMBRES contra el maestro, verificado por linea.
+            # Unico candidato -> IDs; 0 o varios -> queda vacio y sin avisar
+            # de adivinar (el stat con_ids_jerarquia refleja el total real).
+            kid = resolver_jerarquia_por_nombre(p, kardex_nombre or {})
+            if kid:
+                estadisticas["ids_por_nombre"] += 1
         if kid.get("grupo_id") and kid.get("tipo_id") and kid.get("familia_id"):
             estadisticas["con_ids_jerarquia"] += 1
         if origen == "s1":
@@ -1044,13 +1058,11 @@ def generar_output(
                 "linea": p["linea"],
                 "linea_nombre": p.get("linea_nombre", ""),
                 "grupo": p["grupo"],
-                "grupo_id": (kardex_ids or {}).get(p["sku"], {}).get("grupo_id", ""),
+                "grupo_id": kid.get("grupo_id", ""),
                 "tipo": p["tipo"],
-                "tipo_id": (kardex_ids or {}).get(p["sku"], {}).get("tipo_id", ""),
+                "tipo_id": kid.get("tipo_id", ""),
                 "familia": p["familia"],
-                "familia_id": (kardex_ids or {})
-                .get(p["sku"], {})
-                .get("familia_id", ""),
+                "familia_id": kid.get("familia_id", ""),
                 "um": p.get("um", "") or (um_kardex or {}).get(p["sku"], ""),
                 "un_bx": un_bx,
                 "orden": orden_map.get(p["sku"], 0),
@@ -1161,10 +1173,13 @@ def generar_output(
         "categorias_venta": list(CATEGORIAS_VENTA),
         "categoria_venta_revision": CATEGORIA_VENTA_REVISION,
         # Almacenes publicados (VARIABLE de config/almacenes.json): quien
-        # consuma stock/almacenes toma la lista de aca.
+        # consuma stock/almacenes toma la lista de aca. `nombres` agrega la
+        # denominacion visible de cada almacen (del KARDEX, colNomAlmacen);
+        # solo el id->tipo es obligatorio, el nombre puede faltar.
         "almacenes": {
             "principal": config_almacenes["almacen_principal"],
             "almacenes": config_almacenes["almacenes"],
+            "nombres": dict(almacenes_nombres or {}),
             "fuente": config_almacenes["fuente"],
         },
         # Regla de inclusion publicada: el consumidor puede explicar por que
@@ -1664,6 +1679,8 @@ def main():
     # calce exacto primero, sin prefijo despues (contratos.emparejar_skus).
     um_kardex: dict[str, str] = {}
     kardex_ids: dict[str, dict] | None = None
+    kardex_nombre = None
+    almacenes_nombres: dict = {}
     kardex_ruta = Path("data") / "KARDEX_BASE.xlsx"
     if kardex_ruta.exists():
         fichas_kardex, meta_kardex = leer_kardex(kardex_ruta)
@@ -1681,6 +1698,12 @@ def main():
             }
             for s, m in match_kardex.items()
         }
+        # Resolucion por NOMBRE para SKUs sin calce directo (S1-only, D):
+        # nombres exactos + verificacion de linea; nunca adivina.
+        kardex_nombre = indice_jerarquia_por_nombre(fichas_kardex)
+        almacenes_nombres = meta_kardex.get("almacenes", {})
+        if almacenes_nombres:
+            print(f"  KARDEX: {len(almacenes_nombres)} almacenes con nombre")
         print(
             f"  KARDEX: {meta_kardex.get('nota', '')} "
             f"({meta_kardex.get('articulos', 0)} articulos); "
@@ -1706,6 +1729,8 @@ def main():
         erp_todos=erp_todos,
         um_kardex=um_kardex,
         kardex_ids=kardex_ids,
+        kardex_nombre=kardex_nombre,
+        almacenes_nombres=almacenes_nombres,
     )
 
     print(f"\n{'=' * 50}")
@@ -1722,6 +1747,10 @@ def main():
     print(f"  Descontinuados:           {est['descontinuados']}")
     print(f"  Sin linea_codigo:          {est['sin_linea_codigo']}")
     print(f"  Con linea OTROS (S1 sin taxonomia): {est['con_linea_otros']}")
+    print(
+        f"  Con IDs jerarquia:         {est['con_ids_jerarquia']} "
+        f"(resueltos por nombre: {est.get('ids_por_nombre', 0)})"
+    )
     print(f"  En guia (SKU_BX):          {est['en_guia']}")
     print(f"  Con compromiso:            {est['con_compromiso']}")
     print(f"  Cotizables:                {est['cotizables']}")

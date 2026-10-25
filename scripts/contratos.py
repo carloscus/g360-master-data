@@ -938,7 +938,7 @@ def calcular_m3(largo_cm, ancho_cm, alto_cm) -> float | None:
 # derivan de esa única lectura. Así ningún campo "se deja de leer".
 
 CACHE_KARDEX_NOMBRE = ".cache_kardex.json"
-CACHE_KARDEX_VERSION = 4
+CACHE_KARDEX_VERSION = 5
 
 
 def derecha2(valor) -> str:
@@ -1056,6 +1056,68 @@ def emparejar_skus(buscados, candidatos) -> tuple[dict[str, str], dict]:
     return match, stats
 
 
+def indice_jerarquia_por_nombre(fichas) -> dict[tuple, list[dict]]:
+    """Índice (grupo, tipo, familia) normalizados -> registros de jerarquía.
+
+    Permite resolver los IDs de un producto que solo trae NOMBRES (SKU nuevo
+    de S1 o D-sin-ficha) contra el maestro KARDEX. Cada registro guarda la
+    linea completa (id y nombre) para que quien consulta verifique la
+    pertenencia: la combinacion de nombres sola no basta.
+
+    - Normaliza con normalizar_encabezado (sin acentos, mayusculas): la misma
+      taxonomia escrita 'S/IMPRESION' o 'S/IMPRESIÓN' cae en la misma clave.
+    - Solo entra si los 3 IDs estan completos.
+    - Dos combinaciones con IDs distintos NO se fusionan: el llamador decide
+      (si tras filtrar por linea queda mas de un candidato, no se adivina).
+    """
+    indice: dict[tuple, list[dict]] = {}
+    for f in fichas.values():
+        ids = {
+            "linea_id": f.get("linea_id", ""),
+            "grupo_id": f.get("grupo_id", ""),
+            "tipo_id": f.get("tipo_id", ""),
+            "familia_id": f.get("familia_id", ""),
+        }
+        if not (ids["grupo_id"] and ids["tipo_id"] and ids["familia_id"]):
+            continue
+        clave = tuple(
+            normalizar_encabezado(f.get(k, "")) for k in ("grupo", "tipo", "familia")
+        )
+        reg = {
+            **ids,
+            "linea": normalizar_encabezado(f.get("linea", "")),
+        }
+        registros = indice.setdefault(clave, [])
+        if not any(r == reg for r in registros):
+            registros.append(reg)
+    return indice
+
+
+def resolver_jerarquia_por_nombre(p, indice) -> dict:
+    """IDs jerarquicos para un producto que solo trae nombres.
+
+    `p` es el producto del catalogo (linea_codigo, linea_nombre, grupo, tipo,
+    familia). Filtra los candidatos del indice por LINEA (nombre o codigo:
+    cualquiera de los dos prueba la pertenencia) y devuelve los IDs solo si
+    queda EXACTAMENTE un candidato. Cero o mas de uno -> {} (nunca se
+    adivina; el llamador lo reporta como sin IDs).
+    """
+    clave = tuple(
+        normalizar_encabezado(p.get(k, "")) for k in ("grupo", "tipo", "familia")
+    )
+    cands = indice.get(clave, [])
+    lin_cod = normalizar_encabezado(p.get("linea_codigo", ""))
+    lin_nom = normalizar_encabezado(p.get("linea_nombre", ""))
+    validos = [
+        c
+        for c in cands
+        if (lin_cod and c["linea_id"] == lin_cod) or (lin_nom and c["linea"] == lin_nom)
+    ]
+    if len(validos) == 1:
+        return {k: validos[0][k] for k in ("grupo_id", "tipo_id", "familia_id")}
+    return {}
+
+
 def leer_kardex(ruta) -> tuple[dict, dict]:
     """Lee KARDEX_BASE.xlsx completo, una sola vez por archivo (cache en
     disco). Devuelve (articulos, meta) donde articulos es
@@ -1090,6 +1152,7 @@ def leer_kardex(ruta) -> tuple[dict, dict]:
                 "nota": "indice cacheado",
             }
             meta.update(guardado.get("ajustes", {}))
+            meta["almacenes"] = guardado.get("almacenes", {})
             return articulos, meta
     except (OSError, ValueError):
         pass
@@ -1133,11 +1196,25 @@ def leer_kardex(ruta) -> tuple[dict, dict]:
             return norm
 
         stats_jer = {"n": 0, "ej": [], "vistos": set()}
+        # Almacenes del archivo: id como texto ('40', 'VES') -> nombre visible.
+        almacenes: dict[str, str] = {}
+        almacenes_conflictos: set[str] = set()
         todos_uno = True
         hay_skus = False
         for fila in hoja.iter_rows(min_row=2, values_only=True):
             if len(fila) <= max(i_sku, i_um):
                 continue
+            aid = (
+                sku_texto(columnas.valor(fila, "id_almacen"))
+                if "id_almacen" in idx
+                else ""
+            )
+            if aid:
+                nom_alm = _txt(fila, "nom_almacen")
+                if not almacenes.get(aid):
+                    almacenes[aid] = nom_alm
+                elif nom_alm and nom_alm != almacenes[aid]:
+                    almacenes_conflictos.add(aid)
             sku = sku_texto(fila[i_sku])
             um = limpiar_texto(fila[i_um]).upper() if len(fila) > i_um else ""
             if not sku:
@@ -1188,6 +1265,10 @@ def leer_kardex(ruta) -> tuple[dict, dict]:
     if stats_jer["n"]:
         ajustes["jerarquia_normalizada"] = stats_jer["n"]
         ajustes["jerarquia_ejemplos"] = stats_jer["ej"]
+    if almacenes_conflictos:
+        # Mismo id de almacen con nombres distintos: el primero gana y se
+        # reporta (nada se cambia en silencio).
+        ajustes["almacenes_conflictos"] = sorted(almacenes_conflictos)
     # SKU y almacen son TEXTO: se leen sin modificar. Unica excepcion: si
     # TODOS los SKUs empiezan con '1' es un prefijo sistematico del archivo
     # y se quita uno solo. Con mezcla no se toca nada.
@@ -1202,6 +1283,7 @@ def leer_kardex(ruta) -> tuple[dict, dict]:
                     "huella": huella,
                     "articulos": articulos,
                     "ajustes": ajustes,
+                    "almacenes": almacenes,
                 },
                 f,
             )
@@ -1213,4 +1295,5 @@ def leer_kardex(ruta) -> tuple[dict, dict]:
         "nota": "indice reconstruido",
     }
     meta.update(ajustes)
+    meta["almacenes"] = almacenes
     return articulos, meta

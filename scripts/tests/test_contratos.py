@@ -1598,3 +1598,255 @@ class TestReglasPorColumnaEnLoader:
         fichas, meta = leer_kardex(tmp_path / "KARDEX_BASE.xlsx")
         assert set(fichas) == {"011019", "11019"}
         assert "sku_prefijo_uno" not in meta
+
+
+class TestAlmacenesEnLoader:
+    """El loader publica id->nombre de almacen (el JSON lo necesita)."""
+
+    @staticmethod
+    def _fila(alm, nom, sku="K1"):
+        return [
+            alm,
+            nom,
+            sku,
+            "NOM " + sku,
+            "LARGO",
+            "01",
+            "LINEA",
+            "G1",
+            "GRUPO",
+            "T1",
+            "TIPO",
+            "F1",
+            "FAM",
+            "UND",
+        ]
+
+    def test_id_int_vuelve_como_texto_con_nombre(self, tmp_path):
+        from contratos import leer_kardex
+
+        _escribir_kardex(
+            tmp_path / "KARDEX_BASE.xlsx",
+            [self._fila(40, "ALM VENTA 40"), self._fila("VES", "ALMACEN VES")],
+        )
+        _, meta = leer_kardex(tmp_path / "KARDEX_BASE.xlsx")
+        assert meta["almacenes"] == {"40": "ALM VENTA 40", "VES": "ALMACEN VES"}
+
+    def test_conflicto_de_nombre_se_reporta_no_se_pierde(self, tmp_path):
+        from contratos import leer_kardex
+
+        _escribir_kardex(
+            tmp_path / "KARDEX_BASE.xlsx",
+            [self._fila("40", "NOMBRE VIEJO"), self._fila("40", "NOMBRE NUEVO")],
+        )
+        _, meta = leer_kardex(tmp_path / "KARDEX_BASE.xlsx")
+        # El primero gana y el conflicto queda visible en meta.
+        assert meta["almacenes"]["40"] == "NOMBRE VIEJO"
+        assert meta["almacenes_conflictos"] == ["40"]
+
+    def test_cache_tambien_lleva_almacenes(self, tmp_path):
+        from contratos import leer_kardex
+
+        _escribir_kardex(tmp_path / "KARDEX_BASE.xlsx", [self._fila("40", "ALM")])
+        leer_kardex(tmp_path / "KARDEX_BASE.xlsx")
+        _, meta = leer_kardex(tmp_path / "KARDEX_BASE.xlsx")
+        assert meta["nota"] == "indice cacheado"
+        assert meta["almacenes"] == {"40": "ALM"}
+
+
+class TestResolucionPorNombre:
+    """SKU sin calce directo (S1-only, D): los IDs salen por NOMBRES
+    exactos + verificacion de linea. Unico candidato -> IDs; si no, vacio."""
+
+    @staticmethod
+    def _fichas():
+        from contratos import indice_jerarquia_por_nombre
+
+        return indice_jerarquia_por_nombre(
+            {
+                "A": {
+                    "linea_id": "30",
+                    "linea": "CIPTECH",
+                    "grupo_id": "05",
+                    "grupo": "TAG DIRECTO",
+                    "tipo_id": "02",
+                    "tipo": "S/IMPRESIÓN",
+                    "familia_id": "01",
+                    "familia": 'NUCLEO 1"',
+                },
+                # Misma taxonomia escrita sin acento: no duplica el registro.
+                "B": {
+                    "linea_id": "30",
+                    "linea": "CIPTECH",
+                    "grupo_id": "05",
+                    "grupo": "TAG DIRECTO",
+                    "tipo_id": "02",
+                    "tipo": "S/IMPRESION",
+                    "familia_id": "01",
+                    "familia": 'NUCLEO 1"',
+                },
+            }
+        )
+
+    def test_indice_normaliza_acentos_y_deduplica(self):
+        idx = self._fichas()
+        clave = ("TAG DIRECTO", "S/IMPRESION", 'NUCLEO 1"')
+        assert len(idx[clave]) == 1
+
+    def test_resuelve_por_codigo_de_linea(self):
+        from contratos import resolver_jerarquia_por_nombre
+
+        p = {
+            "linea_codigo": "30",
+            "linea_nombre": "CIPTECH ETIQUETAS",
+            "grupo": "TAG DIRECTO",
+            "tipo": "S/IMPRESION",  # sin acento: calza con la ficha
+            "familia": 'NUCLEO 1"',
+        }
+        r = resolver_jerarquia_por_nombre(p, self._fichas())
+        assert r == {"grupo_id": "05", "tipo_id": "02", "familia_id": "01"}
+
+    def test_resuelve_por_nombre_de_linea(self):
+        from contratos import resolver_jerarquia_por_nombre
+
+        p = {
+            "linea_codigo": "99",  # codigo distinto...
+            "linea_nombre": "CIPTECH",  # ...pero el nombre coincide
+            "grupo": "TAG DIRECTO",
+            "tipo": "S/IMPRESION",
+            "familia": 'NUCLEO 1"',
+        }
+        r = resolver_jerarquia_por_nombre(p, self._fichas())
+        assert r["grupo_id"] == "05"
+
+    def test_linea_incompatible_no_calza(self):
+        from contratos import resolver_jerarquia_por_nombre
+
+        p = {
+            "linea_codigo": "01",
+            "linea_nombre": "PELOTAS",
+            "grupo": "TAG DIRECTO",
+            "tipo": "S/IMPRESION",
+            "familia": 'NUCLEO 1"',
+        }
+        assert resolver_jerarquia_por_nombre(p, self._fichas()) == {}
+
+    def test_ambiguo_no_se_adivina(self):
+        from contratos import indice_jerarquia_por_nombre, resolver_jerarquia_por_nombre
+
+        idx = indice_jerarquia_por_nombre(
+            {
+                "A": {
+                    "linea_id": "11",
+                    "linea": "METALICA",
+                    "grupo_id": "04",
+                    "grupo": "X",
+                    "tipo_id": "01",
+                    "tipo": "Y",
+                    "familia_id": "01",
+                    "familia": "Z",
+                },
+                "B": {
+                    "linea_id": "11",
+                    "linea": "METALICA",
+                    "grupo_id": "09",
+                    "grupo": "X",
+                    "tipo_id": "01",
+                    "tipo": "Y",
+                    "familia_id": "01",
+                    "familia": "Z",
+                },
+            }
+        )
+        p = {
+            "linea_codigo": "11",
+            "linea_nombre": "METALICA",
+            "grupo": "X",
+            "tipo": "Y",
+            "familia": "Z",
+        }
+        assert resolver_jerarquia_por_nombre(p, idx) == {}
+
+    def test_sin_candidatos_devuelve_vacio(self):
+        from contratos import resolver_jerarquia_por_nombre
+
+        p = {
+            "linea_codigo": "30",
+            "linea_nombre": "",
+            "grupo": "GRUPO INEXISTENTE",
+            "tipo": "T",
+            "familia": "F",
+        }
+        assert resolver_jerarquia_por_nombre(p, self._fichas()) == {}
+
+
+class TestIdsPorNombreEnOutput:
+    """generar_output resuelve los IDs por nombre cuando no hay calce."""
+
+    @staticmethod
+    def _prod(sku):
+        return {
+            "sku": sku,
+            "nombre": f"Producto {sku}",
+            "ean13": "",
+            "ean14": "",
+            "peso_kg": 0.1,
+            "linea": "PELOTAS",
+            "grupo": "G",
+            "tipo": "T",
+            "familia": "F",
+            "categoria": "VINIBALL",
+            "precio": 10.0,
+            "descontinuado": False,
+            "linea_codigo": "01",
+        }
+
+    @staticmethod
+    def _indice():
+        from contratos import indice_jerarquia_por_nombre
+
+        return indice_jerarquia_por_nombre(
+            {
+                "A": {
+                    "linea_id": "01",
+                    "linea": "PELOTAS",
+                    "grupo_id": "07",
+                    "grupo": "G",
+                    "tipo_id": "03",
+                    "tipo": "T",
+                    "familia_id": "04",
+                    "familia": "F",
+                },
+            }
+        )
+
+    def test_producto_sin_calce_resuelve_ids(self, tmp_path):
+        from generar_catalogo_base import generar_output
+
+        out = tmp_path / "cat.json"
+        res = generar_output(
+            [self._prod("3010301")],
+            {},
+            {},
+            {},
+            str(out),
+            kardex_nombre=self._indice(),
+        )
+        p = res["productos"][0]
+        assert p["grupo_id"] == "07"
+        assert p["tipo_id"] == "03"
+        assert p["familia_id"] == "04"
+        est = res["metadata"]["estadisticas"]
+        assert est["con_ids_jerarquia"] == 1
+        assert est["ids_por_nombre"] == 1
+
+    def test_sin_indice_ids_vacios_y_sin_invencion(self, tmp_path):
+        from generar_catalogo_base import generar_output
+
+        out = tmp_path / "cat.json"
+        res = generar_output([self._prod("ZZZ99")], {}, {}, {}, str(out))
+        p = res["productos"][0]
+        assert p["grupo_id"] == ""
+        est = res["metadata"]["estadisticas"]
+        assert est["con_ids_jerarquia"] == 0
+        assert est["ids_por_nombre"] == 0

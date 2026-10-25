@@ -52,6 +52,7 @@ Si algo frena, el mensaje dice qué bloque y por qué (ver §4).
 | SKU no aparece en consulta | Motivo `FUERA` en la fila | Regla de inclusión: guía ∨ stock>0 ∨ compromiso>0 ∨ (vigente ∧ precio>0). Revisar ERP (precio/inactivo) |
 | ID jerarquía con 3 chars (`101`) | `contratos.derecha2` | Se normaliza solo a 2 (`01`); si el paso 0 lo reporta en masa, revisar el KARDEX origen |
 | SKU numérico con `1` de más | `contratos.reducir_uno_numerico` | Solo calza si el reducido existe en el maestro; si ambas formas existen, no se fusiona (alerta) |
+| SKU sin `grupo_id/tipo_id/familia_id` | stat `ids_por_nombre` / `con_ids_jerarquia` | Los IDs se resuelven por nombre verificado por línea; si queda vacío es que KARDEX no conoce esa combinación (6 hoy) — no se adivina |
 | Taxonomía distinta ERP↔KARDEX | Bloque `KARDEX vs ERP` del paso 0 | Defecto de registro: corregir en el maestro que esté mal, no en el código |
 
 ## 5. Reglas duras (no se negocian con los datos)
@@ -67,7 +68,7 @@ Si algo frena, el mensaje dice qué bloque y por qué (ver §4).
 
 ## 6. Dónde vive cada regla
 
-- Contratos y lectura por nombre: `scripts/contratos.py` (`CONTRATO_ERP`, `CONTRATO_KARDEX`, `emparejar_skus`, `derecha2`, `reducir_uno_numerico`, `leer_kardex`)
+- Contratos y lectura por nombre: `scripts/contratos.py` (`CONTRATO_ERP`, `CONTRATO_KARDEX`, `emparejar_skus`, `derecha2`, `reducir_uno_numerico`, `leer_kardex`, `indice_jerarquia_por_nombre`/`resolver_jerarquia_por_nombre` para IDs por nombre)
 - Generador y regla de inclusión: `scripts/generar_catalogo_base.py` (`generar_output`, `decidir_inclusion`)
 - Gates: `scripts/validar_encabezados.py` (paso 0), `scripts/validar_taxonomia.py`
 - Consulta: `scripts/consultar_por_taxonomia.py`
