@@ -724,6 +724,46 @@ class TestUniversoStock:
         assert universo["B"]["linea"] == "0178 - ARCHIVO"
 
 
+class TestUmFallbackUniverso:
+    """UM: ficha (S1-only) -> KARDEX (primaria) -> universo S1 (fallback
+    para un SKU ERP que tenga stock y aun no exista en el KARDEX). Si
+    ninguna fuente lo sabe, la UM queda vacia: no se inventa."""
+
+    def test_kardex_gana_sobre_universo(self, tmp_path):
+        res = generar_output(
+            [_prod("A")],
+            {},
+            {},
+            {},
+            str(tmp_path / "cat.json"),
+            um_kardex={"A": "KGR"},
+            universo={"A": {"stock": 3, "predespacho": 0, "um": "UND"}},
+        )
+        p = res["productos"][0]
+        assert p["um"] == "KGR"
+        assert res["metadata"]["estadisticas"]["con_um"] == 1
+
+    def test_universo_cubre_sku_erp_sin_kardex(self, tmp_path):
+        res = generar_output(
+            [_prod("B")],
+            {},
+            {},
+            {},
+            str(tmp_path / "cat.json"),
+            um_kardex={},
+            universo={"B": {"stock": 3, "predespacho": 0, "um": " pza "}},
+        )
+        p = res["productos"][0]
+        assert p["um"] == "PZA"  # limpio y en mayusculas, como el resto
+        assert res["metadata"]["estadisticas"]["con_um"] == 1
+
+    def test_sin_fuente_um_vacia(self, tmp_path):
+        res = generar_output([_prod("C")], {}, {}, {}, str(tmp_path / "cat.json"))
+        p = res["productos"][0]
+        assert p["um"] == ""
+        assert res["metadata"]["estadisticas"]["con_um"] == 0
+
+
 if __name__ == "__main__":
     import pytest
 

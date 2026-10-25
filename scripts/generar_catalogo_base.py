@@ -1026,7 +1026,16 @@ def generar_output(
             estadisticas["por_activar"] += 1
         if cotizable:
             estadisticas["cotizables"] += 1
-        if p.get("um", "") or (um_kardex or {}).get(p["sku"], ""):
+        # UM: la ficha (S1-only ya la trae del universo) -> KARDEX (fuente
+        # primaria) -> universo S1 como fallback para un SKU ERP que tenga
+        # stock pero aun no exista en el KARDEX. Si las tres fuentes no lo
+        # saben, queda vacio (no se inventa).
+        um_final = (
+            p.get("um", "")
+            or (um_kardex or {}).get(p["sku"], "")
+            or str((universo.get(p["sku"]) or {}).get("um") or "").strip().upper()
+        )
+        if um_final:
             estadisticas["con_um"] += 1
         kid = (kardex_ids or {}).get(p["sku"], {})
         if not (kid.get("grupo_id") and kid.get("tipo_id") and kid.get("familia_id")):
@@ -1063,7 +1072,7 @@ def generar_output(
                 "tipo_id": kid.get("tipo_id", ""),
                 "familia": p["familia"],
                 "familia_id": kid.get("familia_id", ""),
-                "um": p.get("um", "") or (um_kardex or {}).get(p["sku"], ""),
+                "um": um_final,
                 "un_bx": un_bx,
                 "orden": orden_map.get(p["sku"], 0),
                 "estado_linea": est,
