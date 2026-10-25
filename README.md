@@ -38,10 +38,11 @@ g360-master-data/
 │   │             + LARGO_CM, ANCHO_CM, ALTO_CM, PESO_CAJA_KG
 │   │             + M3_CAJA, M3_UNIDAD (calculadas, opcionales)
 │   │   Aporta: qué se vende, unidades por caja, orden comercial y m³
-│   ├── KARDEX_BASE.xlsx        ← Padrón de artículos por almacén (export manual, 179.591 filas)
+│   ├── KARDEX_BASE.xlsx        ← Padrón de artículos por almacén (export manual, ~95k filas)
 │   │   Columnas: colId/colNom de Almacén, Línea, Grupo, Tipo, Familia,
 │   │              Artículo (corto y largo), UM (sin cantidades ni fechas)
-│   │   Aporta: UM por SKU al catálogo (el ERP no la exporta) + taxonomía
+│   │   Aporta: jerarquía (línea/grupo/tipo/familia por ID de 2 chars),
+│   │   UM por SKU (el ERP no la exporta) y nombres de almacén
 │   │   observada SKU × almacén (revisión de guía, fase 3: demanda/rotación)
 │   └── plantilla_precios.xlsx  ← Plantilla comercial (hoja única SKU_PRECIOS:
 │       SKU, DESC1..6, VIGENCIA_DESC, PRECIO_FIJO, VIGENCIA_PRECIO, OBSERVACION)
@@ -52,12 +53,12 @@ g360-master-data/
 │   └── plantilla_precios.xlsx  ← molde vacío (DESC1..6 como fracción)
 │
 ├── output/
-│   └── catalogo_productos.json ← Catálogo generado (3.538 SKUs)
+│   └── catalogo_productos.json ← Catálogo generado (~3.550 SKUs)
 │
 ├── scripts/
 │   ├── contratos.py            ← Contrato de encabezados: campos canónicos + alias
 │   ├── validar_encabezados.py  ← Paso 0: valida las fuentes antes de generar
-│   ├── generar_catalogo_base.py ← Genera catálogo desde ERP + SKU_BX + stock (principal, v3.7)
+│   ├── generar_catalogo_base.py ← Genera catálogo desde ERP + SKU_BX + stock (principal, v3.8)
 │   ├── generar_catalogo.py     ← Generador legacy v1 (no usar: no lee el ERP actual)
 │   ├── crear_plantillas.py     ← Genera/migra las plantillas de plantillas/
 │   ├── leer_plantilla_precios.py ← Lee plantilla_precios.xlsx (hoja única SKU_PRECIOS; acepta el layout legacy)
@@ -70,6 +71,11 @@ g360-master-data/
 │   └── tests/                   ← Tests unitarios (pytest)
 │
 ├── actualizar_catalogo.bat     ← Workflow interactivo + modo automático (--auto)
+├── requirements.txt|.lock     ← Dependencias fijadas (instalación reproducible)
+├── ruff.toml                  ← Política de lint (ignores con motivo)
+├── conftest.py                ← pytest solo recolecta scripts/tests/
+├── g360/ + g360-manifest.json ← Assets G360 (traídos con `g360 bring`)
+├── docs/MANUAL.md             ← Manual de operación autónoma (mapa, diagnóstico)
 └── README.md
 ```
 
@@ -95,7 +101,7 @@ python scripts\crear_plantillas.py --migrar
 ```
 
 Hoy el generador consume **PRODUCTOS.xls + SKU_BX.xlsx + KARDEX_BASE.xlsx
-(UM por SKU) + el universo de stock**; `plantilla_precios.xlsx` está para la
+(UM, jerarquía y almacenes) + el universo de stock**; `plantilla_precios.xlsx` está para la
 siguiente fase (descuentos). Cuando se sume una fuente nueva, se agrega acá,
 se declara su contrato en `scripts/contratos.py` y se escribe su lector en
 `scripts/`.
@@ -124,6 +130,9 @@ solo si el repo hermano no está presente).
 
 Variables de entorno: ver `.env.example` (defaults documentados; ninguna es
 obligatoria para generar en modo offline con `G360_S1_CACHE`).
+
+Para operar sin ayuda (consultas, diagnóstico de fallos, dónde vive cada
+regla): **`docs/MANUAL.md`**.
 
 ---
 
@@ -231,9 +240,9 @@ la toma de KARDEX (`colIdUM`): coincidencia exacta primero y, si no hay,
 sin prefijo numérico (`01CA001` → `CA001`). No se adivina con códigos
 puramente numéricos (`016763` nunca se reduce a `16763`: son artículos
 distintos) ni con ambigüedad (dos códigos distintos al mismo SKU se omiten
-y se avisan). Verificado: UM 100% consistente por SKU en los 179.591
-registros. El KARDEX se lee una sola vez por archivo (caché en
-`data/.cache_kardex_um.json`).
+y se avisan). Verificado: UM 100% consistente por SKU (0 casos con UM
+distinta entre filas/almacenes del export). El KARDEX se lee una sola vez
+por archivo (caché en `data/.cache_kardex.json`).
 
 **Reporte S1 (sin encabezado real).** El `.xls` del S1 trae 9–12 filas de
 preámbulo y una fila de encabezados con celdas combinadas: `ARTICULO` queda en
@@ -308,7 +317,7 @@ en guía (SKU_BX) ∨ stock > 0 ∨ compromiso > 0 ∨ (vigente ∧ precio > 0)
 | SKU con stock/compromiso y **sin precio** | **Incluido** con `cotizable: false`, `por_activar: true` |
 | SKUs duplicados en ERP | Solo el primero |
 | SKUs en guía sin ERP | Advertencia y se omiten (ej. `04058`) |
-| **Productos finales** | **3.538 SKUs** |
+| **Productos finales** | **3.553 SKUs** |
 
 El precio ya **no decide la presencia**: decide la **cotizabilidad**. Un SKU sin
 precio puede estar publicado (hay producto físico), pero se marca `por_activar`
@@ -381,8 +390,9 @@ del anterior (suele ser una fuente faltante, no menos productos).
 | ean13 | PRODUCTOS.xls | ~36% tiene valor |
 | ean14 | PRODUCTOS.xls | ~29% tiene valor |
 | peso_kg | PRODUCTOS.xls | |
-| linea, grupo, tipo, familia | PRODUCTOS.xls / S1 | `linea` es el **código canónico** (2 chars); el nombre va en `linea_nombre`. Grupo/tipo/familia salen **sin** el código del S1 (`03 - BORRADOR` → `BORRADOR`) |
-| um | S1 | Unidad de medida del reporte |
+| linea, grupo, tipo, familia | PRODUCTOS.xls / S1 (nombres) | `linea` es el **código canónico** (2 chars); el nombre va en `linea_nombre`. Grupo/tipo/familia salen **sin** el código del S1 (`03 - BORRADOR` → `BORRADOR`) |
+| grupo_id, tipo_id, familia_id | KARDEX (IDs de 2 chars) | Los IDs de jerarquía para filtrar sin leer el KARDEX. Sin calce directo se resuelven **por nombre** contra el maestro (verificado por línea, nunca adivinando): ~99.8% de cobertura; lo que queda vacío es que el KARDEX no conoce esa combinación |
+| um | KARDEX (primaria) → S1 (fallback) | Cadena: ficha (S1-only) → KARDEX → universo S1. Vacío solo si ninguna fuente lo sabe |
 | linea_codigo | Mapa estático + desambiguación por grupo | SKUs Crayola (`C*`) usan su prefijo como línea propia (CA/CB/CC/CD/CE/CF/CG → REPRESENTADAS); líneas ERP genéricas (72/76/77/79) quedan 100% VINIFAN. Grupo desempata cuando el nombre es ambiguo (`ACCESORIOS|PINCELES`→`CD`) |
 | categoria | Marca > línea | La **marca manda**: todo SKU `C*` es `REPRESENTADAS` con línea propia (su prefijo de 2 letras), aunque la línea del ERP sea genérica o la sub-marca aún no exista en la taxonomía. Para el resto, la categoría sale de la línea |
 | categoria_venta | Derivada de `categoria` | `VINIBALL` / `VINIFAN` / `REPRESENTADAS`, o `REVISION_VENTA` para el resto |
@@ -416,8 +426,13 @@ encabezados y valores, `ErrorContrato`, `resolver_columnas` (campo canónico →
 índice), los contratos por fuente (`CONTRATO_ERP`, `CONTRATO_SKU_BX`,
 `CONTRATO_KARDEX`, `CONTRATO_PLANTILLA_*`), las anclas del S1
 (`detectar_columnas_s1`), la lista de almacenes publicados, `calcular_m3` y
-`huella_fuente` (sha256 + fecha para la trazabilidad). No lee archivos por sí
-mismo: lo usan todos los lectores.
+`huella_fuente` (sha256 + fecha para la trazabilidad). También el cruce de
+SKUs: `emparejar_skus` (exacto primero, prefijo verificado después, en
+cualquier dirección), `derecha2`/`reducir_uno_numerico` (reglas por columna)
+e `indice_jerarquia_por_nombre`/`resolver_jerarquia_por_nombre` (IDs por
+nombre verificados por línea). `leer_kardex` es la única lectura del padrón
+(con caché en `data/.cache_kardex.json`). No lee archivos por sí mismo los
+contratos: lo usan todos los lectores.
 
 ### `validar_encabezados.py`
 
@@ -425,7 +440,11 @@ Paso 0 del workflow. Valida ERP, SKU_BX, plantilla de precios, S1 (si hay un
 `.xls` en `data/`) y KARDEX: columnas obligatorias por nombre, **sanidad del
 contenido** (un SKU parece SKU, un precio es número, UN_BX entero, descuentos
 en rango), duplicados, columnas de más, SKUs guardados como número y cajas
-incompletas.
+incompletas. Además cruza la **guía vs maestros** (motivo por SKU, con
+`config/guia_ignorados.json` para los ya revisados) y audita **KARDEX vs ERP**
+por taxonomía (divergencias de línea/grupo/tipo/familia, conflictos de
+almacén, frescura del ERP): los 3 bloques informativos documentan
+divergencias entre originales sin frenar nada.
 
 ```bash
 python scripts/validar_encabezados.py
@@ -615,6 +634,22 @@ python scripts/simular_actualizacion.py
 python scripts/simular_actualizacion.py --api-url http://127.0.0.1:8099 --api-key CLAVE
 ```
 
+### `consultar_por_taxonomia.py`
+
+Consulta autónoma por jerarquía sin ayuda de nadie: filtra el KARDEX por
+`--linea/--grupo/--tipo/--familia` (IDs exactos, **entrecomillar las comas en
+PowerShell**: `--familia '01,02'`), cruza contra el JSON publicado (exacto
+primero, prefijo verificado después) y muestra EAN13/EAN14, precio, peso,
+`un_bx`, stock y categoría — o el motivo `FUERA` de cada SKU.
+
+```bash
+python scripts/consultar_por_taxonomia.py --linea 01 --grupo 01 --tipo 02 --familia '01,02'
+python scripts/consultar_por_taxonomia.py --linea 01 --json          # salida para otra app
+python scripts/consultar_por_taxonomia.py --linea 01 --limite 0      # ver todo
+```
+
+La tabla muestra `SKU_KARDEX -> SKU_JSON` cuando difieren (`1011019 -> 011019`).
+
 ### Tests
 
 ```bash
@@ -642,7 +677,7 @@ y robustez de la validación.
       { "archivo": "PRODUCTOS.xls", "bytes": 4844312, "sha256": "2dbbbf8b9669cc52", "modificado": "2026-10-20T16:16:53" },
       { "archivo": "SKU_BX.xlsx", "bytes": 37266, "sha256": "e910d11c282f85b0", "modificado": "2026-09-21T23:37:32" }
     ],
-    "total_productos": 3538,
+    "total_productos": 3553,
     "estadisticas": {
       "sin_ean13": 2267,
       "con_ean14": 1037,
@@ -651,6 +686,10 @@ y robustez de la validación.
       "con_caja": 0,
       "descontinuados": 348,
       "sin_linea_codigo": 0,
+      "con_linea_otros": 0,
+      "con_um": 3550,
+      "con_ids_jerarquia": 3547,
+      "ids_por_nombre": 41,
       "en_guia": 1022,
       "con_compromiso": 667,
       "por_activar": 768,
@@ -681,7 +720,12 @@ y robustez de la validación.
     "universo_stock": { "incluido": true, "skus": 2256, "con_stock": 2256, "con_compromiso": 699, "error": "", "previo_skus": 2256, "variacion": 0.0 },
     "universo_skus": ["016763", "..."],
     "cobertura_faltante": [],
-    "almacenes": { "principal": "VES", "almacenes": { "40": "venta", "VES": "venta", "...": "..." }, "fuente": "config" },
+    "almacenes": {
+      "principal": "VES",
+      "almacenes": { "40": "venta", "VES": "venta", "...": "..." },
+      "nombres": { "40": "ALMACEN PROD. TERMINADOS", "VES": "ALMACEN VES", "...": "..." },
+      "fuente": "config"
+    },
   },
   "productos": [
     {
@@ -695,9 +739,12 @@ y robustez de la validación.
       "linea": "01",
       "linea_nombre": "PELOTAS",
       "grupo": "IMPORTADA VINIBALL",
+      "grupo_id": "01",
       "tipo": "PU",
+      "tipo_id": "02",
       "familia": "FUTBOL",
-      "um": "",
+      "familia_id": "01",
+      "um": "UND",
       "un_bx": 18,
       "orden": 1,
       "estado_linea": "IMPORTADO",
