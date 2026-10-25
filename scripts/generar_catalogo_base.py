@@ -1547,15 +1547,9 @@ def _agregar_universo(datos, origen=""):
     return universo
 
 
-def main():
-    """CLI: genera output/catalogo_productos.json desde las fuentes locales.
-
-    Flujo: args -> ERP + SKU_BX (+ plantilla) -> universo de stock (API o
-    G360_S1_CACHE) -> KARDEX (UM, IDs de jerarquia, almacenes) ->
-    generar_output -> resumen con estadisticas. Los gates de taxonomia y
-    tests los corre el BAT despues de esta salida; --validate-only delega
-    en validar_encabezados sin generar nada.
-    """
+def _construir_parser():
+    """Parser CLI; los defaults de red/clave salen del entorno
+    (G360_STOCK_URL, G360_STOCK_API_KEY, G360_S1_CACHE)."""
     ap = argparse.ArgumentParser(description=f"G360 Catalog Generator v{VERSION}")
     ap.add_argument("--erp", "-e", default="data/PRODUCTOS.xls", help="Archivo ERP")
     ap.add_argument("--unbx", "-u", default="data/SKU_BX.xlsx", help="Archivo SKU_BX")
@@ -1588,23 +1582,13 @@ def main():
         action="store_true",
         help="No consultar el API: solo se incluye lo que esta en SKU_BX",
     )
-    a = ap.parse_args()
+    return ap
 
-    print("=" * 50)
-    print(f"G360 CATALOG GENERATOR v{VERSION}")
-    print("=" * 50)
-    print(f"ERP:      {a.erp}")
-    print(f"SKU_BX:   {a.unbx}")
-    print(f"Output:   {a.output}")
-    if a.s1_cache:
-        print(f"S1 cache: {a.s1_cache}")
-    print()
 
-    # Leer fuentes (BX primero: es la guía de lo que se vende).
-    # v3.8: si existe `data/SKU_PRECIOS.xlsx` (archivo consolidado con 2 hojas:
-    # SKU_LOGISTICA + SKU_PRECIOS) se usa el lector unificado. Si no, se cae
-    # al lector viejo (SKU_BX.xlsx) para mantener compatibilidad con data/.
-    print("Leyendo fuentes...")
+def _leer_guia(a):
+    """Guia comercial: archivo unificado SKU_PRECIOS.xlsx si existe, si no
+    el legado SKU_BX.xlsx (compatibilidad con data/). Devuelve
+    (orden_map, unbx_map, estado_map, caja_map); sale con exit 1 si falta."""
     ruta_unificada = Path(a.unbx).with_name("SKU_PRECIOS.xlsx")
     guia_caja: dict[str, dict] = {}
     if ruta_unificada.exists():
@@ -1647,187 +1631,126 @@ def main():
             "  WARN: la guia comercial esta VACIA (0 SKUs): el catalogo saldra "
             "sin en_guia y con un_bx=1 en todo"
         )
+    return orden_map, unbx_map, estado_map, guia_caja
 
-    # Universo de stock + compromiso: los SKU con despacho o venta pendiente
-    # tambien necesitan catalogo (peso/EAN/caja para despachar).
+
+def _cargar_universo(a):
+    """Universo de stock + compromiso: API o cache local del S1. Devuelve
+    (universo, meta) donde meta explica si entro, cuantos SKUs trae y si el
+    parseo viene sin taxonomia (alerta >=15%)."""
     universo: dict[str, dict] = {}
     universo_stock = {"incluido": False, "skus": 0, "error": ""}
     if a.sin_universo_stock:
         print("  Universo de stock: omitido (--sin-universo-stock)")
         universo_stock["error"] = "omitido por --sin-universo-stock"
-    else:
-        universo, err = leer_universo_stock(
-            a.stock_url, a.stock_key, cache_local=a.s1_cache
-        )
-        if err and not universo:
-            print(f"  Universo de stock: no disponible ({err}) -> solo SKU_BX")
-            print(
-                "  WARN: el catalogo va a quedar INCOMPLETO: los SKUs con stock "
-                "que no esten en SKU_BX no entran."
-            )
-            universo_stock["error"] = err
-        else:
-            con_stock = sum(1 for d in universo.values() if d["stock"] > 0)
-            con_compromiso = sum(1 for d in universo.values() if d["predespacho"] > 0)
-            print(
-                f"  Universo de stock: {len(universo)} SKUs "
-                f"({con_stock} con stock, {con_compromiso} con compromiso)"
-            )
-            universo_stock = {
-                "incluido": True,
-                "skus": len(universo),
-                "con_stock": con_stock,
-                "con_compromiso": con_compromiso,
-                "error": err,
-            }
-            # Taxonomia del universo: si el API sirve un parseo sin lineas
-            # (codigo viejo o cache anterior al parser por anclas), los S1
-            # caen a OTROS y los D no se enlazan. Se avisa fuerte aca.
-            sin_tax = sum(
-                1 for d in universo.values() if not str(d.get("linea") or "").strip()
-            )
-            universo_stock["sin_taxonomia_s1"] = sin_tax
-            if universo and sin_tax / len(universo) >= 0.15:
-                universo_stock["alerta_sin_taxonomia"] = (
-                    f"{sin_tax}/{len(universo)} SKUs del universo sin taxonomia S1: "
-                    "el API puede estar sirviendo parseo viejo o cache anterior; "
-                    "revisar deploy/refresh del API antes de publicar"
-                )
-                print(f"  ALERTA: {universo_stock['alerta_sin_taxonomia']}")
-
-    stock_skus = {s for s, d in universo.items() if d["stock"] > 0}
-    compromiso_skus = {s for s, d in universo.items() if d["predespacho"] > 0}
-
-    productos, errs, erp_skus, exclusiones, erp_todos = leer_erp(
-        a.erp,
-        bx_skus=set(orden_map),
-        stock_skus=stock_skus,
-        compromiso_skus=compromiso_skus,
+        return universo, universo_stock
+    universo, err = leer_universo_stock(
+        a.stock_url, a.stock_key, cache_local=a.s1_cache
     )
-    if errs:
-        print("\nERRORES al leer el ERP:")
-        for e in errs:
-            print(str(e) if "\n" in str(e) else f"  {e}")
+    if err and not universo:
+        print(f"  Universo de stock: no disponible ({err}) -> solo SKU_BX")
+        print(
+            "  WARN: el catalogo va a quedar INCOMPLETO: los SKUs con stock "
+            "que no esten en SKU_BX no entran."
+        )
+        universo_stock["error"] = err
+        return universo, universo_stock
+    con_stock = sum(1 for d in universo.values() if d["stock"] > 0)
+    con_compromiso = sum(1 for d in universo.values() if d["predespacho"] > 0)
+    print(
+        f"  Universo de stock: {len(universo)} SKUs "
+        f"({con_stock} con stock, {con_compromiso} con compromiso)"
+    )
+    universo_stock = {
+        "incluido": True,
+        "skus": len(universo),
+        "con_stock": con_stock,
+        "con_compromiso": con_compromiso,
+        "error": err,
+    }
+    # Taxonomia del universo: si el API sirve un parseo sin lineas
+    # (codigo viejo o cache anterior al parser por anclas), los S1
+    # caen a OTROS y los D no se enlazan. Se avisa fuerte aca.
+    sin_tax = sum(1 for d in universo.values() if not str(d.get("linea") or "").strip())
+    universo_stock["sin_taxonomia_s1"] = sin_tax
+    if universo and sin_tax / len(universo) >= 0.15:
+        universo_stock["alerta_sin_taxonomia"] = (
+            f"{sin_tax}/{len(universo)} SKUs del universo sin taxonomia S1: "
+            "el API puede estar sirviendo parseo viejo o cache anterior; "
+            "revisar deploy/refresh del API antes de publicar"
+        )
+        print(f"  ALERTA: {universo_stock['alerta_sin_taxonomia']}")
+    return universo, universo_stock
 
-    # Ficha mínima desde el reporte S1 para los SKU con movimiento que no
-    # entraron por el ERP (no existen o están en línea de proceso).
-    desde_s1 = productos_desde_universo(universo, productos, erp_todos)
-    if desde_s1:
-        print(f"  Ficha mínima desde S1: {len(desde_s1)} SKUs con movimiento")
-        productos.extend(desde_s1)
 
-    # Sin enlaces por parecido: cada SKU es exacto y standalone (linea 98
-    # incluida). Nada se deriva de nada por similitud de nombre o codigo.
+def _aviso_huerfanos(orden_map, erp_skus) -> None:
+    """SKUs de la guia que no existen en ERP (se omiten de la generacion),
+    silenciando los ya revisados a mano en config/guia_ignorados.json."""
     huerfanos = sorted(set(orden_map) - erp_skus)
-    if huerfanos:
-        # Los ya revisados a mano (config/guia_ignorados.json) no se vuelven
-        # a avisar: el paso 0 ya dio el detalle con el motivo.
-        ignorados = cargar_guia_ignorados()
-        silenciados = [s for s in huerfanos if s in ignorados]
-        huerfanos = [s for s in huerfanos if s not in ignorados]
-        if silenciados:
-            print(
-                f"  ... {len(silenciados)} revisado(s) (guia_ignorados.json): "
-                "no se avisan"
-            )
-        if huerfanos:
-            print(
-                f"  WARN: {len(huerfanos)} SKUs en SKU_BX no existen en ERP (se omiten): "
-                f"{', '.join(huerfanos[:10])}"
-                f"{'...' if len(huerfanos) > 10 else ''}"
-            )
-
-    if not productos:
-        print("ERROR: No hay productos válidos")
-        sys.exit(1)
-
-    print(f"\nTotal productos válidos: {len(productos)}")
-    print(f"  Con orden definido:    {len(orden_map)}")
-    print(f"  Con un_bx definido:    {len(unbx_map)}")
-    print(f"  Sin un_bx (default 1): {len(productos) - len(unbx_map)}")
-    if exclusiones:
-        print("  Exclusiones del ERP:")
-        for motivo, cnt in sorted(exclusiones.items(), key=lambda x: -x[1]):
-            print(f"    {motivo}: {cnt}")
-
-    if a.validate_only:
-        print("\nValidación completada")
+    if not huerfanos:
         return
-
-    # Sub-marcas Crayola nuevas: se publican ya clasificadas y se avisa para
-    # que queden fijas en CATEGORIA_POR_LINEA (y en el API de stock).
-    crayolas_nuevas = taxonomias_crayola_nuevas(productos)
-    if crayolas_nuevas:
-        print("\n  ALERTA: sub-marca(s) Crayola nueva(s) detectada(s):")
-        for cod, cat in sorted(crayolas_nuevas.items()):
-            print(f"    {cod} -> {cat}")
+    ignorados = cargar_guia_ignorados()
+    silenciados = [s for s in huerfanos if s in ignorados]
+    huerfanos = [s for s in huerfanos if s not in ignorados]
+    if silenciados:
         print(
-            "    Agregalas a CATEGORIA_POR_LINEA (scripts/generar_catalogo_base.py)\n"
-            "    y a CATEGORIAS (g360-stock-api/app/core/constants.py) para que\n"
-            "    la taxonomia quede fija y no dependa de esta generacion."
+            f"  ... {len(silenciados)} revisado(s) (guia_ignorados.json): no se avisan"
+        )
+    if huerfanos:
+        print(
+            f"  WARN: {len(huerfanos)} SKUs en SKU_BX no existen en ERP (se omiten): "
+            f"{', '.join(huerfanos[:10])}"
+            f"{'...' if len(huerfanos) > 10 else ''}"
         )
 
-    # Generar output
-    print("\nGenerando catálogo...")
-    # UM desde KARDEX (fuente primaria: el ERP no exporta UM, KARDEX sí).
-    # Una sola lectura compartida (contratos.leer_kardex, con cache) y
-    # calce exacto primero, sin prefijo despues (contratos.emparejar_skus).
-    um_kardex: dict[str, str] = {}
-    kardex_ids: dict[str, dict] | None = None
-    kardex_nombre = None
-    almacenes_nombres: dict = {}
+
+def _cargar_kardex(productos):
+    """KARDEX compartido (con cache): UM por SKU, IDs de jerarquia (calce
+    directo + resolucion por nombre) y nombres de almacen. Sin archivo
+    devuelve todo vacio y solo avisa. Devuelve un dict con las 4 claves."""
+    resultado = {
+        "um_kardex": {},
+        "kardex_ids": None,
+        "kardex_nombre": None,
+        "almacenes_nombres": {},
+    }
     kardex_ruta = Path("data") / "KARDEX_BASE.xlsx"
-    if kardex_ruta.exists():
-        fichas_kardex, meta_kardex = leer_kardex(kardex_ruta)
-        um_raw = {sku: f["um"] for sku, f in fichas_kardex.items() if f.get("um")}
-        match_kardex, stats_kardex = emparejar_skus(
-            {p["sku"] for p in productos}, um_raw
-        )
-        um_kardex = {s: um_raw[m] for s, m in match_kardex.items()}
-        # IDs de jerarquia KARDEX por producto (el JSON los publica para que
-        # las apps filtren por jerarquia sin leer el KARDEX).
-        kardex_ids = {
-            s: {
-                k: fichas_kardex[m].get(k, "")
-                for k in ("grupo_id", "tipo_id", "familia_id")
-            }
-            for s, m in match_kardex.items()
-        }
-        # Resolucion por NOMBRE para SKUs sin calce directo (S1-only, D):
-        # nombres exactos + verificacion de linea; nunca adivina.
-        kardex_nombre = indice_jerarquia_por_nombre(fichas_kardex)
-        almacenes_nombres = meta_kardex.get("almacenes", {})
-        if almacenes_nombres:
-            print(f"  KARDEX: {len(almacenes_nombres)} almacenes con nombre")
-        print(
-            f"  KARDEX: {meta_kardex.get('nota', '')} "
-            f"({meta_kardex.get('articulos', 0)} articulos); "
-            f"UM exacto={stats_kardex['exactos']} "
-            f"prefijo={stats_kardex['prefijo']} "
-            f"ambiguos={stats_kardex['ambiguos']} "
-            f"sin_match={stats_kardex['sin_match']}"
-        )
-    else:
+    if not kardex_ruta.exists():
         print("  KARDEX: sin archivo (UM queda como esta: S1 o vacio)")
-    output = generar_output(
-        productos,
-        unbx_map,
-        estado_map,
-        orden_map,
-        a.output,
-        exclusiones=exclusiones,
-        universo_stock=universo_stock,
-        taxonomia_extra=crayolas_nuevas,
-        universo=universo,
-        caja_map=guia_caja,
-        fuentes=[huella_fuente(a.erp), huella_fuente(a.unbx)],
-        erp_todos=erp_todos,
-        um_kardex=um_kardex,
-        kardex_ids=kardex_ids,
-        kardex_nombre=kardex_nombre,
-        almacenes_nombres=almacenes_nombres,
+        return resultado
+    fichas_kardex, meta_kardex = leer_kardex(kardex_ruta)
+    um_raw = {sku: f["um"] for sku, f in fichas_kardex.items() if f.get("um")}
+    match_kardex, stats_kardex = emparejar_skus({p["sku"] for p in productos}, um_raw)
+    resultado["um_kardex"] = {s: um_raw[m] for s, m in match_kardex.items()}
+    # IDs de jerarquia KARDEX por producto (el JSON los publica para que
+    # las apps filtren por jerarquia sin leer el KARDEX).
+    resultado["kardex_ids"] = {
+        s: {
+            k: fichas_kardex[m].get(k, "")
+            for k in ("grupo_id", "tipo_id", "familia_id")
+        }
+        for s, m in match_kardex.items()
+    }
+    # Resolucion por NOMBRE para SKUs sin calce directo (S1-only, D):
+    # nombres exactos + verificacion de linea; nunca adivina.
+    resultado["kardex_nombre"] = indice_jerarquia_por_nombre(fichas_kardex)
+    resultado["almacenes_nombres"] = meta_kardex.get("almacenes", {})
+    if resultado["almacenes_nombres"]:
+        print(f"  KARDEX: {len(resultado['almacenes_nombres'])} almacenes con nombre")
+    print(
+        f"  KARDEX: {meta_kardex.get('nota', '')} "
+        f"({meta_kardex.get('articulos', 0)} articulos); "
+        f"UM exacto={stats_kardex['exactos']} "
+        f"prefijo={stats_kardex['prefijo']} "
+        f"ambiguos={stats_kardex['ambiguos']} "
+        f"sin_match={stats_kardex['sin_match']}"
     )
+    return resultado
 
+
+def _imprimir_resumen(output) -> None:
+    """Resumen post-generacion: totales, estadisticas, universo de stock,
+    categorias y semaforo de venta (lo que muestra el BAT al terminar)."""
     print(f"\n{'=' * 50}")
     print("CATÁLOGO GENERADO")
     print(f"{'=' * 50}")
@@ -1866,6 +1789,123 @@ def main():
     for cat, cnt in sorted(est["por_categoria_venta"].items(), key=lambda x: -x[1]):
         print(f"  {cat}: {cnt}")
     print("\nListo!")
+
+
+def _cargar_productos(a, universo, orden_map, unbx_map):
+    """Productos validos: ERP filtrado por reglas + ficha minima S1 para los
+    SKU con movimiento, aviso de huérfanos de guia y totales en pantalla.
+    Sale con exit 1 si no queda ningun producto valido."""
+    stock_skus = {s for s, d in universo.items() if d["stock"] > 0}
+    compromiso_skus = {s for s, d in universo.items() if d["predespacho"] > 0}
+    productos, errs, erp_skus, exclusiones, erp_todos = leer_erp(
+        a.erp,
+        bx_skus=set(orden_map),
+        stock_skus=stock_skus,
+        compromiso_skus=compromiso_skus,
+    )
+    if errs:
+        print("\nERRORES al leer el ERP:")
+        for e in errs:
+            print(str(e) if "\n" in str(e) else f"  {e}")
+
+    # Ficha mínima desde el reporte S1 para los SKU con movimiento que no
+    # entraron por el ERP (no existen o están en línea de proceso).
+    desde_s1 = productos_desde_universo(universo, productos, erp_todos)
+    if desde_s1:
+        print(f"  Ficha mínima desde S1: {len(desde_s1)} SKUs con movimiento")
+        productos.extend(desde_s1)
+
+    # Sin enlaces por parecido: cada SKU es exacto y standalone (linea 98
+    # incluida). Nada se deriva de nada por similitud de nombre o codigo.
+    _aviso_huerfanos(orden_map, erp_skus)
+
+    if not productos:
+        print("ERROR: No hay productos válidos")
+        sys.exit(1)
+
+    print(f"\nTotal productos válidos: {len(productos)}")
+    print(f"  Con orden definido:    {len(orden_map)}")
+    print(f"  Con un_bx definido:    {len(unbx_map)}")
+    print(f"  Sin un_bx (default 1): {len(productos) - len(unbx_map)}")
+    if exclusiones:
+        print("  Exclusiones del ERP:")
+        for motivo, cnt in sorted(exclusiones.items(), key=lambda x: -x[1]):
+            print(f"    {motivo}: {cnt}")
+    return productos, erp_skus, exclusiones, erp_todos
+
+
+def main():
+    """CLI: genera output/catalogo_productos.json desde las fuentes locales.
+
+    Flujo: args -> ERP + SKU_BX (+ plantilla) -> universo de stock (API o
+    G360_S1_CACHE) -> KARDEX (UM, IDs de jerarquia, almacenes) ->
+    generar_output -> resumen con estadisticas. Los gates de taxonomia y
+    tests los corre el BAT despues de esta salida; --validate-only delega
+    en validar_encabezados sin generar nada.
+    """
+    a = _construir_parser().parse_args()
+
+    print("=" * 50)
+    print(f"G360 CATALOG GENERATOR v{VERSION}")
+    print("=" * 50)
+    print(f"ERP:      {a.erp}")
+    print(f"SKU_BX:   {a.unbx}")
+    print(f"Output:   {a.output}")
+    if a.s1_cache:
+        print(f"S1 cache: {a.s1_cache}")
+    print()
+
+    print("Leyendo fuentes...")
+    orden_map, unbx_map, estado_map, guia_caja = _leer_guia(a)
+
+    # Universo de stock + compromiso: los SKU con despacho o venta pendiente
+    # tambien necesitan catalogo (peso/EAN/caja para despachar).
+    universo, universo_stock = _cargar_universo(a)
+
+    productos, erp_skus, exclusiones, erp_todos = _cargar_productos(
+        a, universo, orden_map, unbx_map
+    )
+
+    if a.validate_only:
+        print("\nValidación completada")
+        return
+
+    # Sub-marcas Crayola nuevas: se publican ya clasificadas y se avisa para
+    # que queden fijas en CATEGORIA_POR_LINEA (y en el API de stock).
+    crayolas_nuevas = taxonomias_crayola_nuevas(productos)
+    if crayolas_nuevas:
+        print("\n  ALERTA: sub-marca(s) Crayola nueva(s) detectada(s):")
+        for cod, cat in sorted(crayolas_nuevas.items()):
+            print(f"    {cod} -> {cat}")
+        print(
+            "    Agregalas a CATEGORIA_POR_LINEA (scripts/generar_catalogo_base.py)\n"
+            "    y a CATEGORIAS (g360-stock-api/app/core/constants.py) para que\n"
+            "    la taxonomia quede fija y no dependa de esta generacion."
+        )
+
+    # Generar output
+    print("\nGenerando catálogo...")
+    # UM/IDs/almacenes desde KARDEX (fuente primaria: el ERP no exporta UM).
+    kardex = _cargar_kardex(productos)
+    output = generar_output(
+        productos,
+        unbx_map,
+        estado_map,
+        orden_map,
+        a.output,
+        exclusiones=exclusiones,
+        universo_stock=universo_stock,
+        taxonomia_extra=crayolas_nuevas,
+        universo=universo,
+        caja_map=guia_caja,
+        fuentes=[huella_fuente(a.erp), huella_fuente(a.unbx)],
+        erp_todos=erp_todos,
+        um_kardex=kardex["um_kardex"],
+        kardex_ids=kardex["kardex_ids"],
+        kardex_nombre=kardex["kardex_nombre"],
+        almacenes_nombres=kardex["almacenes_nombres"],
+    )
+    _imprimir_resumen(output)
 
 
 if __name__ == "__main__":
