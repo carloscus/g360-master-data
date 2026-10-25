@@ -1118,6 +1118,176 @@ def resolver_jerarquia_por_nombre(p, indice) -> dict:
     return {}
 
 
+def _cache_kardex(cache, huella) -> tuple | None:
+    """Cache del indice KARDEX: devuelve (articulos, ajustes, almacenes)
+    si el archivo no cambio; None si hay que reconstruirlo (archivo nuevo,
+    version de cache distinta o cache ilegible)."""
+    try:
+        with open(cache, encoding="utf-8") as f:
+            guardado = json.load(f)
+    except (OSError, ValueError):
+        return None
+    if guardado.get("v") != CACHE_KARDEX_VERSION:
+        return None
+    if not all(guardado.get("huella", {}).get(k) == v for k, v in huella.items()):
+        return None
+    return (
+        guardado.get("articulos", {}),
+        guardado.get("ajustes", {}),
+        guardado.get("almacenes", {}),
+    )
+
+
+def _construir_indice_kardex(hoja, columnas) -> dict:
+    """Recorre las filas del KARDEX y arma el indice de articulos.
+
+    Reglas por columna (nada se corrige en silencio, todo queda en ajustes):
+      - jerarquia: IDs a 2 chars por la derecha (derecha2) con conteo.
+      - almacenes: id como texto ('40', 'VES') -> nombre; conflicto = primero.
+      - SKU: texto, sin tocar. Si TODOS empiezan con '1' queda senalado
+        (prefijo sistematico, se quita uno solo en _ajustes_finales).
+    Devuelve un dict con articulos, stats, almacenes y banderas del loop.
+    """
+    idx = {c: columnas.idx(c) for c in columnas.indices}
+    i_sku, i_um = idx["id_articulo"], idx["id_um"]
+    # La 2da ocurrencia de colNomArticulo es la descripcion larga
+    # (la 1ra es el nombre corto y es la que mapea el contrato).
+    # Se acepta solo si el encabezado vecino es el mismo nombre:
+    # nunca por posicion a ciegas.
+    nombres_norm = [normalizar_encabezado(h) for h in columnas.encabezados]
+    i_nom = idx["nom_articulo"]
+    i_largo = None
+    if i_nom + 1 < len(nombres_norm) and nombres_norm[i_nom + 1] == nombres_norm[i_nom]:
+        i_largo = i_nom + 1
+
+    def _txt(fila, campo, default=""):
+        v = columnas.valor(fila, campo) if campo in idx else default
+        return limpiar_texto(v)
+
+    def _id(fila, campo, stats):
+        # IDs de jerarquia: siempre ('00'+v)[-2:] en mayusculas.
+        # '1'->'01', '101'->'01', 'ad'->'AD'. Lo que ya viene bien ('01')
+        # pasa igual; lo distinto queda contado en stats (visible en meta).
+        v = columnas.valor(fila, campo) if campo in idx else ""
+        crudo = limpiar_texto(v)
+        norm = derecha2(v)
+        if crudo and crudo != norm:
+            stats["n"] += 1
+            if len(stats["ej"]) < 5 and crudo not in stats["vistos"]:
+                stats["vistos"].add(crudo)
+                stats["ej"].append(f"{crudo}->{norm}")
+        return norm
+
+    articulos: dict[str, dict] = {}
+    stats_jer = {"n": 0, "ej": [], "vistos": set()}
+    # Almacenes del archivo: id como texto ('40', 'VES') -> nombre visible.
+    almacenes: dict[str, str] = {}
+    almacenes_conflictos: set[str] = set()
+    todos_uno = True
+    hay_skus = False
+    for fila in hoja.iter_rows(min_row=2, values_only=True):
+        if len(fila) <= max(i_sku, i_um):
+            continue
+        aid = (
+            sku_texto(columnas.valor(fila, "id_almacen")) if "id_almacen" in idx else ""
+        )
+        if aid:
+            nom_alm = _txt(fila, "nom_almacen")
+            if not almacenes.get(aid):
+                almacenes[aid] = nom_alm
+            elif nom_alm and nom_alm != almacenes[aid]:
+                almacenes_conflictos.add(aid)
+        sku = sku_texto(fila[i_sku])
+        um = limpiar_texto(fila[i_um]).upper() if len(fila) > i_um else ""
+        if not sku:
+            continue
+        # Regla SKU: todos empiezan con '1' => prefijo sistematico
+        # (se quita uno solo al final). Mezcla => codigos reales, intactos.
+        hay_skus = True
+        if not sku.startswith("1"):
+            todos_uno = False
+        ficha = articulos.get(sku)
+        largo = (
+            limpiar_texto(fila[i_largo])
+            if i_largo is not None and len(fila) > i_largo
+            else ""
+        )
+        if ficha is None:
+            articulos[sku] = {
+                "um": um,
+                "linea_id": _id(fila, "id_linea", stats_jer),
+                "linea": _txt(fila, "nom_linea"),
+                "grupo_id": _id(fila, "id_grupo", stats_jer),
+                "grupo": _txt(fila, "nom_grupo"),
+                "tipo_id": _id(fila, "id_tipo", stats_jer),
+                "tipo": _txt(fila, "nom_tipo"),
+                "familia_id": _id(fila, "id_familia", stats_jer),
+                "familia": _txt(fila, "nom_familia"),
+                "nombre_corto": _txt(fila, "nom_articulo"),
+                "nombre_largo": largo,
+                "n_almacenes": 1,
+                "conflictos": {},
+            }
+            continue
+        ficha["n_almacenes"] += 1
+        for campo, valor in (
+            ("um", um),
+            ("linea", _txt(fila, "nom_linea")),
+            ("grupo", _txt(fila, "nom_grupo")),
+            ("tipo", _txt(fila, "nom_tipo")),
+            ("familia", _txt(fila, "nom_familia")),
+        ):
+            if valor and valor != ficha[campo]:
+                ficha["conflictos"].setdefault(campo, sorted({ficha[campo], valor}))
+    return {
+        "articulos": articulos,
+        "stats_jer": stats_jer,
+        "almacenes": almacenes,
+        "almacenes_conflictos": almacenes_conflictos,
+        "todos_uno": todos_uno,
+        "hay_skus": hay_skus,
+    }
+
+
+def _ajustes_finales(indice) -> tuple[dict, dict]:
+    """Ajustes aplicados en la construccion (todo visible en meta): jerarquia
+    normalizada, conflictos de almacen y el prefijo '1' sistematico. Devuelve
+    (articulos_finales, ajustes); con mezcla de prefijos no se toca nada."""
+    ajustes: dict = {}
+    stats_jer = indice["stats_jer"]
+    if stats_jer["n"]:
+        ajustes["jerarquia_normalizada"] = stats_jer["n"]
+        ajustes["jerarquia_ejemplos"] = stats_jer["ej"]
+    if indice["almacenes_conflictos"]:
+        # Mismo id de almacen con nombres distintos: el primero gana y se
+        # reporta (nada se cambia en silencio).
+        ajustes["almacenes_conflictos"] = sorted(indice["almacenes_conflictos"])
+    articulos = indice["articulos"]
+    if indice["hay_skus"] and indice["todos_uno"]:
+        articulos = {s[1:]: f for s, f in articulos.items()}
+        ajustes["sku_prefijo_uno"] = True
+    return articulos, ajustes
+
+
+def _guardar_cache_kardex(cache, huella, articulos, ajustes, almacenes) -> None:
+    """Escribe el cache en disco (si falla el disco, se reconstruye la
+    proxima vez: el cache es un acelerador, nunca la fuente de verdad)."""
+    try:
+        with open(cache, "w", encoding="utf-8") as f:
+            json.dump(
+                {
+                    "v": CACHE_KARDEX_VERSION,
+                    "huella": huella,
+                    "articulos": articulos,
+                    "ajustes": ajustes,
+                    "almacenes": almacenes,
+                },
+                f,
+            )
+    except OSError:
+        pass
+
+
 def leer_kardex(ruta) -> tuple[dict, dict]:
     """Lee KARDEX_BASE.xlsx completo, una sola vez por archivo (cache en
     disco). Devuelve (articulos, meta) donde articulos es
@@ -1139,156 +1309,30 @@ def leer_kardex(ruta) -> tuple[dict, dict]:
         return {}, meta
     huella = {"archivo": p.name, "bytes": st.st_size, "modificado": st.st_mtime}
     cache = p.with_name(CACHE_KARDEX_NOMBRE)
-    try:
-        with open(cache, encoding="utf-8") as f:
-            guardado = json.load(f)
-        if guardado.get("v") == CACHE_KARDEX_VERSION and all(
-            guardado.get("huella", {}).get(k) == v for k, v in huella.items()
-        ):
-            articulos = guardado.get("articulos", {})
-            meta = {
-                "archivo": p.name,
-                "articulos": len(articulos),
-                "nota": "indice cacheado",
-            }
-            meta.update(guardado.get("ajustes", {}))
-            meta["almacenes"] = guardado.get("almacenes", {})
-            return articulos, meta
-    except (OSError, ValueError):
-        pass
+    cacheado = _cache_kardex(cache, huella)
+    if cacheado is not None:
+        articulos, ajustes, almacenes = cacheado
+        meta = {
+            "archivo": p.name,
+            "articulos": len(articulos),
+            "nota": "indice cacheado",
+        }
+        meta.update(ajustes)
+        meta["almacenes"] = almacenes
+        return articulos, meta
 
     print("  (leyendo KARDEX completo: una sola vez por archivo...)")
-    articulos: dict[str, dict] = {}
     libro = openpyxl.load_workbook(ruta, read_only=True, data_only=True)
     try:
         columnas, hoja = resolver_xlsx(libro, CONTRATO_KARDEX)
-        idx = {c: columnas.idx(c) for c in columnas.indices}
-        i_sku, i_um = idx["id_articulo"], idx["id_um"]
-        # La 2da ocurrencia de colNomArticulo es la descripcion larga
-        # (la 1ra es el nombre corto y es la que mapea el contrato).
-        # Se acepta solo si el encabezado vecino es el mismo nombre:
-        # nunca por posicion a ciegas.
-        nombres_norm = [normalizar_encabezado(h) for h in columnas.encabezados]
-        i_nom = idx["nom_articulo"]
-        i_largo = None
-        if (
-            i_nom + 1 < len(nombres_norm)
-            and nombres_norm[i_nom + 1] == nombres_norm[i_nom]
-        ):
-            i_largo = i_nom + 1
-
-        def _txt(fila, campo, default=""):
-            v = columnas.valor(fila, campo) if campo in idx else default
-            return limpiar_texto(v)
-
-        def _id(fila, campo, stats):
-            # IDs de jerarquia: siempre ('00'+v)[-2:] en mayusculas.
-            # '1'->'01', '101'->'01', 'ad'->'AD'. Lo que ya viene bien ('01')
-            # pasa igual; lo distinto queda contado en stats (visible en meta).
-            v = columnas.valor(fila, campo) if campo in idx else ""
-            crudo = limpiar_texto(v)
-            norm = derecha2(v)
-            if crudo and crudo != norm:
-                stats["n"] += 1
-                if len(stats["ej"]) < 5 and crudo not in stats["vistos"]:
-                    stats["vistos"].add(crudo)
-                    stats["ej"].append(f"{crudo}->{norm}")
-            return norm
-
-        stats_jer = {"n": 0, "ej": [], "vistos": set()}
-        # Almacenes del archivo: id como texto ('40', 'VES') -> nombre visible.
-        almacenes: dict[str, str] = {}
-        almacenes_conflictos: set[str] = set()
-        todos_uno = True
-        hay_skus = False
-        for fila in hoja.iter_rows(min_row=2, values_only=True):
-            if len(fila) <= max(i_sku, i_um):
-                continue
-            aid = (
-                sku_texto(columnas.valor(fila, "id_almacen"))
-                if "id_almacen" in idx
-                else ""
-            )
-            if aid:
-                nom_alm = _txt(fila, "nom_almacen")
-                if not almacenes.get(aid):
-                    almacenes[aid] = nom_alm
-                elif nom_alm and nom_alm != almacenes[aid]:
-                    almacenes_conflictos.add(aid)
-            sku = sku_texto(fila[i_sku])
-            um = limpiar_texto(fila[i_um]).upper() if len(fila) > i_um else ""
-            if not sku:
-                continue
-            # Regla SKU: todos empiezan con '1' => prefijo sistematico
-            # (se quita uno solo al final). Mezcla => codigos reales, intactos.
-            hay_skus = True
-            if not sku.startswith("1"):
-                todos_uno = False
-            ficha = articulos.get(sku)
-            largo = (
-                limpiar_texto(fila[i_largo])
-                if i_largo is not None and len(fila) > i_largo
-                else ""
-            )
-            if ficha is None:
-                articulos[sku] = {
-                    "um": um,
-                    "linea_id": _id(fila, "id_linea", stats_jer),
-                    "linea": _txt(fila, "nom_linea"),
-                    "grupo_id": _id(fila, "id_grupo", stats_jer),
-                    "grupo": _txt(fila, "nom_grupo"),
-                    "tipo_id": _id(fila, "id_tipo", stats_jer),
-                    "tipo": _txt(fila, "nom_tipo"),
-                    "familia_id": _id(fila, "id_familia", stats_jer),
-                    "familia": _txt(fila, "nom_familia"),
-                    "nombre_corto": _txt(fila, "nom_articulo"),
-                    "nombre_largo": largo,
-                    "n_almacenes": 1,
-                    "conflictos": {},
-                }
-                continue
-            ficha["n_almacenes"] += 1
-            for campo, valor in (
-                ("um", um),
-                ("linea", _txt(fila, "nom_linea")),
-                ("grupo", _txt(fila, "nom_grupo")),
-                ("tipo", _txt(fila, "nom_tipo")),
-                ("familia", _txt(fila, "nom_familia")),
-            ):
-                if valor and valor != ficha[campo]:
-                    ficha["conflictos"].setdefault(campo, sorted({ficha[campo], valor}))
+        construido = _construir_indice_kardex(hoja, columnas)
     except ErrorContrato:
         return {}, {"archivo": p.name, "articulos": 0, "nota": "contrato roto"}
     finally:
         libro.close()
-    ajustes: dict = {}
-    if stats_jer["n"]:
-        ajustes["jerarquia_normalizada"] = stats_jer["n"]
-        ajustes["jerarquia_ejemplos"] = stats_jer["ej"]
-    if almacenes_conflictos:
-        # Mismo id de almacen con nombres distintos: el primero gana y se
-        # reporta (nada se cambia en silencio).
-        ajustes["almacenes_conflictos"] = sorted(almacenes_conflictos)
-    # SKU y almacen son TEXTO: se leen sin modificar. Unica excepcion: si
-    # TODOS los SKUs empiezan con '1' es un prefijo sistematico del archivo
-    # y se quita uno solo. Con mezcla no se toca nada.
-    if hay_skus and todos_uno:
-        articulos = {s[1:]: f for s, f in articulos.items()}
-        ajustes["sku_prefijo_uno"] = True
-    try:
-        with open(cache, "w", encoding="utf-8") as f:
-            json.dump(
-                {
-                    "v": CACHE_KARDEX_VERSION,
-                    "huella": huella,
-                    "articulos": articulos,
-                    "ajustes": ajustes,
-                    "almacenes": almacenes,
-                },
-                f,
-            )
-    except OSError:
-        pass
+    articulos, ajustes = _ajustes_finales(construido)
+    almacenes = construido["almacenes"]
+    _guardar_cache_kardex(cache, huella, articulos, ajustes, almacenes)
     meta = {
         "archivo": p.name,
         "articulos": len(articulos),
