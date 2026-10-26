@@ -1653,6 +1653,42 @@ class TestAlmacenesEnLoader:
         assert meta["nota"] == "indice cacheado"
         assert meta["almacenes"] == {"40": "ALM"}
 
+    def test_presencia_por_sku_en_ficha(self, tmp_path):
+        """Cada ficha guarda almacenes_ids (lista unica y ordenada): la
+        presencia del SKU en el padron, para replicarla en el JSON."""
+        from contratos import leer_kardex
+
+        _escribir_kardex(
+            tmp_path / "KARDEX_BASE.xlsx",
+            [
+                self._fila("40", "ALM 40", sku="K1"),
+                self._fila("VES", "ALM VES", sku="K1"),
+                self._fila("VES", "ALM VES", sku="K1"),  # duplicada: no duplica
+                self._fila("40", "ALM 40", sku="K2"),
+            ],
+        )
+        fichas, _ = leer_kardex(tmp_path / "KARDEX_BASE.xlsx")
+        assert fichas["K1"]["almacenes_ids"] == ["40", "VES"]
+        assert fichas["K2"]["almacenes_ids"] == ["40"]
+
+    def test_presencia_sobrevive_al_prefijo_uno(self, tmp_path):
+        """Con prefijo '1' total las claves se reducen; la presencia viaja
+        en la ficha y no se pierde en la reduccion."""
+        from contratos import leer_kardex
+
+        _escribir_kardex(
+            tmp_path / "KARDEX_BASE.xlsx",
+            [
+                self._fila("40", "ALM 40", sku="1A001"),
+                self._fila("VES", "ALM VES", sku="1A002"),
+            ],
+        )
+        fichas, meta = leer_kardex(tmp_path / "KARDEX_BASE.xlsx")
+        assert meta.get("sku_prefijo_uno") is True
+        assert set(fichas) == {"A001", "A002"}
+        assert fichas["A001"]["almacenes_ids"] == ["40"]
+        assert fichas["A002"]["almacenes_ids"] == ["VES"]
+
 
 class TestResolucionPorNombre:
     """SKU sin calce directo (S1-only, D): los IDs salen por NOMBRES
@@ -1850,3 +1886,51 @@ class TestIdsPorNombreEnOutput:
         est = res["metadata"]["estadisticas"]
         assert est["con_ids_jerarquia"] == 0
         assert est["ids_por_nombre"] == 0
+
+
+class TestAlmacenesPorSku:
+    """El JSON replica la presencia de almacenes por SKU (ids ordenados);
+    los nombres ya viajan en metadata.almacenes.nombres."""
+
+    @staticmethod
+    def _prod(sku):
+        return {
+            "sku": sku,
+            "nombre": f"Producto {sku}",
+            "ean13": "",
+            "ean14": "",
+            "peso_kg": 0.1,
+            "linea": "PELOTAS",
+            "grupo": "G",
+            "tipo": "T",
+            "familia": "F",
+            "categoria": "VINIBALL",
+            "precio": 10.0,
+            "descontinuado": False,
+            "linea_codigo": "01",
+        }
+
+    def test_presencia_publicada_y_contada(self, tmp_path):
+        from generar_catalogo_base import generar_output
+
+        out = tmp_path / "cat.json"
+        res = generar_output(
+            [self._prod("A")],
+            {},
+            {},
+            {},
+            str(out),
+            kardex_almacenes={"A": ["40", "VES"]},
+        )
+        p = res["productos"][0]
+        assert p["almacenes"] == ["40", "VES"]
+        assert res["metadata"]["estadisticas"]["con_almacenes"] == 1
+
+    def test_sin_calce_almacenes_vacios(self, tmp_path):
+        from generar_catalogo_base import generar_output
+
+        out = tmp_path / "cat.json"
+        res = generar_output([self._prod("SINFI")], {}, {}, {}, str(out))
+        p = res["productos"][0]
+        assert p["almacenes"] == []
+        assert res["metadata"]["estadisticas"]["con_almacenes"] == 0

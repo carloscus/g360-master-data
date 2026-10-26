@@ -393,6 +393,7 @@ del anterior (suele ser una fuente faltante, no menos productos).
 | linea, grupo, tipo, familia | PRODUCTOS.xls / S1 (nombres) | `linea` es el **código canónico** (2 chars); el nombre va en `linea_nombre`. Grupo/tipo/familia salen **sin** el código del S1 (`03 - BORRADOR` → `BORRADOR`) |
 | grupo_id, tipo_id, familia_id | KARDEX (IDs de 2 chars) | Los IDs de jerarquía para filtrar sin leer el KARDEX. Sin calce directo se resuelven **por nombre** contra el maestro (verificado por línea, nunca adivinando): ~99.8% de cobertura; lo que queda vacío es que el KARDEX no conoce esa combinación |
 | um | KARDEX (primaria) → S1 (fallback) | Cadena: ficha (S1-only) → KARDEX → universo S1. Vacío solo si ninguna fuente lo sabe |
+| almacenes | KARDEX | Lista de ids de los almacenes donde el SKU tiene presencia (calce directo con KARDEX). Los nombres se resuelven en `metadata.almacenes.nombres` — una sola copia, sin duplicar en cada SKU. Vacío para SKUs sin calce directo (la resolución por nombre es de jerarquía, no da presencia por SKU) |
 | linea_codigo | Mapa estático + desambiguación por grupo | SKUs Crayola (`C*`) usan su prefijo como línea propia (CA/CB/CC/CD/CE/CF/CG → REPRESENTADAS); líneas ERP genéricas (72/76/77/79) quedan 100% VINIFAN. Grupo desempata cuando el nombre es ambiguo (`ACCESORIOS|PINCELES`→`CD`) |
 | categoria | Marca > línea | La **marca manda**: todo SKU `C*` es `REPRESENTADAS` con línea propia (su prefijo de 2 letras), aunque la línea del ERP sea genérica o la sub-marca aún no exista en la taxonomía. Para el resto, la categoría sale de la línea |
 | categoria_venta | Derivada de `categoria` | `VINIBALL` / `VINIFAN` / `REPRESENTADAS`, o `REVISION_VENTA` para el resto |
@@ -690,6 +691,7 @@ y robustez de la validación.
       "con_um": 3550,
       "con_ids_jerarquia": 3547,
       "ids_por_nombre": 41,
+      "con_almacenes": 3506,
       "en_guia": 1022,
       "con_compromiso": 667,
       "por_activar": 768,
@@ -745,6 +747,7 @@ y robustez de la validación.
       "familia": "FUTBOL",
       "familia_id": "01",
       "um": "UND",
+      "almacenes": ["40", "92", "121", "VES", "..."],
       "un_bx": 18,
       "orden": 1,
       "estado_linea": "IMPORTADO",

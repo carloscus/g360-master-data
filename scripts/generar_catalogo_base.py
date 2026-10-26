@@ -943,6 +943,8 @@ def _estadisticas_base() -> dict:
         "con_ids_jerarquia": 0,
         # IDs resueltos por NOMBRE contra KARDEX (SKU sin calce directo)
         "ids_por_nombre": 0,
+        # SKUs con presencia de almacenes publicada (calce directo KARDEX)
+        "con_almacenes": 0,
         # Sin enlaces por parecido: siempre 0. Se mantiene la clave para no
         # romper consumidores del metadata.
         "derivados": 0,
@@ -1001,11 +1003,20 @@ def _resolver_ids(p, kardex_ids, kardex_nombre) -> tuple[dict, bool]:
 
 
 def _acumular_stats(
-    estadisticas, p, flags, kid, um, un_bx_definido, caja, est, ids_por_nombre
+    estadisticas,
+    p,
+    flags,
+    kid,
+    um,
+    un_bx_definido,
+    caja,
+    est,
+    ids_por_nombre,
+    almacenes_sku=None,
 ) -> None:
     """Suma cada SKU a los contadores del metadata: ficha (EAN, caja,
-    descontinuados), flags de negocio, UM, IDs de jerarquia y agregados
-    por categoria/linea/estado."""
+    descontinuados), flags de negocio, UM, IDs de jerarquia, almacenes
+    y agregados por categoria/linea/estado."""
     if caja:
         estadisticas["con_caja"] += 1
     if un_bx_definido:
@@ -1051,6 +1062,8 @@ def _acumular_stats(
         estadisticas["con_ids_jerarquia"] += 1
     if ids_por_nombre:
         estadisticas["ids_por_nombre"] += 1
+    if almacenes_sku:
+        estadisticas["con_almacenes"] += 1
     if flags["origen"] == "s1":
         estadisticas["solo_s1"] += 1
     estadisticas["por_categoria_venta"][flags["cat_venta"]] = (
@@ -1058,9 +1071,12 @@ def _acumular_stats(
     )
 
 
-def _construir_producto(p, flags, kid, um, un_bx, caja, est, orden_map) -> dict:
+def _construir_producto(
+    p, flags, kid, um, un_bx, caja, est, orden_map, almacenes_sku=None
+) -> dict:
     """Item del catalogo: identidad (ERP) + jerarquia (KARDEX) + flags de
-    negocio + snapshot del S1 que justifico la inclusion."""
+    negocio + snapshot del S1 que justifico la inclusion + presencia de
+    almacenes (ids; los nombres viven en metadata.almacenes.nombres)."""
     return {
         "sku": p["sku"],
         "nombre": p["nombre"],
@@ -1079,6 +1095,7 @@ def _construir_producto(p, flags, kid, um, un_bx, caja, est, orden_map) -> dict:
         "familia": p["familia"],
         "familia_id": kid.get("familia_id", ""),
         "um": um,
+        "almacenes": list(almacenes_sku or []),
         "un_bx": un_bx,
         "orden": orden_map.get(p["sku"], 0),
         "estado_linea": est,
@@ -1312,6 +1329,7 @@ def generar_output(
     kardex_ids=None,
     kardex_nombre=None,
     almacenes_nombres=None,
+    kardex_almacenes=None,
 ):
     """Genera el JSON de catálogo completo.
 
@@ -1333,6 +1351,10 @@ def generar_output(
         un_bx = unbx_map.get(p["sku"], 1)
         caja = caja_map.get(p["sku"])
         est = estado_map.get(p["sku"], "")
+        # Presencia de almacenes: solo con calce directo al KARDEX (la
+        # resolucion por nombre es de jerarquia, no por SKU: no puede decir
+        # en que almacenes esta un SKU que no calzo).
+        almacenes_sku = list((kardex_almacenes or {}).get(p["sku"], []))
         _acumular_stats(
             estadisticas,
             p,
@@ -1343,9 +1365,20 @@ def generar_output(
             caja=caja,
             est=est,
             ids_por_nombre=por_nombre,
+            almacenes_sku=almacenes_sku,
         )
         productos_final.append(
-            _construir_producto(p, flags, kid, um_final, un_bx, caja, est, orden_map)
+            _construir_producto(
+                p,
+                flags,
+                kid,
+                um_final,
+                un_bx,
+                caja,
+                est,
+                orden_map,
+                almacenes_sku=almacenes_sku,
+            )
         )
 
     productos_final.sort(
@@ -1752,6 +1785,7 @@ def _cargar_kardex(productos):
         "kardex_ids": None,
         "kardex_nombre": None,
         "almacenes_nombres": {},
+        "kardex_almacenes": {},
     }
     kardex_ruta = Path("data") / "KARDEX_BASE.xlsx"
     if not kardex_ruta.exists():
@@ -1773,6 +1807,12 @@ def _cargar_kardex(productos):
     # Resolucion por NOMBRE para SKUs sin calce directo (S1-only, D):
     # nombres exactos + verificacion de linea; nunca adivina.
     resultado["kardex_nombre"] = indice_jerarquia_por_nombre(fichas_kardex)
+    resultado["almacenes_nombres"] = meta_kardex.get("almacenes", {})
+    # Presencia por SKU (solo calce directo): ids de almacenes; los nombres
+    # se resuelven en metadata.almacenes.nombres (una sola copia).
+    resultado["kardex_almacenes"] = {
+        s: fichas_kardex[m].get("almacenes_ids", []) for s, m in match_kardex.items()
+    }
     resultado["almacenes_nombres"] = meta_kardex.get("almacenes", {})
     if resultado["almacenes_nombres"]:
         print(f"  KARDEX: {len(resultado['almacenes_nombres'])} almacenes con nombre")
@@ -1808,6 +1848,7 @@ def _imprimir_resumen(output) -> None:
         f"  Con IDs jerarquia:         {est['con_ids_jerarquia']} "
         f"(resueltos por nombre: {est.get('ids_por_nombre', 0)})"
     )
+    print(f"  Con almacenes (KARDEX):    {est.get('con_almacenes', 0)}")
     print(f"  En guia (SKU_BX):          {est['en_guia']}")
     print(f"  Con compromiso:            {est['con_compromiso']}")
     print(f"  Cotizables:                {est['cotizables']}")
@@ -1943,6 +1984,7 @@ def main():
         kardex_ids=kardex["kardex_ids"],
         kardex_nombre=kardex["kardex_nombre"],
         almacenes_nombres=kardex["almacenes_nombres"],
+        kardex_almacenes=kardex["kardex_almacenes"],
     )
     _imprimir_resumen(output)
 

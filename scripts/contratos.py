@@ -938,7 +938,7 @@ def calcular_m3(largo_cm, ancho_cm, alto_cm) -> float | None:
 # derivan de esa única lectura. Así ningún campo "se deja de leer".
 
 CACHE_KARDEX_NOMBRE = ".cache_kardex.json"
-CACHE_KARDEX_VERSION = 5
+CACHE_KARDEX_VERSION = 6
 
 
 def derecha2(valor) -> str:
@@ -1146,7 +1146,10 @@ def _construir_indice_kardex(hoja, columnas) -> dict:
       - almacenes: id como texto ('40', 'VES') -> nombre; conflicto = primero.
       - SKU: texto, sin tocar. Si TODOS empiezan con '1' queda senalado
         (prefijo sistematico, se quita uno solo en _ajustes_finales).
-    Devuelve un dict con articulos, stats, almacenes y banderas del loop.
+    Ademas guarda por SKU la presencia en almacenes (presencia[sku]): la
+    lista de ids donde tiene filas, que _ajustes_finales adjunta a cada
+    ficha como almacenes_ids. Devuelve un dict con articulos, stats,
+    almacenes, presencia y banderas del loop.
     """
     idx = {c: columnas.idx(c) for c in columnas.indices}
     i_sku, i_um = idx["id_articulo"], idx["id_um"]
@@ -1179,6 +1182,7 @@ def _construir_indice_kardex(hoja, columnas) -> dict:
         return norm
 
     articulos: dict[str, dict] = {}
+    presencia: dict[str, set] = {}
     stats_jer = {"n": 0, "ej": [], "vistos": set()}
     # Almacenes del archivo: id como texto ('40', 'VES') -> nombre visible.
     almacenes: dict[str, str] = {}
@@ -1201,6 +1205,8 @@ def _construir_indice_kardex(hoja, columnas) -> dict:
         um = limpiar_texto(fila[i_um]).upper() if len(fila) > i_um else ""
         if not sku:
             continue
+        if aid:
+            presencia.setdefault(sku, set()).add(aid)
         # Regla SKU: todos empiezan con '1' => prefijo sistematico
         # (se quita uno solo al final). Mezcla => codigos reales, intactos.
         hay_skus = True
@@ -1244,6 +1250,7 @@ def _construir_indice_kardex(hoja, columnas) -> dict:
         "stats_jer": stats_jer,
         "almacenes": almacenes,
         "almacenes_conflictos": almacenes_conflictos,
+        "presencia": presencia,
         "todos_uno": todos_uno,
         "hay_skus": hay_skus,
     }
@@ -1251,7 +1258,8 @@ def _construir_indice_kardex(hoja, columnas) -> dict:
 
 def _ajustes_finales(indice) -> tuple[dict, dict]:
     """Ajustes aplicados en la construccion (todo visible en meta): jerarquia
-    normalizada, conflictos de almacen y el prefijo '1' sistematico. Devuelve
+    normalizada, conflictos de almacen, el prefijo '1' sistematico y la
+    presencia por SKU (ficha.almacenes_ids, lista ordenada de ids). Devuelve
     (articulos_finales, ajustes); con mezcla de prefijos no se toca nada."""
     ajustes: dict = {}
     stats_jer = indice["stats_jer"]
@@ -1263,9 +1271,15 @@ def _ajustes_finales(indice) -> tuple[dict, dict]:
         # reporta (nada se cambia en silencio).
         ajustes["almacenes_conflictos"] = sorted(indice["almacenes_conflictos"])
     articulos = indice["articulos"]
+    presencia = indice.get("presencia", {})
     if indice["hay_skus"] and indice["todos_uno"]:
         articulos = {s[1:]: f for s, f in articulos.items()}
         ajustes["sku_prefijo_uno"] = True
+    # Lista ordenada y unica por SKU (JSON no serializa sets); la clave del
+    # presencia puede diferir de la final solo con el prefijo '1' reducido.
+    for sku, ficha in articulos.items():
+        base = sku if sku in presencia else ("1" + sku)
+        ficha["almacenes_ids"] = sorted(presencia.get(base, ()))
     return articulos, ajustes
 
 
@@ -1293,11 +1307,13 @@ def leer_kardex(ruta) -> tuple[dict, dict]:
     disco). Devuelve (articulos, meta) donde articulos es
     {colIdArticulo: ficha} con ficha = {um, linea_id, linea, grupo_id,
     grupo, tipo_id, tipo, familia_id, familia, nombre_corto, nombre_largo,
-    n_almacenes, conflictos}.
+    n_almacenes, conflictos, almacenes_ids}.
 
     `conflictos` junta los valores distintos vistos para el mismo SKU en
     distintas filas/almacenes (UM, linea, grupo...): el KARDEX tambien
     trae defectos y aca quedan a la vista en vez de perderse en silencio.
+    `almacenes_ids` es la lista ordenada de almacenes donde el SKU tiene
+    filas (los nombres estan en meta["almacenes"]).
     """
     import openpyxl
 
