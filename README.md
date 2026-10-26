@@ -317,7 +317,7 @@ en guía (SKU_BX) ∨ stock > 0 ∨ compromiso > 0 ∨ (vigente ∧ precio > 0)
 | SKU con stock/compromiso y **sin precio** | **Incluido** con `cotizable: false`, `por_activar: true` |
 | SKUs duplicados en ERP | Solo el primero |
 | SKUs en guía sin ERP | Advertencia y se omiten (ej. `04058`) |
-| **Productos finales** | **3.553 SKUs** |
+| **Productos finales** | **3.550 SKUs** |
 
 El precio ya **no decide la presencia**: decide la **cotizabilidad**. Un SKU sin
 precio puede estar publicado (hay producto físico), pero se marca `por_activar`
@@ -363,8 +363,8 @@ universo de stock entró y si hubo SKUs con movimiento que no se publicaron:
 "regla_inclusion": "en guia ∨ stock > 0 ∨ compromiso > 0 ∨ (vigente ∧ precio > 0)",
 "exclusiones": {
   "linea_proceso": 6538,
-  "sin_precio_ni_movimiento": 2236,
-  "descontinuado_sin_guia_ni_stock": 446
+  "sin_precio_ni_movimiento": 2227,
+  "descontinuado_sin_guia_ni_stock": 427
 },
 "universo_stock": { "incluido": true, "skus": 2214, "con_stock": 2204, "con_compromiso": 666, "error": "" },
 "universo_skus": ["016763", "..."],
@@ -657,8 +657,8 @@ La tabla muestra `SKU_KARDEX -> SKU_JSON` cuando difieren (`1011019 -> 011019`).
 python -m pytest scripts/tests -q
 ```
 
-160 tests: generación (inclusión, taxonomía, SKUs exactos sin enlaces,
-cobertura, universo S1), contrato de encabezados (normalización, alias,
+216 tests: generación (inclusión, taxonomía, SKUs exactos sin enlaces,
+cobertura, universo S1, IDs de jerarquia y almacenes por SKU), contrato de encabezados (normalización, alias,
 duplicados, columnas corridas, anclas del S1, cajas/m³), revisión de guía
 y robustez de la validación.
 
@@ -670,7 +670,7 @@ y robustez de la validación.
 {
   "metadata": {
     "version": "3.8.0",
-    "generated_at": "2026-10-23T00:12:00.000000",
+    "generated_at": "2026-10-26T09:47:24.067439",
     "source_erp": "PRODUCTOS.xls",
     "source_un_bx": "SKU_BX.xlsx",
     "source_stock": "http://appweb.cipsa.com.pe:8054/...",
@@ -678,34 +678,34 @@ y robustez de la validación.
       { "archivo": "PRODUCTOS.xls", "bytes": 4844312, "sha256": "2dbbbf8b9669cc52", "modificado": "2026-10-20T16:16:53" },
       { "archivo": "SKU_BX.xlsx", "bytes": 37266, "sha256": "e910d11c282f85b0", "modificado": "2026-09-21T23:37:32" }
     ],
-    "total_productos": 3553,
+    "total_productos": 3550,
     "estadisticas": {
-      "sin_ean13": 2267,
-      "con_ean14": 1037,
-      "sin_unbx": 2516,
+      "sin_ean13": 2295,
+      "con_ean14": 1017,
+      "sin_unbx": 2528,
       "con_unbx": 1022,
       "con_caja": 0,
-      "descontinuados": 348,
+      "descontinuados": 363,
       "sin_linea_codigo": 0,
       "con_linea_otros": 0,
-      "con_um": 3550,
-      "con_ids_jerarquia": 3547,
-      "ids_por_nombre": 41,
-      "con_almacenes": 3506,
+      "con_um": 3549,
+      "con_ids_jerarquia": 3544,
+      "ids_por_nombre": 39,
+      "con_almacenes": 3505,
       "en_guia": 1022,
-      "con_compromiso": 667,
-      "por_activar": 768,
-      "cotizables": 2770,
+      "con_compromiso": 672,
+      "por_activar": 791,
+      "cotizables": 2759,
       "derivados": 0,
-      "solo_s1": 522,
+      "solo_s1": 506,
       "por_categoria_venta": {
-        "REVISION_VENTA": 1152,
-        "VINIFAN": 972,
+        "REVISION_VENTA": 1175,
+        "VINIFAN": 948,
         "REPRESENTADAS": 838,
-        "VINIBALL": 576
+        "VINIBALL": 589
       },
-      "por_categoria": { "VINIFAN": 972, "REPRESENTADAS": 838, "VINIBALL": 576, "...": "..." },
-      "por_linea": { "85": 776, "01": 523, "78": 421, "80": 303, "...": "..." },
+      "por_categoria": { "VINIFAN": 948, "REPRESENTADAS": 838, "VINIBALL": 589, "INDUSTRIAL": 447 },
+      "por_linea": { "85": 776, "01": 536, "78": 394, "80": 310, "...": "..." },
       "por_estado_linea": { "NUEVO": 406, "IMPORTADO": 285, "TRADICIONAL": 191, "NACIONAL": 140 }
     },
     "categorias_por_linea": { "01": "VINIBALL", "78": "VINIFAN", "CA": "REPRESENTADAS", "...": "..." },
@@ -719,13 +719,13 @@ y robustez de la validación.
       "sin_precio_ni_movimiento": 2236,
       "descontinuado_sin_guia_ni_stock": 446
     },
-    "universo_stock": { "incluido": true, "skus": 2256, "con_stock": 2256, "con_compromiso": 699, "error": "", "previo_skus": 2256, "variacion": 0.0 },
+    "universo_stock": { "incluido": true, "skus": 2267, "con_stock": 2267, "con_compromiso": 672, "error": "", "previo_skus": 2267, "variacion": 0.0 },
     "universo_skus": ["016763", "..."],
     "cobertura_faltante": [],
     "almacenes": {
       "principal": "VES",
       "almacenes": { "40": "venta", "VES": "venta", "...": "..." },
-      "nombres": { "40": "ALMACEN PROD. TERMINADOS", "VES": "ALMACEN VES", "...": "..." },
+      "nombres": { "40": "ALMACEN PROD. TERMINADOS", "VES": "CENTRO LOGISTICO VES", "...": "..." },
       "fuente": "config"
     },
   },
@@ -770,8 +770,8 @@ y robustez de la validación.
       "por_activar": false,
       "derivado_de": "",
       "origen": "erp",
-      "stock_snapshot": 615,
-      "predespacho_snapshot": 181,
+      "stock_snapshot": 621,
+      "predespacho_snapshot": 229,
       "keywords": ["01", "FUTBOL", "FUTURE", "PELOTAS", "VINIBALL"]
     }
   ]
