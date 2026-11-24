@@ -11,6 +11,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from generar_catalogo_base import (
+    VERSION,
     decidir_inclusion,
     generar_nombre_corto,
     generar_keywords,
@@ -762,6 +763,50 @@ class TestUmFallbackUniverso:
         p = res["productos"][0]
         assert p["um"] == ""
         assert res["metadata"]["estadisticas"]["con_um"] == 0
+
+
+class TestContratoMetadata:
+    """Contrato de metadata: campos estables y su version."""
+
+    def test_metadata_expone_contract_version(self, tmp_path):
+        """generar_output emite contract_version == VERSION (el mismo valor)."""
+        out = tmp_path / "cat.json"
+        res = generar_output([_prod("A")], {}, {}, {}, str(out))
+        meta = res["metadata"]
+        assert meta["contract_version"] == VERSION
+        assert meta["contract_version"] == meta["version"]
+
+    def test_estadisticas_conserva_las_claves_fijas(self, tmp_path):
+        """Las 22 claves de estadisticas son fijas: un test LITERAL, no
+        leido de _estadisticas_base(), para que no pase si alguien elimina
+        la clave en ambos sitios a la vez."""
+        out = tmp_path / "cat.json"
+        res = generar_output([_prod("A")], {}, {}, {}, str(out))
+        claves_esperadas = {
+            "sin_ean13",
+            "con_ean14",
+            "sin_unbx",
+            "con_unbx",
+            "con_caja",
+            "descontinuados",
+            "sin_linea_codigo",
+            "con_linea_otros",
+            "en_guia",
+            "con_compromiso",
+            "por_activar",
+            "cotizables",
+            "con_um",
+            "con_ids_jerarquia",
+            "ids_por_nombre",
+            "con_almacenes",
+            "derivados",
+            "solo_s1",
+            "por_categoria",
+            "por_categoria_venta",
+            "por_linea",
+            "por_estado_linea",
+        }
+        assert set(res["metadata"]["estadisticas"].keys()) == claves_esperadas
 
 
 if __name__ == "__main__":

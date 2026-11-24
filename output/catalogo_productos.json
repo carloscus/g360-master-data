@@ -1,6 +1,7 @@
 {
   "metadata": {
     "version": "3.8.0",
+    "contract_version": "3.8.0",
     "generated_at": "2026-10-26T09:47:24.067439",
     "source_erp": "PRODUCTOS.xls",
     "source_un_bx": "SKU_BX.xlsx",
