@@ -73,4 +73,4 @@ Si algo frena, el mensaje dice qué bloque y por qué (ver §4).
 - Gates: `scripts/validar_encabezados.py` (paso 0), `scripts/validar_taxonomia.py`
 - Consulta: `scripts/consultar_por_taxonomia.py`
 - Config editable sin código: `config/almacenes.json`, `config/guia_ignorados.json`
-- Tests: `scripts/tests/` — 198 verdes a la fecha. Si cambias una regla, cambia su test primero.
+- Tests: `scripts/tests/` — 223 verdes a la fecha. Si cambias una regla, cambia su test primero.

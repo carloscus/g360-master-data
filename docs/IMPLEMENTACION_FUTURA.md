@@ -226,9 +226,9 @@ python scripts/leer_sku_precios.py -i data/SKU_PRECIOS.xlsx
 ## Notas Históricas
 
 - El "método D" (derivación por parecido) se eliminó en commit `ee2b68b` (2026-09-25).
-- `dimensiones_caja` está definido en schema pero nunca poblado porque `SKU_PRECIOS.xlsx` no existía.
+- `dimensiones_caja` está definido en schema pero nunca poblado porque `plantilla_precios.xlsx` (hoja `SKU_PRECIOS`) no existía.
 - `UM` se pobló desde KARDEX en commit `1037a25` (2026-10-23).
-- La estructura `SKU_PRECIOS.xlsx` unificada se diseñó en v3.8 para consolidar `SKU_BX.xlsx` + `plantilla_precios.xlsx`.
+- La estructura `plantilla_precios.xlsx` unificada (hoja `SKU_PRECIOS`) se diseñó en v3.8 para consolidar `SKU_BX.xlsx` + `plantilla_precios.xlsx`. Archivo propuesto, aún no creado.
 
 ---
 
