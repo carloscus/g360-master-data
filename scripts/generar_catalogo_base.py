@@ -4,7 +4,7 @@ G360 Catalog Generator
 Genera el catálogo maestro (el ALLOWLIST real del API) desde las fuentes
 disponibles. El API de stock no tiene allowlist propia: lo que no está en
 este catálogo se ve como `sin_catalogo` (precio 0, caja 1, sin peso/EAN).
-Autor: CCUSI | v3.7.0
+Autor: CCUSI
 
 Fuentes (se leen por NOMBRE de columna, ver scripts/contratos.py):
   - data/PRODUCTOS.xls       → SKU, nombre, ean13, ean14, peso, linea, grupo, tipo, familia, precio
@@ -1193,6 +1193,11 @@ def _construir_metadata(
 
     return {
         "version": VERSION,
+        # contract_version es la misma VERSION: cada version del catalogo es
+        # tambien version del contrato. Los consumidores leen contract_version
+        # para decidir compatibilidad (evita campos divergentes entre el
+        # banner/ayuda y el metadata).
+        "contract_version": VERSION,
         "generated_at": datetime.now().isoformat(),
         "source_erp": "PRODUCTOS.xls",
         "source_un_bx": "SKU_BX.xlsx",

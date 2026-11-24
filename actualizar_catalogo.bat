@@ -27,6 +27,13 @@ REM
 REM v3.7.0: paso 0 de contrato de encabezados (scripts/validar_encabezados.py):
 REM las fuentes se leen por NOMBRE de columna y una fuente rota frena todo.
 REM El catalogo agrega las dimensiones de caja y el m3 (plantillas/).
+REM
+REM v3.8.0: contrato de datos (semver). El campo metadata.contract_version
+REM (== VERSION 3.8.0) se publica en el artefacto mediante
+REM scripts/actualizar_contract_version.py, un paso determinista, idempotente
+REM y sin red que corre DESPUES de generar el catalogo completo. Los
+REM consumidores (g360-stock-api) lo leen para decidir compatibilidad en
+REM runtime.
 
 set "AUTO_MODE=0"
 set "UPLOAD_MODE=0"
@@ -136,6 +143,16 @@ if defined G360_S1_CACHE set "GEN_CMD=%GEN_CMD% --s1-cache "%G360_S1_CACHE%""
 
 if %ERRORLEVEL% NEQ 0 (
     echo ERROR: Fallo al generar catalogo
+    if "%AUTO_MODE%"=="0" pause
+    exit /b 1
+)
+
+REM Paso aditivo: publicar metadata.contract_version en el artefacto ya
+REM generado. No toca ningun otro dato; si ya esta correcto no modifica nada.
+echo Publicando contract_version en el catalogo...
+.venv\Scripts\python.exe scripts\actualizar_contract_version.py output\catalogo_productos.json
+if %ERRORLEVEL% NEQ 0 (
+    echo ERROR: Fallo al publicar contract_version
     if "%AUTO_MODE%"=="0" pause
     exit /b 1
 )
