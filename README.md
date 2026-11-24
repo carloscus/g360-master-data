@@ -624,15 +624,14 @@ Si aparece una sub-marca nueva (CH, CI…), el generador:
    metadata (así ningún consumidor la deja en el default `OTROS`);
 2. avisa en consola y el validador lo reporta como aviso (no bloquea).
 
-Para dejarla fija hay que tocar **dos** archivos:
+Para dejarla fija, completar este checklist:
 
-```python
-# scripts/generar_catalogo_base.py
-CATEGORIA_POR_LINEA = { ..., "CH": "REPRESENTADAS" }
+1. `scripts/generar_catalogo_base.py`: agregar `"CH": "REPRESENTADAS"` a `CATEGORIA_POR_LINEA` (y a `LINEA_NOMBRE_A_CODIGO` si el nombre de línea es nuevo).
+2. `g360-stock-api/app/core/constants.py`: agregar `"CH"` a la lista `CATEGORIAS["REPRESENTADAS"]`.
+3. Validar con el checkout hermano presente: `python scripts/validar_taxonomia.py` (si el test cross-repo se salta, el hermano no está en la ruta esperada — ver `scripts/tests/test_validacion_taxonomia.py:171`).
+4. Regenerar y subir el catálogo con `actualizar_catalogo.bat`.
 
-# g360-stock-api/app/core/constants.py
-CATEGORIAS = { ..., "REPRESENTADAS": ["85", "CE", "CF", "CA", "CB", "CC", "CD", "CG", "CH"] }
-```
+> Nota: el catálogo ya publica `metadata.categorias_por_linea` y stock-api lo expone; la copia en `constants.py` es deuda por eliminar, no la fuente de verdad. El generador ya publica sub-marcas nuevas clasificadas automáticamente como `REPRESENTADAS`, así que esta alta es para **fijarlas**, no para que funcionen.
 
 Mientras no se fije, el API de stock sigue clasificando bien los C* por marca
 (todo C* es REPRESENTADAS, incluso sin catálogo).
@@ -724,6 +723,8 @@ tener que regenerar desde cero.
 | **PATCH** (3.8.1) | Correcciones que no cambian shape ni semántica. Los **refrescos de contenido no bumpan** la versión (el catálogo se regenera con datos nuevos pero `VERSION` y `contract_version` se mantienen). |
 
 > El catálogo **no es fuente de stock**: los campos de movimiento son diagnóstico de generación, no contenido del catálogo. El dato de stock vivo vive en `/api/v1/stock` de `g360-stock-api` (TTL 10 min) y se valida por SKU.
+
+> **Campos RESERVADOS:** poblar un campo RESERVADO (`dimensiones_caja`, hoy `null` en el 100% de los 3550 SKU) con su tipo y nulabilidad actuales es **refresco de contenido**, no un bump: no cambia nombre, tipo, nulabilidad ni significado del contrato. Sí sería MAJOR convertirlo en obligatorio, cambiar su tipo o redefinir su semántica.
 
 ### Alcance de ESTABLE
 

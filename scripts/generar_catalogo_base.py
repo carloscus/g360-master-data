@@ -187,7 +187,6 @@ PREFIJOS_CATEGORIA_AUTO: list[tuple[str, str]] = [
     ("41", "MATERIALES"),
     ("50", "MATERIALES"),
     ("51", "MATERIALES"),
-    ("52", "MATERIALES"),
     ("53", "MATERIALES"),
     ("54", "MATERIALES"),
     ("55", "MATERIALES"),
