@@ -340,6 +340,15 @@ Crayola), pero para venta se publica además `categoria_venta`:
 DESCARTE Y VARIOS, OTROS, etc. La distribución actual: **REVISION_VENTA 1.152 /
 VINIFAN 972 / REPRESENTADAS 838 / VINIBALL 576**.
 
+> **`OTROS` (14) ≠ `VARIOS` (99).** No son dos nombres para lo mismo: la
+> desambiguación no la hace el nombre de la línea sino la jerarquía validada
+> contra KARDEX por línea (grupo + tipo + familia, con calce directo por SKU
+> primero y por nombre solo si hay un candidato único; nunca se adivina).
+> `14` son 36 SKU de JUGUETES/PROTECTOR FACIAL/ATOMIZADOR → `VINIBALL`,
+> con 9 en guía SKU_BX; `99` son 50 SKU de ACTIVO FIJO/SERVICIOS →
+> `OTROS` / `REVISION_VENTA`, sin guía. SKU_BX define guía y caja; el nombre
+> de línea solo etiqueta.
+
 ### SKUs exactos, sin enlaces por parecido (ex método D)
 
 Cada SKU es exacto y standalone: ningún código "parecido" genera vínculo
