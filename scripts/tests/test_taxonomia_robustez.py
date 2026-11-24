@@ -18,7 +18,9 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from generar_catalogo_base import (  # noqa: E402
     LINEA_GRUPO_A_CODIGO,
+    PREFIJOS_CATEGORIA_AUTO,
     PREFIJO_MARCA_A_CATEGORIA,
+    asignar_categoria,
     categoria_de_producto,
     codigo_linea_crayola,
     decidir_inclusion,
@@ -132,6 +134,17 @@ class TestProcesosNuevos:
             False,
             False,
         )
+
+
+class TestPrefijo52Quitado:
+    """Quitar el prefijo ("52", "MATERIALES") no debe cambiar el exacto:
+    la linea "52" sigue siendo INDUMENTARIA y el prefijo ya no existe."""
+
+    def test_linea_52_sigue_si_indumentaria(self):
+        assert asignar_categoria("52") == "INDUMENTARIA"
+
+    def test_prefijo_52_materiales_ya_no_esta(self):
+        assert ("52", "MATERIALES") not in PREFIJOS_CATEGORIA_AUTO
 
 
 class TestConsistenciaTaxonomia:
