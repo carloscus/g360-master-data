@@ -714,17 +714,19 @@ tener que regenerar desde cero.
 | **MINOR** (3.9.0) | Agregar campo aditivo o clave nueva a un mapa **si está documentado que los consumidores deben tolerar claves/valores desconocidos con fallback**; agregar valor a `categorias_venta` **solo bajo esa misma regla de tolerancia**. Si no hay regla de tolerancia documentada para ese mapa/enumeración, el agregado es MAJOR. |
 | **PATCH** (3.8.1) | Correcciones que no cambian shape ni semántica. Los **refrescos de contenido no bumpan** la versión (el catálogo se regenera con datos nuevos pero `VERSION` y `contract_version` se mantienen). |
 
+> El catálogo **no es fuente de stock**: los campos de movimiento son diagnóstico de generación, no contenido del catálogo. El dato de stock vivo vive en `/api/v1/stock` de `g360-stock-api` (TTL 10 min) y se valida por SKU.
+
 ### Alcance de ESTABLE
 
 Estable significa conservar **nombre, tipo, nulabilidad y semántica**; un cambio en cualquiera de esas dimensiones requiere MAJOR.
 
 **Metadato ESTABLE:** `version`, `contract_version`, `generated_at`, `fuentes` (forma interna `archivo`/`bytes`/`sha256`/`modificado` parte del contrato), `total_productos`, `estadisticas.*` (las 22 claves: `sin_ean13`, `con_ean14`, `sin_unbx`, `con_unbx`, `con_caja`, `descontinuados`, `sin_linea_codigo`, `con_linea_otros`, `en_guia`, `con_compromiso`, `por_activar`, `cotizables`, `con_um`, `con_ids_jerarquia`, `ids_por_nombre`, `con_almacenes`, `derivados`, `solo_s1`, `por_categoria`, `por_categoria_venta`, `por_linea`, `por_estado_linea`), `categorias_por_linea`, `categorias_venta`, `categoria_venta_revision`, `almacenes` (forma de `almacenes.almacenes` parte del contrato), `lineas_nombre_a_codigo`, `lineas_grupo_a_codigo`, `universo_skus`, `cobertura_faltante`.
 
-**Metadato DEPRECADO (se sigue emitiendo):** `source_erp`, `source_un_bx`, `source_stock` (sustituto: `fuentes` con sha256), `regla_inclusion`, `exclusiones`, `universo_stock`.
+**Metadato DEPRECADO (se sigue emitiendo):** `source_erp`, `source_un_bx`, `source_stock` (sustituto: `fuentes` con sha256), `regla_inclusion`, `exclusiones`, `universo_stock` (diagnóstico de generación: qué filas del ERP quedaron fuera y si entró el universo S1; no es dato del catálogo, sustituto es la validación por SKU en `/api/v1/stock`).
 
-**Producto ESTABLE:** `sku`, `nombre`, `nombre_corto`, `ean13/14`, `peso_kg`, `linea`, `linea_nombre`, `grupo/tipo/familia` + `_id`, `um`, `almacenes`, `un_bx`, `orden`, `estado_linea`, `precio`, `descontinuado`, `en_guia`, `compromiso`, `cotizable`, `por_activar`, `vigente`, `categoria`, `categoria_venta`, `origen`, `keywords`, `linea_codigo`, `stock_snapshot`, `predespacho_snapshot`, `derivado_de` (clave estable, hoy siempre vacía por compatibilidad; su contenido placeholder puede evolucionar dentro de su tipo), `derivados` (clave de estadísticas, siempre 0).
+**Producto ESTABLE:** `sku`, `nombre`, `nombre_corto`, `ean13/14`, `peso_kg`, `linea`, `linea_nombre`, `grupo/tipo/familia` + `_id`, `um`, `almacenes`, `un_bx`, `orden`, `estado_linea`, `precio`, `descontinuado`, `en_guia`, `cotizable`, `por_activar`, `vigente`, `categoria`, `categoria_venta`, `origen`, `keywords`, `linea_codigo`, `derivado_de` (clave estable, hoy siempre vacía por compatibilidad; su contenido placeholder puede evolucionar dentro de su tipo), `derivados` (clave de estadísticas, siempre 0).
 
-**Producto DEPRECADO/RESERVADO:** `dimensiones_caja` (RESERVADO: se emite por herencia, no recomendado para nuevas integraciones; sin sustituto; validador local en `scripts/validar_taxonomia.py:327-341` y tests en `test_contratos.py:748,778`). No se elimina.
+**Producto DEPRECADO/RESERVADO:** `dimensiones_caja` (RESERVADO: se emite por herencia, no recomendado para nuevas integraciones; sin sustituto; validador local en `scripts/validar_taxonomia.py:327-341` y tests en `test_contratos.py:748,778`). No se elimina. `stock_snapshot`, `predespacho_snapshot` y `compromiso` (DEPRECADO: diagnóstico de la corrida de generación, no dato del catálogo; se siguen emitiendo por compatibilidad hasta el próximo MAJOR; sustituto es `/api/v1/stock` de `g360-stock-api` consultado por SKU).
 
 ### Deprecación
 
