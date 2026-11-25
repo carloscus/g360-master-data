@@ -20,6 +20,14 @@ flowchart TD
 > **El catálogo es el allowlist del API.** Todo SKU que puede aparecer en
 > `/stock` y cotizarse tiene que estar publicado acá: si no está, el API lo
 > muestra como `sin_catalogo` (sin precio, sin peso, sin caja).
+>
+> **Contrato de salida para consumidores** (`g360-stock-api` y apps): la
+> definición canónica está en [Versionado del contrato](#versionado-del-contrato-semver)
+> (`contract_version`, estabilidad y deprecación) y en [Output JSON](#output-json)
+> (ejemplo alineado con el artefacto publicado). Reglas que no se negocian:
+> `sku` siempre es texto (los ceros a la izquierda son datos),
+> `cobertura_faltante` debe ser `[]` y `data/catalogo.db` es una copia derivada
+> del JSON, nunca una segunda fuente de verdad.
 
 ---
 
@@ -404,7 +412,7 @@ universo de stock entró y si hubo SKUs con movimiento que no se publicaron:
   "sin_precio_ni_movimiento": 2227,
   "descontinuado_sin_guia_ni_stock": 427
 },
-"universo_stock": { "incluido": true, "skus": 2214, "con_stock": 2204, "con_compromiso": 666, "error": "" },
+"universo_stock": { "incluido": true, "skus": 2267, "con_stock": 2267, "con_compromiso": 672, "error": "" },
 "universo_skus": ["016763", "..."],
 "cobertura_faltante": []
 ```
@@ -710,10 +718,10 @@ La tabla muestra `SKU_KARDEX -> SKU_JSON` cuando difieren (`1011019 -> 011019`).
 python -m pytest scripts/tests -q
 ```
 
-223 tests: generación (inclusión, taxonomía, SKUs exactos sin enlaces,
-cobertura, universo S1, IDs de jerarquia y almacenes por SKU), contrato de encabezados (normalización, alias,
-duplicados, columnas corridas, anclas del S1, cajas/m³), revisión de guía
-y robustez de la validación.
+257 tests: generación (inclusión, taxonomía, SKUs exactos sin enlaces,
+cobertura, universo S1, IDs de jerarquía y almacenes por SKU), contrato de encabezados (normalización, alias,
+duplicados, columnas corridas, anclas del S1, cajas/m³), revisión de guía,
+robustez de la validación y BD derivada (32 tests: build, `--check`, sha256, invariantes y regresión).
 
 ---
 ## Versionado del contrato (semver)
