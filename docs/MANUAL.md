@@ -68,6 +68,9 @@ Si algo frena, el mensaje dice qué bloque y por qué (ver §4).
 4. **Toda reescritura queda en `meta`** del loader y se muestra en el paso 0.
 5. **Línea 98** visible en catálogo pero fuera del semáforo vendible.
 6. `data/` no se versiona. Solo `output/*.json` y `plantillas/`.
+7. `'VA':''` en `metadata.almacenes.nombres` es **dato real del JSON** y debe
+   preservarse verbatim en `data/catalogo.db` (nombre TEXT `''`, no NULL). No
+   se "arregla" en la BD: si el origen cambia, se regenera desde el JSON.
 
 ## 6. Dónde vive cada regla
 

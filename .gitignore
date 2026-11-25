@@ -20,6 +20,11 @@ output/test_estado_linea.json
 # Materia prima: son exports manuales (PRODUCTOS.xls, SKU_BX.xlsx,
 # KARDEX_BASE.xlsx, plantilla_precios.xlsx) y el cache local del catalogo.
 # No se versionan: el repo solo lleva el catalogo generado (output/).
+# /data/ (linea 23) YA cubre la BD derivada (data/catalogo.db): se regenera
+# con scripts/generar_catalogo_db.py y nunca se edita a mano.
+# La linea siguiente es documentativa, no una exclusion nueva ni amplia el
+# alcance fuera de data/.
+data/catalogo.db*
 /data/
 
 # Decks: se versionan el spec, la marca, el build y el pptx final;
