@@ -53,10 +53,15 @@ g360-master-data/
 │   └── plantilla_precios.xlsx  ← molde vacío (DESC1..6 como fracción)
 │
 ├── output/
-│   └── catalogo_productos.json ← Catálogo generado (~3.550 SKUs)
-│
+│   └── catalogo_productos.json ← Catálogo generado (~3.550 SKUs) — ÚNICA FUENTE
+└── data/
+    └── catalogo.db               ← SQLite derivado (regenerable, NO se versiona)
+
 ├── scripts/
 │   ├── contratos.py            ← Contrato de encabezados: campos canónicos + alias
+│   ├── generar_catalogo_db.py  ← JSON → SQLite (solo stdlib, sin red, sin Excel, sin API)
+│   └── tests/
+│       └── test_catalogo_db.py ← Tests de la BD derivada (pytest)
 │   ├── validar_encabezados.py  ← Paso 0: valida las fuentes antes de generar
 │   ├── generar_catalogo_base.py ← Genera catálogo desde ERP + SKU_BX + stock (principal, v3.8)
 │   ├── generar_catalogo.py     ← Generador legacy v1 (no usar: no lee el ERP actual)
@@ -83,6 +88,13 @@ g360-master-data/
 catálogo y se reemplaza completo cuando llega el export nuevo (no se edita a
 mano ni se mezcla). **No se versiona**: son exports pesados y cambian seguido;
 el repo solo lleva el catálogo generado (`output/`).
+
+Dentro de `data/` vive `catalogo.db`, la **BD derivada** de
+`output/catalogo_productos.json` vía `scripts/generar_catalogo_db.py`. Es un
+artefacto regenerable: nadie escribe en ella salvo el generador, si difiere del
+JSON se regenera (nunca se edita) y nunca se versiona. Es decisión humana que
+sea derivada, no central y no segunda fuente de verdad — el contrato de verdad
+sigue siendo el JSON.
 
 `plantillas/` es lo único que **sí** se versiona de los archivos manuales: son
 moldes vacíos (con encabezados, fórmulas y listas desplegables) que se copian a
@@ -130,6 +142,17 @@ solo si el repo hermano no está presente).
 
 Variables de entorno: ver `.env.example` (defaults documentados; ninguna es
 obligatoria para generar en modo offline con `G360_S1_CACHE`).
+
+### BD derivada (`data/catalogo.db`)
+`verificar.ps1` también construye `data/catalogo.db` desde el JSON en `%TEMP%`
+y corre `--check` para confirmar que refleja el artefacto (sha256, conteos,
+`user_version`, 7 tablas). Si falla, imprime `BD obsoleta o dañada: regenerar`.
+El build es offline (solo stdlib) y no toca `output/`.
+
+Aritmética del cruce (`cruce_s1`, `incluido=true`): `ok=2257` (catálogo∩universo),
+`sin_catalogo=0` (universo∖catálogo), `sin_s1=1293` (catálogo∖universo), unión=3550.
+Los δ=10 SKUs son filtrados upstream (no huecos): el universo S1 trae 2267 crudos
+de los cuales 10 no pasan el filtro de taxonomía, quedando 2257 únicos publicados.
 
 Para operar sin ayuda (consultas, diagnóstico de fallos, dónde vive cada
 regla): **`docs/MANUAL.md`**.
@@ -469,6 +492,22 @@ python scripts/validar_encabezados.py --json
 ```
 
 Sale con código 1 solo si falla una fuente que alimenta el catálogo.
+
+### generar_catalogo_db.py
+
+Deriva `data/catalogo.db` (SQLite, regenerable) desde `output/catalogo_productos.json` sin red ni Excel:
+
+```powershell
+python scripts\generar_catalogo_db.py                    # build por defecto (output/ -> data/)
+python scripts\generar_catalogo_db.py --check            # verifica sin escribir; exit 1 si obsoleta/dañada
+python scripts\generar_catalogo_db.py --json x.json --db y.db --quiet
+```
+
+- Flags: `--json` (default `output/catalogo_productos.json`), `--db` (default `data/catalogo.db`), `--check`, `--quiet`.
+- Códigos de salida: 0 ok · 1 BD obsoleta/dañada (`--check`) · 2 JSON ausente/ilegible · 3 contrato roto · 4 invariante.
+- `--check` valida en orden: BD válida, `json_sha256`+`json_bytes`, `PRAGMA user_version=1`, 7 tablas, `COUNT(producto)==total_productos`, y `s1_universo`/`cruce_s1` según `incluido`. Falla con `BD obsoleta o dañada: regenerar`.
+- El build es offline (solo stdlib), escribe en `<db>.tmp` y hace `os.replace()` atómico; `<db>.tmp` se borra al inicio y en `finally`.
+- `incluido=false` es condición del JSON: build permitido con warning en stderr, `s1_universo`/`cruce_s1` vacías, exit 0.
 
 ### `generar_catalogo_base.py`
 
