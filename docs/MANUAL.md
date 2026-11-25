@@ -54,6 +54,9 @@ Si algo frena, el mensaje dice qué bloque y por qué (ver §4).
 | SKU numérico con `1` de más | `contratos.reducir_uno_numerico` | Solo calza si el reducido existe en el maestro; si ambas formas existen, no se fusiona (alerta) |
 | SKU sin `grupo_id/tipo_id/familia_id` | stat `ids_por_nombre` / `con_ids_jerarquia` | Los IDs se resuelven por nombre verificado por línea; si queda vacío es que KARDEX no conoce esa combinación (6 hoy) — no se adivina |
 | Taxonomía distinta ERP↔KARDEX | Bloque `KARDEX vs ERP` del paso 0 | Defecto de registro: corregir en el maestro que esté mal, no en el código |
+| SKU en /stock con `sin_catalogo=true` / `revision="sin_catalogo"` y sin EAN, peso, precio ni `un_bx` | `GET /api/v1/stock` de g360-stock-api; `metadata.cobertura_faltante` del catálogo | `NO es error y no se oculta`: es un producto nuevo sin matricular. El S1 ya trae línea/grupo/tipo/familia (id + nombre) y la categoría se deriva localmente; lo que falta es la ficha comercial del catálogo. Dar de alta en `SKU_BX.xlsx` (y ficha ERP si aplica), regenerar y subir el catálogo con `actualizar_catalogo.bat`. El badge se limpia cuando el siguiente update de appweb ya encuentre el SKU en el catálogo. |
+
+> El ítem provisional se muestra con sus cantidades **y su taxonomía** (el S1 la trae completa incluso para SKU fuera de catálogo); lo que falta es la ficha comercial. El badge `sin_catalogo` es la señal para matricularlo, no un motivo para ocultar el movimiento.
 
 ## 5. Reglas duras (no se negocian con los datos)
 
@@ -65,6 +68,9 @@ Si algo frena, el mensaje dice qué bloque y por qué (ver §4).
 4. **Toda reescritura queda en `meta`** del loader y se muestra en el paso 0.
 5. **Línea 98** visible en catálogo pero fuera del semáforo vendible.
 6. `data/` no se versiona. Solo `output/*.json` y `plantillas/`.
+7. `'VA':''` en `metadata.almacenes.nombres` es **dato real del JSON** y debe
+   preservarse verbatim en `data/catalogo.db` (nombre TEXT `''`, no NULL). No
+   se "arregla" en la BD: si el origen cambia, se regenera desde el JSON.
 
 ## 6. Dónde vive cada regla
 
@@ -73,4 +79,4 @@ Si algo frena, el mensaje dice qué bloque y por qué (ver §4).
 - Gates: `scripts/validar_encabezados.py` (paso 0), `scripts/validar_taxonomia.py`
 - Consulta: `scripts/consultar_por_taxonomia.py`
 - Config editable sin código: `config/almacenes.json`, `config/guia_ignorados.json`
-- Tests: `scripts/tests/` — 198 verdes a la fecha. Si cambias una regla, cambia su test primero.
+- Tests: `scripts/tests/` — 223 verdes a la fecha. Si cambias una regla, cambia su test primero.

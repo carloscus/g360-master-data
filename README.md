@@ -53,10 +53,15 @@ g360-master-data/
 │   └── plantilla_precios.xlsx  ← molde vacío (DESC1..6 como fracción)
 │
 ├── output/
-│   └── catalogo_productos.json ← Catálogo generado (~3.550 SKUs)
-│
+│   └── catalogo_productos.json ← Catálogo generado (~3.550 SKUs) — ÚNICA FUENTE
+└── data/
+    └── catalogo.db               ← SQLite derivado (regenerable, NO se versiona)
+
 ├── scripts/
 │   ├── contratos.py            ← Contrato de encabezados: campos canónicos + alias
+│   ├── generar_catalogo_db.py  ← JSON → SQLite (solo stdlib, sin red, sin Excel, sin API)
+│   └── tests/
+│       └── test_catalogo_db.py ← Tests de la BD derivada (pytest)
 │   ├── validar_encabezados.py  ← Paso 0: valida las fuentes antes de generar
 │   ├── generar_catalogo_base.py ← Genera catálogo desde ERP + SKU_BX + stock (principal, v3.8)
 │   ├── generar_catalogo.py     ← Generador legacy v1 (no usar: no lee el ERP actual)
@@ -83,6 +88,13 @@ g360-master-data/
 catálogo y se reemplaza completo cuando llega el export nuevo (no se edita a
 mano ni se mezcla). **No se versiona**: son exports pesados y cambian seguido;
 el repo solo lleva el catálogo generado (`output/`).
+
+Dentro de `data/` vive `catalogo.db`, la **BD derivada** de
+`output/catalogo_productos.json` vía `scripts/generar_catalogo_db.py`. Es un
+artefacto regenerable: nadie escribe en ella salvo el generador, si difiere del
+JSON se regenera (nunca se edita) y nunca se versiona. Es decisión humana que
+sea derivada, no central y no segunda fuente de verdad — el contrato de verdad
+sigue siendo el JSON.
 
 `plantillas/` es lo único que **sí** se versiona de los archivos manuales: son
 moldes vacíos (con encabezados, fórmulas y listas desplegables) que se copian a
@@ -130,6 +142,17 @@ solo si el repo hermano no está presente).
 
 Variables de entorno: ver `.env.example` (defaults documentados; ninguna es
 obligatoria para generar en modo offline con `G360_S1_CACHE`).
+
+### BD derivada (`data/catalogo.db`)
+`verificar.ps1` también construye `data/catalogo.db` desde el JSON en `%TEMP%`
+y corre `--check` para confirmar que refleja el artefacto (sha256, conteos,
+`user_version`, 7 tablas). Si falla, imprime `BD obsoleta o dañada: regenerar`.
+El build es offline (solo stdlib) y no toca `output/`.
+
+Aritmética del cruce (`cruce_s1`, `incluido=true`): `ok=2257` (catálogo∩universo),
+`sin_catalogo=0` (universo∖catálogo), `sin_s1=1293` (catálogo∖universo), unión=3550.
+Los δ=10 SKUs son filtrados upstream (no huecos): el universo S1 trae 2267 crudos
+de los cuales 10 no pasan el filtro de taxonomía, quedando 2257 únicos publicados.
 
 Para operar sin ayuda (consultas, diagnóstico de fallos, dónde vive cada
 regla): **`docs/MANUAL.md`**.
@@ -340,6 +363,15 @@ Crayola), pero para venta se publica además `categoria_venta`:
 DESCARTE Y VARIOS, OTROS, etc. La distribución actual: **REVISION_VENTA 1.152 /
 VINIFAN 972 / REPRESENTADAS 838 / VINIBALL 576**.
 
+> **`OTROS` (14) ≠ `VARIOS` (99).** No son dos nombres para lo mismo: la
+> desambiguación no la hace el nombre de la línea sino la jerarquía validada
+> contra KARDEX por línea (grupo + tipo + familia, con calce directo por SKU
+> primero y por nombre solo si hay un candidato único; nunca se adivina).
+> `14` son 36 SKU de JUGUETES/PROTECTOR FACIAL/ATOMIZADOR → `VINIBALL`,
+> con 9 en guía SKU_BX; `99` son 50 SKU de ACTIVO FIJO/SERVICIOS →
+> `OTROS` / `REVISION_VENTA`, sin guía. SKU_BX define guía y caja; el nombre
+> de línea solo etiqueta.
+
 ### SKUs exactos, sin enlaces por parecido (ex método D)
 
 Cada SKU es exacto y standalone: ningún código "parecido" genera vínculo
@@ -358,6 +390,12 @@ al catálogo con su propia ficha (línea, precio, peso) o no entra.
 
 El `metadata` del JSON registra por qué se quedó fuera cada fila del ERP, si el
 universo de stock entró y si hubo SKUs con movimiento que no se publicaron:
+
+> **Trazabilidad operativa actual, no recomendada para nuevas integraciones.**
+> Los campos `regla_inclusion`, `exclusiones` y `universo_stock` están
+> **DEPRECADOS**: se siguen emitiendo pero su sustituto es `fuentes` (con sha256)
+> para trazabilidad de archivo y `metadata` estable para el resto. Ver §
+> Versionado del contrato (semver) → Deprecación.
 
 ```json
 "regla_inclusion": "en guia ∨ stock > 0 ∨ compromiso > 0 ∨ (vigente ∧ precio > 0)",
@@ -454,6 +492,22 @@ python scripts/validar_encabezados.py --json
 ```
 
 Sale con código 1 solo si falla una fuente que alimenta el catálogo.
+
+### generar_catalogo_db.py
+
+Deriva `data/catalogo.db` (SQLite, regenerable) desde `output/catalogo_productos.json` sin red ni Excel:
+
+```powershell
+python scripts\generar_catalogo_db.py                    # build por defecto (output/ -> data/)
+python scripts\generar_catalogo_db.py --check            # verifica sin escribir; exit 1 si obsoleta/dañada
+python scripts\generar_catalogo_db.py --json x.json --db y.db --quiet
+```
+
+- Flags: `--json` (default `output/catalogo_productos.json`), `--db` (default `data/catalogo.db`), `--check`, `--quiet`.
+- Códigos de salida: 0 ok · 1 BD obsoleta/dañada (`--check`) · 2 JSON ausente/ilegible · 3 contrato roto · 4 invariante.
+- `--check` valida en orden: BD válida, `json_sha256`+`json_bytes`, `PRAGMA user_version=1`, 7 tablas, `COUNT(producto)==total_productos`, y `s1_universo`/`cruce_s1` según `incluido`. Falla con `BD obsoleta o dañada: regenerar`.
+- El build es offline (solo stdlib), escribe en `<db>.tmp` y hace `os.replace()` atómico; `<db>.tmp` se borra al inicio y en `finally`.
+- `incluido=false` es condición del JSON: build permitido con warning en stderr, `s1_universo`/`cruce_s1` vacías, exit 0.
 
 ### `generar_catalogo_base.py`
 
@@ -609,15 +663,14 @@ Si aparece una sub-marca nueva (CH, CI…), el generador:
    metadata (así ningún consumidor la deja en el default `OTROS`);
 2. avisa en consola y el validador lo reporta como aviso (no bloquea).
 
-Para dejarla fija hay que tocar **dos** archivos:
+Para dejarla fija, completar este checklist:
 
-```python
-# scripts/generar_catalogo_base.py
-CATEGORIA_POR_LINEA = { ..., "CH": "REPRESENTADAS" }
+1. `scripts/generar_catalogo_base.py`: agregar `"CH": "REPRESENTADAS"` a `CATEGORIA_POR_LINEA` (y a `LINEA_NOMBRE_A_CODIGO` si el nombre de línea es nuevo).
+2. `g360-stock-api/app/core/constants.py`: agregar `"CH"` a la lista `CATEGORIAS["REPRESENTADAS"]`.
+3. Validar con el checkout hermano presente: `python scripts/validar_taxonomia.py` (si el test cross-repo se salta, el hermano no está en la ruta esperada — ver `scripts/tests/test_validacion_taxonomia.py:171`).
+4. Regenerar y subir el catálogo con `actualizar_catalogo.bat`.
 
-# g360-stock-api/app/core/constants.py
-CATEGORIAS = { ..., "REPRESENTADAS": ["85", "CE", "CF", "CA", "CB", "CC", "CD", "CG", "CH"] }
-```
+> Nota: el catálogo ya publica `metadata.categorias_por_linea` y stock-api lo expone; la copia en `constants.py` es deuda por eliminar, no la fuente de verdad. El generador ya publica sub-marcas nuevas clasificadas automáticamente como `REPRESENTADAS`, así que esta alta es para **fijarlas**, no para que funcionen.
 
 Mientras no se fije, el API de stock sigue clasificando bien los C* por marca
 (todo C* es REPRESENTADAS, incluso sin catálogo).
@@ -657,19 +710,98 @@ La tabla muestra `SKU_KARDEX -> SKU_JSON` cuando difieren (`1011019 -> 011019`).
 python -m pytest scripts/tests -q
 ```
 
-216 tests: generación (inclusión, taxonomía, SKUs exactos sin enlaces,
+223 tests: generación (inclusión, taxonomía, SKUs exactos sin enlaces,
 cobertura, universo S1, IDs de jerarquia y almacenes por SKU), contrato de encabezados (normalización, alias,
 duplicados, columnas corridas, anclas del S1, cajas/m³), revisión de guía
 y robustez de la validación.
 
 ---
+## Versionado del contrato (semver)
+
+El catálogo expone un **contrato de datos** versionado bajo semver. Cada versión
+del catálogo es también una versión del contrato:
+
+```
+contract_version = VERSION
+```
+
+Los consumidores (`g360-stock-api`: `app/config.py:37` y
+`app/services/catalog_service.py:41-55`) leen `contract_version` para decidir
+si el catálogo publicado es compatible con su versión de código. Por eso el
+campo vive en el artefacto (`output/catalogo_productos.json`) y no solo en el
+generador.
+
+### Cómo se publica `contract_version`
+
+El campo se publica de dos formas que convergen en el mismo valor:
+
+1. **Generador:** `scripts/generar_catalogo_base.py` lo emite en cada corrida
+   (`metadata.contract_version == VERSION`, hoy `3.8.0`).
+2. **Script determinista:** `scripts/actualizar_contract_version.py` inserta
+   (o corrige) SOLO `metadata.contract_version` en un artefacto ya generado,
+   sin tocar ningún otro dato (`generated_at`, `total_productos`, productos,
+   estadísticas...). Es idempotente: si el campo ya tiene el valor esperado,
+   el archivo queda intacto.
+
+El BAT lo ejecuta como **paso aditivo posterior a la generación completa**
+(ver `actualizar_catalogo.bat`, luego de generar el catálogo y antes de
+validar/subir). Sirve para publicar el campo en artefactos ya generados sin
+tener que regenerar desde cero.
+
+> El orden de claves dentro de `metadata` no es contractual (JSON no lo
+> define), pero el script las publica con `contract_version` inmediatamente
+> despues de `version` para que el artefacto, el generador y el ejemplo del
+> README queden alineados.
+
+### Política semver
+
+| Bump | Dispara |
+|------|---------|
+| **MAJOR** (4.0.0) | Eliminar/renombrar cualquier campo en **cualquier nivel** (incluye claves dentro de `metadata.almacenes`, `metadata.fuentes` y `estadisticas`); cambiar tipo, nulabilidad o **significado** en cualquier nivel; cambiar `regla_inclusion` de modo que un SKU cambie de incluido/excluido; redefinir la semántica de campos normados (`categoria_venta`, `linea`, `origen`, `stock_snapshot`, `predespacho_snapshot`, `derivado_de`); quitar un valor de una enumeración. |
+| **MINOR** (3.9.0) | Agregar campo aditivo o clave nueva a un mapa **si está documentado que los consumidores deben tolerar claves/valores desconocidos con fallback**; agregar valor a `categorias_venta` **solo bajo esa misma regla de tolerancia**. Si no hay regla de tolerancia documentada para ese mapa/enumeración, el agregado es MAJOR. |
+| **PATCH** (3.8.1) | Correcciones que no cambian shape ni semántica. Los **refrescos de contenido no bumpan** la versión (el catálogo se regenera con datos nuevos pero `VERSION` y `contract_version` se mantienen). |
+
+> El catálogo **no es fuente de stock**: los campos de movimiento son diagnóstico de generación, no contenido del catálogo. El dato de stock vivo vive en `/api/v1/stock` de `g360-stock-api` (TTL 10 min) y se valida por SKU.
+
+> **Campos RESERVADOS:** poblar un campo RESERVADO (`dimensiones_caja`, hoy `null` en el 100% de los 3550 SKU) con su tipo y nulabilidad actuales es **refresco de contenido**, no un bump: no cambia nombre, tipo, nulabilidad ni significado del contrato. Sí sería MAJOR convertirlo en obligatorio, cambiar su tipo o redefinir su semántica.
+
+### Alcance de ESTABLE
+
+Estable significa conservar **nombre, tipo, nulabilidad y semántica**; un cambio en cualquiera de esas dimensiones requiere MAJOR.
+
+**Metadato ESTABLE:** `version`, `contract_version`, `generated_at`, `fuentes` (forma interna `archivo`/`bytes`/`sha256`/`modificado` parte del contrato), `total_productos`, `estadisticas.*` (las 22 claves: `sin_ean13`, `con_ean14`, `sin_unbx`, `con_unbx`, `con_caja`, `descontinuados`, `sin_linea_codigo`, `con_linea_otros`, `en_guia`, `con_compromiso`, `por_activar`, `cotizables`, `con_um`, `con_ids_jerarquia`, `ids_por_nombre`, `con_almacenes`, `derivados`, `solo_s1`, `por_categoria`, `por_categoria_venta`, `por_linea`, `por_estado_linea`), `categorias_por_linea`, `categorias_venta`, `categoria_venta_revision`, `almacenes` (forma de `almacenes.almacenes` parte del contrato), `lineas_nombre_a_codigo`, `lineas_grupo_a_codigo`, `universo_skus`, `cobertura_faltante`.
+
+**Metadato DEPRECADO (se sigue emitiendo):** `source_erp`, `source_un_bx`, `source_stock` (sustituto: `fuentes` con sha256), `regla_inclusion`, `exclusiones`, `universo_stock` (diagnóstico de generación: qué filas del ERP quedaron fuera y si entró el universo S1; no es dato del catálogo, sustituto es la validación por SKU en `/api/v1/stock`).
+
+**Producto ESTABLE:** `sku`, `nombre`, `nombre_corto`, `ean13/14`, `peso_kg`, `linea`, `linea_nombre`, `grupo/tipo/familia` + `_id`, `um`, `almacenes`, `un_bx`, `orden`, `estado_linea`, `precio`, `descontinuado`, `en_guia`, `cotizable`, `por_activar`, `vigente`, `categoria`, `categoria_venta`, `origen`, `keywords`, `linea_codigo`, `derivado_de` (clave estable, hoy siempre vacía por compatibilidad; su contenido placeholder puede evolucionar dentro de su tipo), `derivados` (clave de estadísticas, siempre 0).
+
+**Producto DEPRECADO/RESERVADO:** `dimensiones_caja` (RESERVADO: se emite por herencia, no recomendado para nuevas integraciones; sin sustituto; validador local en `scripts/validar_taxonomia.py:327-341` y tests en `test_contratos.py:748,778`). No se elimina. `stock_snapshot`, `predespacho_snapshot` y `compromiso` (DEPRECADO: diagnóstico de la corrida de generación, no dato del catálogo; se siguen emitiendo por compatibilidad hasta el próximo MAJOR; sustituto es `/api/v1/stock` de `g360-stock-api` consultado por SKU).
+
+### Deprecación
+
+Cada campo DEPRECADO/RESERVADO se sigue emitiendo hasta al menos el MAJOR siguiente (4.0.0). Su eliminación efectiva es cambio de nivel C que requiere aprobación humana. Ninguno se elimina en esta versión.
+
+### Aclaración acotada sobre v3.6.0 → 3.8.0
+
+Los flags de negocio y la regla de inclusión se introdujeron en **v3.6.0**; el contrato vigente es **3.8.0**. Las menciones "(v3.6.0)" en títulos/docstrings de flags/reglas son **atribución histórica** de esa funcionalidad. No se generaliza a toda mención textual de 3.6.0: hay lógica de compatibilidad en `scripts/validar_taxonomia.py:232` y un endpoint v3.6.0 en `scripts/generar_catalogo_base.py:1530`.
+
+**Promesa de estabilidad:** nada se elimina sin MAJOR + ciclo de deprecación.
 
 ## Output JSON
+
+> **Ejemplo coherente con el artefacto real** (`output/catalogo_productos.json`,
+> ya publicado con `metadata.contract_version = "3.8.0"` vía el script
+> determinista). Los campos `source_erp`, `source_un_bx`, `source_stock`,
+> `regla_inclusion`, `exclusiones` y `universo_stock` están **DEPRECADOS**:
+> se siguen emitiendo pero no se recomiendan para nuevas integraciones;
+> su sustituto es `fuentes` (con sha256) para trazabilidad de archivo.
+> Ver § Versionado del contrato (semver) → Deprecación.
 
 ```json
 {
   "metadata": {
     "version": "3.8.0",
+    "contract_version": "3.8.0",
     "generated_at": "2026-10-26T09:47:24.067439",
     "source_erp": "PRODUCTOS.xls",
     "source_un_bx": "SKU_BX.xlsx",
